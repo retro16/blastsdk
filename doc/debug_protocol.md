@@ -11,6 +11,7 @@ will avoid problems when switching direction.
 Port mapping / pinout
 
 Looking at the console socket :
+
      -----------
     \ 1 2 3 4 5 /
      \ 6 7 8 9 /
@@ -38,6 +39,7 @@ is the clock, read on edge. Format is big nybble first. For example, to pass
 TL transition. 5V is logic high and 0V is logic low.
 
 Example transmitting 0xA3 to the genesis :
+
                            ___________________
     D0 ---________________/                   ------ output
           ____________________________________
@@ -53,6 +55,7 @@ Example transmitting 0xA3 to the genesis :
           _                               ____
     TR --- \_____________________________/    ------ output
     
+
 Example receiving 0xE0 from the genesis :
           _____                               
     D0 ---     \______________________________------ input
@@ -93,21 +96,22 @@ monitor mode. The acknowledge may be a bit late in this case.
 Byte level protocol
 -------------------
 
-First byte : header
-B7..B5 : command 
-  000 = handshake (ping genesis)
-  001 = exit monitor mode
-  010 = byte read
-  011 = byte write
-  100 = long read
-  101 = long write
-  110 = word read
-  111 = word write
-B4..B0 : data size in bytes (0 means 32, size ignored if B7..B5 = 00)
-3 next bytes : address
+    First byte : header
+    B7..B5 : command 
+      000 = handshake (ping genesis)
+      001 = exit monitor mode
+      010 = byte read
+      011 = byte write
+      100 = long read
+      101 = long write
+      110 = word read
+      111 = word write
+    B4..B0 : data size in bytes (0 means 32, size ignored if B7..B5 = 00)
+    3 next bytes : address
 
 Followed by data for write commands :
-size*bytes : data
+
+    size*bytes : data
 
 
 Command-level protocol

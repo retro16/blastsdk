@@ -47,23 +47,23 @@ values.
 
 ### Global options ###
 
-cc=C compiler
-cxx=C++ compiler
-cflags=C and C++ compiler flags
-ld=C linker
-ldflags=linker flags
-objcopy=path to objcopy
-nm=path to nm
-asmx=path to asmx
-
-output=image file name
-author=image author (keep short)
-title=image title (keep short)
-masterdate=MMDDYYYY mastering date
-region=JUE (only one letter for SCD)
-copyright=copyright / license information
-serial=serial number
-scd=0 for genesis, 1 for SCD mode 1, 2 for SCD mode 2
+    cc=C compiler
+    cxx=C++ compiler
+    cflags=C and C++ compiler flags
+    ld=C linker
+    ldflags=linker flags
+    objcopy=path to objcopy
+    nm=path to nm
+    asmx=path to asmx
+    
+    output=image file name
+    author=image author (keep short)
+    title=image title (keep short)
+    masterdate=MMDDYYYY mastering date
+    region=JUE (only one letter for SCD)
+    copyright=copyright / license information
+    serial=serial number
+    scd=0 for genesis, 1 for SCD mode 1, 2 for SCD mode 2
 
 
 ### Sections ###
@@ -75,41 +75,47 @@ source.
 
 These are the available options for each source :
 
-type=source type
-chip=memory chip where this source will be located when in use
-bus=bus used to access this resource (default : compute from chip+addr)
-filename=source file name (default : section name)
-align=memory alignment (default : depends on chip)
-store=1 to store on physical medium (default), 0 to reserve space only
-addr=target address (chip address) (default : computed automatically)
-binsize=binary size once compiled (default : computed)
-physaddr=address on the physical medium (default : computed)
-physalign=alignment on physical medium (default : 2 for cart, complex on CD)
-groups=dependency groups
+    type=source type
+    chip=memory chip where this source will be located when in use
+    bus=bus used to access this resource (default : compute from chip+addr)
+    filename=source file name (default : section name)
+    align=memory alignment (default : depends on chip)
+    store=1 to store on physical medium (default), 0 to reserve space only
+    addr=target address (chip address) (default : computed automatically)
+    binsize=binary size once compiled (default : computed)
+    physaddr=address on the physical medium (default : computed)
+    physalign=alignment on physical medium (default : 2 for cart, complex on CD)
+    groups=dependency groups
+
 
 Values for type :
- empty=empty memory
- bin=raw binary file
- asm=assembler file
- c_m68k=C source for m68k
- cxx_m68k=C++ source for m68k
- c_z80=C source for Z80 (SDCC)
- png=png file
- pngspr=png with sprite layout
- pngpal=16 color palette from PNG file
+
+    empty=empty memory
+    bin=raw binary file
+    asm=assembler file
+    c_m68k=C source for m68k
+    cxx_m68k=C++ source for m68k
+    c_z80=C source for Z80 (SDCC)
+    png=png file
+    pngspr=png with sprite layout
+    pngpal=16 color palette from PNG file
+
 
 Values for chip :
- cart=cartridge ROM
- ram=main 68k RAM
- zram=Z80 RAM
- vram=Genesis video RAM
- pram=SCD program RAM
- wram=SCD word RAM
+
+    cart=cartridge ROM
+    ram=main 68k RAM
+    zram=Z80 RAM
+    vram=Genesis video RAM
+    pram=SCD program RAM
+    wram=SCD word RAM
+
 
 Values for bus :
- main=main 68k bus
- sub=sub 68k bus
- z80=Z80 bus
+
+    main=main 68k bus
+    sub=sub 68k bus
+    z80=Z80 bus
 
 
 Chip and bus addresses
@@ -169,16 +175,14 @@ Source symbols
 A few symbols are generated from source sections
 (examples for a source named [source.ext] )
 
-SOURCE_EXT=logical address viewed from the current CPU
-SOURCE_EXT_SIZE=size in bytes
-SOURCE_EXT_BANK=bank if logical address is bank switched (for example ROM
-reached from the Z80)
-SOURCE_EXT_CHIP=target chip of the resource
-SOURCE_EXT_ROM=physical address in ROM file (only for cartridge image)
-SOURCE_EXT_SECT=CD-ROM sector
-SOURCE_EXT_SECOFF=offset in CD-ROM sector
-SOURCE_EXT_CONCAT=for concatenated sources, address relative to the first
-element of the concatenation
+    SOURCE_EXT=logical address viewed from the current CPU
+    SOURCE_EXT_SIZE=size in bytes
+    SOURCE_EXT_BANK=bank if logical address is bank switched (for example ROM reached from the Z80)
+    SOURCE_EXT_CHIP=target chip of the resource
+    SOURCE_EXT_ROM=physical address in ROM file (only for cartridge image)
+    SOURCE_EXT_SECT=CD-ROM sector
+    SOURCE_EXT_SECOFF=offset in CD-ROM sector
+    SOURCE_EXT_CONCAT=for concatenated sources, address relative to the first element of the concatenation
 
 All addresses are adjusted for the current CPU using chip-bus translations.
 
