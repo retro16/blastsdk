@@ -23,12 +23,12 @@
 ////// Globals
 
 sigjmp_buf mainloop_jmp;
-
+#define MAX_BREAKPOINTS 1024
 
 char regname[][3] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "pc", "sr"};
 
 
-int breakpoints[256][2] = {{-1, -1}};
+int breakpoints[MAX_BREAKPOINTS][2] = {{-1, -1}};
 
 ////// Extern functions
 
@@ -56,14 +56,10 @@ void goto_mainloop(int sig)
 void cleanup_breakpoints()
 {
   int b;
-  for(b = 0; b < 255; ++b)
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
   {
     if(breakpoints[b][0] == -1)
     {
-      if(b > 0)
-      {
-        printf("Restored %d breakpoints.\n", b);
-      }
       break;
     }
 
@@ -122,7 +118,7 @@ void boot_cd(u8 *image, int imgsize)
   subreq();
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
-  subsendmem_verify(0x6000 + SPHEADERSIZE, sp_start, spsize);
+  subsendmem(0x6000 + SPHEADERSIZE, sp_start, spsize);
   printf("Set sub CPU reset vector to beginning of sub code.\n");
   subwritelong(0x000004, 0x6000 + SPHEADERSIZE);
   printf("Set main CPU registers.\n%06X PC=%08X\n%06X SP=%08X\n%06X SR=%04X\n", REG_PC, 0xFF0000 + seccodesize, REG_SP, 0xFFD000, REG_SR, 0x2700);
@@ -280,6 +276,25 @@ void parse_word(char *token, const char **line)
   skipblanks(line);
 }
 
+void showreg()
+{
+  u8 regs[17*4 + 2];
+  readmem(regs, REGADDR, sizeof(regs));
+
+  int r;
+  int t;
+  for(t = 0; t <= 8; t += 8)
+  {
+    for(r = 0; r < 8; ++r)
+    {
+      u32 value = getint(&regs[(r + t) * 4], 4);
+      printf("%s:%08X ", regname[r + t], value);
+    }
+    printf("\n");
+  }
+  printf("pc:%08X sr:%04X\n", getint(&regs[16 * 4], 4), getint(&regs[17 * 4], 2));
+}
+
 int main(int argc, char **argv)
 {
   if(argc < 2)
@@ -301,6 +316,7 @@ int main(int argc, char **argv)
     readdata();
   }
 
+  char lastline[1024] = "";
   for(;;)
   {
     const char *l;
@@ -313,7 +329,20 @@ int main(int argc, char **argv)
     {
       break;
     }
-		add_history(l);
+    if(*l)
+    {
+      strcpy(lastline, l);
+      add_history(l);
+    }
+    else
+    {
+      // Replay last line
+      if(!lastline[0])
+      {
+        continue;
+      }
+      l = lastline;
+    }
 
     signal(SIGINT, goto_mainloop); // Handle Ctrl-C : jump back to prompt
     
@@ -430,14 +459,10 @@ int main(int argc, char **argv)
     if(strcmp(token, "go") == 0)
     {
       int b;
-      for(b = 0; b < 255; ++b)
+      for(b = 0; b < MAX_BREAKPOINTS; ++b)
       {
         if(breakpoints[b][0] == -1)
         {
-          if(b > 0)
-          {
-            printf("Set up %d breakpoints.\n", b);
-          }
           break;
         }
         breakpoints[b][1] = readword(breakpoints[b][0]);
@@ -460,7 +485,9 @@ int main(int argc, char **argv)
         // Wait until breakpoint
         readdata();
         signal(SIGINT, goto_mainloop);
-        if(inp[3] != 0x07)
+        if(inp[3] == 0x07)
+          printf("Breakpoint triggered.\n");
+        else
           printf("Interrupted before reaching breakpoint.\n");
 
         // Restore original instructions
@@ -468,6 +495,8 @@ int main(int argc, char **argv)
 
         // Adjust PC to point on the break instruction
         writelong(REG_PC, readlong(REG_PC) - 2);
+
+        showreg();
       }
 
       continue;
@@ -500,21 +529,7 @@ int main(int argc, char **argv)
 
 		if(strcmp(token, "reg") == 0)
 		{
-			u8 regs[17*4 + 2];
-			readmem(regs, REGADDR, sizeof(regs));
-
-      int r;
-      int t;
-			for(r = 0; r < 8; ++r)
-      {
-        for(t = 0; t <= 8; t += 8)
-        {
-          u32 value = getint(&regs[(r + t) * 4], 4);
-          printf("%s:%08X ", regname[r + t], value);
-        }
-        printf("\n");
-      }
-      printf("pc:%08X sr:%04X\n", getint(&regs[16 * 4], 4), getint(&regs[17 * 4], 2));
+      showreg();
 
       continue;
 		}
@@ -654,6 +669,7 @@ int main(int argc, char **argv)
       readdata();
 
       writeword(REG_SR, oldsr);
+      showreg();
       continue;
     }
 
@@ -670,18 +686,18 @@ int main(int argc, char **argv)
       if(!*l)
       {
         // List breakpoints
-        for(b = 0; b < 255; ++b)
+        for(b = 0; b < MAX_BREAKPOINTS; ++b)
         {
           if(breakpoints[b][0] == -1)
           {
             break;
           }
-          printf(" $%06X\n", (u32)breakpoints[b][0]);
+          printf("Breakpoint at $%06X\n", (u32)breakpoints[b][0]);
         }
         continue;
       }
       u32 address = parse_int(&l, 12);
-      for(b = 0; b < 255; ++b)
+      for(b = 0; b < MAX_BREAKPOINTS; ++b)
       {
         if(breakpoints[b][0] == -1)
         {
@@ -699,7 +715,7 @@ int main(int argc, char **argv)
     {
       u32 address = parse_int(&l, 12);
       int b;
-      for(b = 0; b < 255; ++b)
+      for(b = 0; b < MAX_BREAKPOINTS; ++b)
       {
         if(breakpoints[b][0] == -1)
         {
@@ -708,7 +724,7 @@ int main(int argc, char **argv)
         while(breakpoints[b][0] == (int)address)
         {
           int nb;
-          for(nb = b; nb < 255; ++nb)
+          for(nb = b; nb < MAX_BREAKPOINTS; ++nb)
           {
             if(breakpoints[nb][0] == -1)
             {
@@ -717,7 +733,7 @@ int main(int argc, char **argv)
             breakpoints[nb][0] = breakpoints[nb+1][0];
             breakpoints[nb][1] = breakpoints[nb+1][1];
           }
-          printf("Deleted a breakpoint at address %06X\n", address);
+          printf("Deleted a breakpoint at $%06X\n", address);
         }
       }
       continue;
@@ -730,6 +746,8 @@ int main(int argc, char **argv)
       continue;
     }
   }
+    
+  printf("\n");
 
   return 0;
 }

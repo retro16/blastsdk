@@ -5,16 +5,11 @@ cdheader	equ	$00FE00			; Contains new IP code
 
 
 sp_init
+sp_main
 		BIOS_CDCSTOP
 		lea	sp_track(pc), a0
 		BIOS_DRVINIT
-		rts
-sp_track	dc.b	$01, $FF		; TOC in track 1, read all tracks
 		
-int_sub_level2
-		rte
-
-sp_main
 		SYNC_MAIN_SUB			; Wait until user pressed START
 
 		lea	sp_track(pc), a0	; Re-init CD drive
@@ -33,6 +28,11 @@ sp_main
 .1		move.w	(a1)+, (a0)+
 		dbra	d0, .1
 		jmp	target_code
+
+sp_track	dc.b	$01, $FF		; TOC in track 1, read all tracks
+
+int_sub_level2
+		rte
 
 		include	blsscd_routines.inc
 

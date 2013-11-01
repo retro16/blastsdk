@@ -1,14 +1,20 @@
 		include	bls.inc
 ip_main
-		jsr	bda_init
-		move.w	#CSEL, CCTRL1	; Enable select line on pad 1
-		move.w	#CSEL, CCTRL1	; Select A/Start line
+;		jsr	bda_init
+		VDPUSEADDR
+		VDPSETREG 1, VDPR01 | VDPDISPEN
+		VDPSETREG 11, VDPR11 | VDPEINT
+		move.w	#$2000, sr	; Enable BDA interrupt
+
+		move.b	#CSEL, CCTRL1	; Enable select line on pad 1
+		move.b	#0, CDATA1	; Select A/Start line
+		nop
 		nop
 
 		; Wait until pressed START
 .1		btst	#BCBTNSTART, CDATA1
-		beq.b	.1
-		move.w	#0, CCTRL1	; Release pad select line
+		bne.b	.1
+		move.b	#0, CCTRL1	; Release pad select line
 
 		SYNC_MAIN_SUB		; Sync with sub
 		SYNC_MAIN_SUB		; Second sync when data is available
