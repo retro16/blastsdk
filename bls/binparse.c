@@ -19,11 +19,11 @@ int getimgtype(const u8 *img, int size)
   if(strncmp((const char *)img + 0x100, "SEGA", 4) == 0)
   {
     // Cart image
-    if(img[4] == 0x20)
+    if(img[5] == 0x20)
     {
       return 3;
     }
-    if(img[4] == 0xFF)
+    if(img[5] == 0xFF)
     {
       return 4;
     }

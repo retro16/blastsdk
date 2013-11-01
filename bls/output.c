@@ -484,7 +484,7 @@ void out_binaries()
 
   for(j = 0; j < SRCCNT; ++j)
   {
-    if(src[j].type == type_none || src[j].physaddr == -1 || src[j].binsize == 0)
+    if(src[j].type == type_none || src[j].physaddr == -1 || src[j].binsize == 0 || !src[j].store)
     {
       continue;
     }
@@ -492,7 +492,7 @@ void out_binaries()
     maxaddr = 0x7FFFFFFF;
     for(i = 0; i < SRCCNT; ++i)
     {
-      if(src[i].type != type_none && src[i].physaddr != -1 && src[i].binsize != 0 && src[i].physaddr < maxaddr && src[i].physaddr > minaddr)
+      if(src[i].type != type_none && src[i].physaddr != -1 && src[i].binsize != 0 && src[i].physaddr < maxaddr && src[i].physaddr > minaddr && src[i].store)
       {
         s = i;
         maxaddr = src[i].physaddr;
@@ -619,8 +619,8 @@ void fix_genimage()
   out_u32(size - 1);
 
   // Pad image to next power of two
-  fseek(imgout, 0, SEEK_END);
-  out_fill((char)-1, size - minsize);
+/*  fseek(imgout, 0, SEEK_END);
+  out_fill((char)-1, size - minsize);*/
 
   printf("Fix ROM : checksum = %04X, size = %06X -> %06X\n", checksum & 0xFFFF, minsize, size);
 }

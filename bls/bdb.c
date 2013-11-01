@@ -163,7 +163,7 @@ void boot_vcart(u8 *image, int imgsize)
   (void)image;
   (void)imgsize;
 
-  u32 imgstart = (u32)image[4] << 16;
+  u32 imgstart = (u32)image[5] << 16;
   printf("Uploading image %06X-%06X (%d bytes) ...\n", imgstart, (u32)(imgstart + imgsize - 1), imgsize);
   sendmem(imgstart, image + ROMHEADERSIZE, imgsize - ROMHEADERSIZE);
 

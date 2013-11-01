@@ -16,3 +16,17 @@
 *.exe
 *.out
 *.app
+*.iso
+*.gen
+*.ram
+/asmx2/src/asmx
+/bls/bdb
+/bls/blsbuild
+/bls/d68k
+/bls/scdupload
+/bls/test_d68k
+/bin2c/bin2c
+
+# Build directories
+/build
+/samples/*/tmp
