@@ -13,7 +13,7 @@
 #define GEND0 4
 #define GEND1 5
 #define GEND2 6
-#defibe GEND3 7
+#define GEND3 7
 #define GENTL 8
 #define GENTR 9
 #define GENTH 3
