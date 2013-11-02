@@ -134,12 +134,12 @@ Status
 
 The project is still in early development stages.
 
+Problems that will be solved as soon as possible :
 * blsbuild code is ugly
 * documentation is sparse
 * most features don't work
-* the SDK provides virtually no functions
+* the SDK provides virtually no functions except basic VDP and controller macros.
 * C support is totally untested
 * Z80 is totally untested
-* exception handling is problematic
-* Debug agent randomly crashes on Sega CD
-
+* Library is ASM only
+* The debugger does not work for sub CPU and Z80
