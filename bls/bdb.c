@@ -93,6 +93,25 @@ void parse_token(char *token, const char **line)
   skipblanks(line);
 }
 
+void showreg()
+{
+  u8 regs[17*4 + 2];
+  readmem(regs, REGADDR, sizeof(regs));
+
+  int r;
+  int t;
+  for(t = 0; t <= 8; t += 8)
+  {
+    for(r = 0; r < 8; ++r)
+    {
+      u32 value = getint(&regs[(r + t) * 4], 4);
+      printf("%s:%08X ", regname[r + t], value);
+    }
+    printf("\n");
+  }
+  printf("pc:%08X sr:%04X\n", getint(&regs[16 * 4], 4), getint(&regs[17 * 4], 2));
+}
+
 void boot_cd(u8 *image, int imgsize)
 {
   (void)imgsize;
@@ -130,6 +149,30 @@ void boot_cd(u8 *image, int imgsize)
   subreset();
 
   printf("Ready to boot.\n");
+}
+
+void boot_sp(u8 *image, int imgsize)
+{
+  (void)imgsize;
+
+  const u8 *sp_start;
+  int spsize;
+  spsize = getspoffset(image, &sp_start);
+
+  printf("CD-ROM image. SP=%04X-%04X (%d bytes).\n", (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
+
+  printf("Requesting sub CPU ...\n");
+  subreq();
+
+  printf("Uploading SP (%d bytes) ...\n", spsize);
+  subsendmem(0x6000 + SPHEADERSIZE, sp_start, spsize);
+  printf("Set sub CPU reset vector to beginning of sub code.\n");
+  subwritelong(0x000004, 0x6000 + SPHEADERSIZE);
+
+  printf("Resetting sub CPU.\n");
+  subreset();
+
+  printf("New SP code running.\n");
 }
 
 void vcart_setvector(u8 *image, u32 v, u32 pc)
@@ -183,47 +226,58 @@ void boot_vcart(u8 *image, int imgsize)
 
 void boot_img(const char *filename)
 {
-      u8 *image;
-      int imgsize = readfile(filename, &image);
-      if(imgsize < 0x200)
-      {
-        printf("Image too small.\n");
-        free(image);
-        return;
-      }
-      switch(getimgtype(image, imgsize))
-      {
-        case 0:
-          printf("Invalid image type.\n");
-          break;
-        case 1:
-          printf("Cannot boot ROM cartridges.\n");
-          break;
-        case 2:
-          boot_cd(image, imgsize);
-          break;
-        case 3:
-        case 4:
-          boot_vcart(image, imgsize);
-          break;
-      }
-      free(image);
-    u8 regs[17*4 + 2];
-    readmem(regs, REGADDR, sizeof(regs));
+  u8 *image;
+  int imgsize = readfile(filename, &image);
+  if(imgsize < 0x200)
+  {
+    printf("Image too small.\n");
+    free(image);
+    return;
+  }
+  switch(getimgtype(image, imgsize))
+  {
+    case 0:
+      printf("Invalid image type.\n");
+      break;
+    case 1:
+      printf("Cannot boot ROM cartridges.\n");
+      break;
+    case 2:
+      boot_cd(image, imgsize);
+      break;
+    case 3:
+    case 4:
+      boot_vcart(image, imgsize);
+      break;
+  }
+  free(image);
 
-    int r;
-    int t;
-    for(r = 0; r < 8; ++r)
-    {
-      for(t = 0; t <= 8; t += 8)
-      {
-        u32 value = getint(&regs[(r + t) * 4], 4);
-        printf("%s:%08X ", regname[r + t], value);
-      }
-      printf("\n");
-    }
-    printf("pc:%08X sr:%04X\n", getint(&regs[16 * 4], 4), getint(&regs[17 * 4], 2));
+  showreg();
+}
 
+void boot_sp_from_iso(const char *filename)
+{
+  u8 *image;
+  int imgsize = readfile(filename, &image);
+  if(imgsize < 0x200)
+  {
+    printf("Image too small.\n");
+    free(image);
+    return;
+  }
+  switch(getimgtype(image, imgsize))
+  {
+    case 0:
+    case 1:
+    case 3:
+    case 4:
+      printf("Invalid image type.\n");
+      break;
+    case 2:
+      boot_sp(image, imgsize);
+      break;
+  }
+  free(image);
 }
 
 int parse_register(const char **line)
@@ -274,25 +328,6 @@ void parse_word(char *token, const char **line)
   }
   *token = '\0';
   skipblanks(line);
-}
-
-void showreg()
-{
-  u8 regs[17*4 + 2];
-  readmem(regs, REGADDR, sizeof(regs));
-
-  int r;
-  int t;
-  for(t = 0; t <= 8; t += 8)
-  {
-    for(r = 0; r < 8; ++r)
-    {
-      u32 value = getint(&regs[(r + t) * 4], 4);
-      printf("%s:%08X ", regname[r + t], value);
-    }
-    printf("\n");
-  }
-  printf("pc:%08X sr:%04X\n", getint(&regs[16 * 4], 4), getint(&regs[17 * 4], 2));
 }
 
 int main(int argc, char **argv)
@@ -677,6 +712,13 @@ int main(int argc, char **argv)
     {
       parse_word(token, &l);
       boot_img(token);
+      continue;
+    }
+
+    if(strcmp(token, "bootsp") == 0)
+    {
+      parse_word(token, &l);
+      boot_sp_from_iso(token);
       continue;
     }
 

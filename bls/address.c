@@ -216,6 +216,8 @@ busaddr_t chip2bus(chipaddr_t ca, bus_t bus)
 			if(ca.addr < 0 || ca.addr >= 0x040000) break;
 			switch(bus)
 			{
+        default:
+          break;
 				case bus_main:
 					switch(scd)
 					{
