@@ -1,5 +1,4 @@
 /* 68000 disassembler.
- * opcode table ripped from asmx2.
  */
 
 #include "bls.h"
@@ -12,13 +11,13 @@ typedef int16_t i16;
 // Instruction operand type
 enum iop
 {
-	            //  Bits  Description
-	op_none,  	//        No operand
+              //  Bits  Description
+  op_none,    //        No operand
   op_ccr,     //        CCR
   op_sr,      //        SR
 
-	ope_imm,    //        Immediate in extension word
-	ope_ims,    //        Signed immediate in extension word
+  ope_imm,    //        Immediate in extension word
+  ope_ims,    //        Signed immediate in extension word
   ope_rl,     //        MOVEM register list (A7-A0/D7-D0)
   ope_rld,    //        MOVEM pre-decrement register list (D0-D7/A0-A7)
   ope_dp,     //        Relative pointer in extension word
@@ -28,16 +27,16 @@ enum iop
   opo_vect,   // 03..00 Trap vector
 
   op2_imm,    // 11..09 Second operand immediate (1..8)
-	op1_Dn,			// 02..00 Dn
-	op2_Dn,			// 11..09 Dn
-	op1_An,			// 02..00 An
-	op2_An,			// 11..09 An
-  op1_AnPD,		// 02..00 -(An)
-  op2_AnPD,		// 11..09 -(An)
-  op1_AnPI,		// 02..00 (An)+
-  op2_AnPI,		// 11..09 (An)+
-  op1_EA,    	// 05..00 Effective address
-	op2_EA,     // 11..06 Effective address (reversed mode/register)
+  op1_Dn,      // 02..00 Dn
+  op2_Dn,      // 11..09 Dn
+  op1_An,      // 02..00 An
+  op2_An,      // 11..09 An
+  op1_AnPD,    // 02..00 -(An)
+  op2_AnPD,    // 11..09 -(An)
+  op1_AnPI,    // 02..00 (An)+
+  op2_AnPI,    // 11..09 (An)+
+  op1_EA,      // 05..00 Effective address
+  op2_EA,     // 11..06 Effective address (reversed mode/register)
   op1e_AnDis  // 02..00 Address register + 16 bits displacement in ext word
 };
 
@@ -47,8 +46,8 @@ struct instr
   u16        code;
   u16        mask;
   enum iop   op1; // First operand
-	enum iop   op2; // Second operand
-	int        size; // Operation size
+  enum iop   op2; // Second operand
+  int        size; // Operation size
 };
 typedef struct instr *iptr;
 
@@ -74,15 +73,15 @@ struct instr m68k_instr[] =
   {ipre "GT" ipost, opcode | 0x0E00, mask, op1, op2, size}, \
   {ipre "LE" ipost, opcode | 0x0F00, mask, op1, op2, size}
 
-  {"ADDX.B", 0xD100, 0xF1F8, op2_Dn, op1_Dn, 1},
-  {"ADDX.B", 0xD108, 0xF1F8, op2_AnPD, op1_AnPD, 1},
-  {"ADDX.W", 0xD140, 0xF1F8, op2_Dn, op1_Dn, 2},
-  {"ADDX.W", 0xD148, 0xF1F8, op2_AnPD, op1_AnPD, 2},
-  {"ADDX.L", 0xD180, 0xF1F8, op2_Dn, op1_Dn, 4},
-  {"ADDX.L", 0xD188, 0xF1F8, op2_AnPD, op1_AnPD, 4},
+  {"ADDX.B", 0xD100, 0xF1F8, op1_Dn, op2_Dn, 1},
+  {"ADDX.B", 0xD108, 0xF1F8, op1_AnPD, op2_AnPD, 1},
+  {"ADDX.W", 0xD140, 0xF1F8, op1_Dn, op2_Dn, 2},
+  {"ADDX.W", 0xD148, 0xF1F8, op1_AnPD, op2_AnPD, 2},
+  {"ADDX.L", 0xD180, 0xF1F8, op1_Dn, op2_Dn, 4},
+  {"ADDX.L", 0xD188, 0xF1F8, op1_AnPD, op2_AnPD, 4},
 
-  {"ABCD", 0xC100, 0xF1F8, op2_Dn, op1_Dn, 1},
-  {"ABCD", 0xC108, 0xF1F8, op2_AnPD, op1_AnPD, 1},
+  {"ABCD", 0xC100, 0xF1F8, op1_Dn, op2_Dn, 1},
+  {"ABCD", 0xC108, 0xF1F8, op1_AnPD, op2_AnPD, 1},
 
   {"ADD.B", 0xD000, 0xF1C0, op1_EA, op2_Dn, 1},
   {"ADD.B", 0xD100, 0xF1C0, op2_Dn, op1_EA, 1},
@@ -94,9 +93,9 @@ struct instr m68k_instr[] =
   {"ADDA.W", 0xD0C0, 0xF1C0, op1_EA, op2_An, 2},
   {"ADDA.L", 0xD1C0, 0xF1C0, op1_EA, op2_An, 4},
 
-  {"ADDI.B", 0x0600, 0xFFC0, ope_imm, op1_EA, 1},
-  {"ADDI.W", 0x0640, 0xFFC0, ope_imm, op1_EA, 2},
-  {"ADDI.L", 0x0680, 0xFFC0, ope_imm, op1_EA, 4},
+  {"ADDI.B", 0x0600, 0xFFC0, ope_ims, op1_EA, 1},
+  {"ADDI.W", 0x0640, 0xFFC0, ope_ims, op1_EA, 2},
+  {"ADDI.L", 0x0680, 0xFFC0, ope_ims, op1_EA, 4},
 
   {"ADDQ.B", 0x5000, 0xF1C0, op2_imm, op1_EA, 1},
   {"ADDQ.W", 0x5040, 0xF1C0, op2_imm, op1_EA, 2},
@@ -114,24 +113,21 @@ struct instr m68k_instr[] =
   {"ANDI.W", 0x0240, 0xFFC0, ope_imm, op1_EA, 2},
   {"ANDI.L", 0x0280, 0xFFC0, ope_imm, op1_EA, 4},
 
-  {"ASL.B", 0xE000, 0xF1F8, op2_imm, op1_Dn, 1},
-  {"ASL.B", 0xE020, 0xF1F8, op2_Dn, op1_Dn, 1},
-  {"ASL.W", 0xE040, 0xF1F8, op2_imm, op1_Dn, 2},
-  {"ASL.W", 0xE060, 0xF1F8, op2_Dn, op1_Dn, 2},
-  {"ASL.L", 0xE080, 0xF1F8, op2_imm, op1_Dn, 4},
-  {"ASL.L", 0xE0A0, 0xF1F8, op2_Dn, op1_Dn, 4},
-  {"ASL.B", 0xE0C0, 0xFFC0, op1_EA, op_none, 1},
+  {"ASR.B", 0xE000, 0xF1F8, op2_imm, op1_Dn, 1},
+  {"ASR.B", 0xE020, 0xF1F8, op2_Dn, op1_Dn, 1},
+  {"ASR.W", 0xE040, 0xF1F8, op2_imm, op1_Dn, 2},
+  {"ASR.W", 0xE060, 0xF1F8, op2_Dn, op1_Dn, 2},
+  {"ASR.L", 0xE080, 0xF1F8, op2_imm, op1_Dn, 4},
+  {"ASR.L", 0xE0A0, 0xF1F8, op2_Dn, op1_Dn, 4},
+  {"ASR.B", 0xE0C0, 0xFFC0, op1_EA, op_none, 1},
 
-  {"ASR.B", 0xE100, 0xF1F8, op2_imm, op1_Dn, 1},
-  {"ASR.B", 0xE120, 0xF1F8, op2_Dn, op1_Dn, 1},
-  {"ASR.W", 0xE140, 0xF1F8, op2_imm, op1_Dn, 2},
-  {"ASR.W", 0xE160, 0xF1F8, op2_Dn, op1_Dn, 2},
-  {"ASR.L", 0xE180, 0xF1F8, op2_imm, op1_Dn, 4},
-  {"ASR.L", 0xE1A0, 0xF1F8, op2_Dn, op1_Dn, 4},
-  {"ASR.B", 0xE1C0, 0xFFC0, op1_EA, op_none, 1},
-
-  {"BCC.W", 0x6000, 0xFFFF, ope_dp, op_none, 1},
-  {"BCC.B", 0x6000, 0xFF00, ope_dp, op_none, 1},
+  {"ASL.B", 0xE100, 0xF1F8, op2_imm, op1_Dn, 1},
+  {"ASL.B", 0xE120, 0xF1F8, op2_Dn, op1_Dn, 1},
+  {"ASL.W", 0xE140, 0xF1F8, op2_imm, op1_Dn, 2},
+  {"ASL.W", 0xE160, 0xF1F8, op2_Dn, op1_Dn, 2},
+  {"ASL.L", 0xE180, 0xF1F8, op2_imm, op1_Dn, 4},
+  {"ASL.L", 0xE1A0, 0xF1F8, op2_Dn, op1_Dn, 4},
+  {"ASL.B", 0xE1C0, 0xFFC0, op1_EA, op_none, 1},
 
   {"BRA.W", 0x6000, 0xFFFF, ope_dp, op_none, 2},
   {"BRA.B", 0x6000, 0xFF00, ope_dp, op_none, 2},
@@ -141,13 +137,13 @@ struct instr m68k_instr[] =
   cc("B", ".B", 0x6000, 0xFF00, ope_dp, op_none, 1),
 
   {"BCHG.L", 0x0140, 0xF1C0, op2_Dn, op1_EA, 4},
-  {"BCHG.B", 0x0840, 0xFFC0, ope_imm, op1_EA, 1},
+  {"BCHG.B", 0x0840, 0xFFC0, ope_ims, op1_EA, 1},
   {"BCLR.L", 0x0180, 0xF1C0, op2_Dn, op1_EA, 4},
-  {"BCLR.B", 0x0880, 0xFFC0, ope_imm, op1_EA, 1},
+  {"BCLR.B", 0x0880, 0xFFC0, ope_ims, op1_EA, 1},
   {"BSET.L", 0x01C0, 0xF1C0, op2_Dn, op1_EA, 4},
-  {"BSET.B", 0x08C0, 0xFFC0, ope_imm, op1_EA, 1},
+  {"BSET.B", 0x08C0, 0xFFC0, ope_ims, op1_EA, 1},
   {"BTST.L", 0x0100, 0xF1C0, op2_Dn, op1_EA, 4},
-  {"BTST.B", 0x0800, 0xFFC0, ope_imm, op1_EA, 1},
+  {"BTST.B", 0x0800, 0xFFC0, ope_ims, op1_EA, 1},
   
   {"CHK.W", 0x4180, 0xF1C0, op1_EA, op2_Dn, 2},
 
@@ -162,9 +158,9 @@ struct instr m68k_instr[] =
   {"CMPA.W", 0xB0C0, 0xF1C0, op1_EA, op2_An, 2},
   {"CMPA.L", 0xB1C0, 0xF1C0, op1_EA, op2_An, 4},
 
-  {"CMPI.B", 0x0C00, 0xFFC0, ope_imm, op1_EA, 1},
-  {"CMPI.W", 0x0C40, 0xFFC0, ope_imm, op1_EA, 2},
-  {"CMPI.L", 0x0C80, 0xFFC0, ope_imm, op1_EA, 4},
+  {"CMPI.B", 0x0C00, 0xFFC0, ope_ims, op1_EA, 1},
+  {"CMPI.W", 0x0C40, 0xFFC0, ope_ims, op1_EA, 2},
+  {"CMPI.L", 0x0C80, 0xFFC0, ope_ims, op1_EA, 4},
 
   {"CMPM.B", 0xB108, 0xF1F8, op2_AnPI, op1_AnPI, 1},
   {"CMPM.W", 0xB148, 0xF1F8, op2_AnPI, op1_AnPI, 2},
@@ -307,10 +303,14 @@ struct instr m68k_instr[] =
   {"ROXL.L", 0xE1B0, 0xF1F8, op2_Dn, op1_Dn, 4},
   {"ROXL.B", 0xE5C0, 0xFFC0, op1_EA, op_none, 1},
 
+  {"RESET", 0x4E70, 0xFFFF, op_none, op_none, 0},
+  {"RTE", 0x4E73, 0xFFFF, op_none, op_none, 0},
   {"RTR", 0x4E77, 0xFFFF, op_none, op_none, 0},
   {"RTS", 0x4E75, 0xFFFF, op_none, op_none, 0},
 
   cc("S", "", 0x50C0, 0xF0C0, op1_EA, op_none, 1),
+
+  {"STOP", 0x4E72, 0xFFFF, ope_imm, op_none, 0},
 
   {"SUBX.B", 0x9100, 0xF1F8, op2_Dn, op1_Dn, 1},
   {"SUBX.B", 0x9108, 0xF1F8, op2_AnPD, op1_AnPD, 1},
@@ -332,9 +332,9 @@ struct instr m68k_instr[] =
   {"SUBA.W", 0x90C0, 0xF1C0, op1_EA, op2_An, 2},
   {"SUBA.L", 0x91C0, 0xF1C0, op1_EA, op2_An, 4},
 
-  {"SUBI.B", 0x0400, 0xFFC0, ope_imm, op1_EA, 1},
-  {"SUBI.W", 0x0440, 0xFFC0, ope_imm, op1_EA, 2},
-  {"SUBI.L", 0x0480, 0xFFC0, ope_imm, op1_EA, 4},
+  {"SUBI.B", 0x0400, 0xFFC0, ope_ims, op1_EA, 1},
+  {"SUBI.W", 0x0440, 0xFFC0, ope_ims, op1_EA, 2},
+  {"SUBI.L", 0x0480, 0xFFC0, ope_ims, op1_EA, 4},
 
   {"SUBQ.B", 0x5100, 0xF1C0, op2_imm, op1_EA, 1},
   {"SUBQ.W", 0x5140, 0xF1C0, op2_imm, op1_EA, 2},
@@ -387,11 +387,17 @@ u32 fetch(int bytes)
   {
     longjmp(error_jmp, 1);
   }
+  u32 mask = 0xFFFFFFFF;
+  if(bytes == 1)
+  {
+    bytes = 2;
+    mask = 0xFF;
+  }
   u32 v = getint(code, bytes);
   code += bytes;
   size -= bytes;
   address += bytes;
-  return v;
+  return v & mask;
 }
 
 #define TPRINTF(...) do { int TPRINTF_sz;\
@@ -423,7 +429,7 @@ void print_pc_offset(int offset)
   }
   else
   {
-    TPRINTF("%d", offset);
+    TPRINTF("$%06X", a);
   }
 }
 
@@ -513,9 +519,10 @@ void print_ea(int mode, int reg)
       break;
     }
     case 6: { /* d8(An,Xn) */
-      u32 flags = fetch(1);
-      int offset = (int)(char)(fetch(1));
-      TPRINTF("%d(A%d,%c%d.%c)", offset, (reg), (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'W' : 'L');
+      u32 flags = fetch(2);
+      int offset = (int)(char)(flags & 0xFF);
+      flags >>= 8;
+      TPRINTF("%d(A%d,%c%d.%c)", offset, (reg), (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'L' : 'W');
       if(flags & 0x07) { TPRINTF("\t; Illegal"); ++*suspicious; }
       break;
     }
@@ -537,17 +544,18 @@ void print_ea(int mode, int reg)
           TPRINTF("(PC)");
           break;
         }
-				case 3: { /* d8(PC,Xn) */
-					u32 flags = fetch(1);
-					int offset = (int)(char)fetch(1);
-					TPRINTF("%d(PC,%c%d.%c)", offset, (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'W' : 'L');
-					if(flags & 0x07) { TPRINTF("\t; Illegal"); ++*suspicious; }
-					break;
+        case 3: { /* d8(PC,Xn) */
+          u32 flags = fetch(2);
+          int offset = (int)(char)(flags & 0xFF);
+          flags >>= 8;
+          TPRINTF("%d(PC,%c%d.%c)", offset, (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'L' : 'W');
+          if(flags & 0x07) { TPRINTF("\t; Illegal"); ++*suspicious; }
+          break;
         }
-				case 4: { /* #xxx */
-					u32 data = fetch(op->size);
-					TPRINTF("#$%X", data);
-					break;
+        case 4: { /* #xxx */
+          u32 data = fetch(op->size);
+          TPRINTF("#$%X", data);
+          break;
         }
       }
       break;
@@ -574,10 +582,12 @@ void print_operand(enum iop ot)
       s = fetch(op->size);
       signext(&s, op->size * 8);
       TPRINTF("#%d", s);
+      break;
 
     case ope_rl:
       u = fetch(2);
       print_rl(u);
+      break;
 
     case ope_rld:
       u = fetch(2);
@@ -593,10 +603,14 @@ void print_operand(enum iop ot)
         }
         print_rl(inverse);
       }
+      break;
 
     case ope_dp:
-      s = fetch(2);
-      signext(&s, 16);
+      s = (int)(char)(opcode);
+      if(!s) {
+        s = fetch(2);
+        signext(&s, 16);
+      }
       print_pc_offset(s);
       break;
     

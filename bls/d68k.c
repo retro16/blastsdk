@@ -9,6 +9,7 @@ int main(int argc, char **argv)
     return 1;
   }
 
+  int labels = 0;
   if(argc == 4)
   {
 /*    if(!parsedsymfile(argv[3]))
@@ -16,6 +17,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "Could not parse symbol file %s.\n", argv[3]);
       return 1;
     }*/
+    labels = 1;
   }
 
   u8 *data;
@@ -26,7 +28,7 @@ int main(int argc, char **argv)
   char *dasm = malloc(size * 40);
 
   int suspicious;
-  int r = d68k(dasm, size * 40, data, size, address, 1, &suspicious);
+  int r = d68k(dasm, size * 40, data, size, address, labels, &suspicious);
 
   printf("%s", dasm);
   free(data);

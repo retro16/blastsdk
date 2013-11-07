@@ -87,7 +87,7 @@ static inline void signext(int *v, int bits)
   }
   else
   {
-    *v &= (1 << bits) - 1;
+    *v &= (1L << bits) - 1;
   }
 }
 
