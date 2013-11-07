@@ -15,6 +15,7 @@ enum iop
   op_none,    //        No operand
   op_ccr,     //        CCR
   op_sr,      //        SR
+  op_bra,     // 07..00 Relative branch
 
   ope_imm,    //        Immediate in extension word
   ope_ims,    //        Signed immediate in extension word
@@ -101,6 +102,10 @@ struct instr m68k_instr[] =
   {"ADDQ.W", 0x5040, 0xF1C0, op2_imm, op1_EA, 2},
   {"ADDQ.L", 0x5080, 0xF1C0, op2_imm, op1_EA, 4},
 
+  {"EXG", 0xC140, 0xF1F8, op2_Dn, op1_Dn, 4},
+  {"EXG", 0xC144, 0xF1F8, op2_An, op1_An, 4},
+  {"EXG", 0xC184, 0xF1F8, op2_Dn, op1_Dn, 4},
+
   {"AND.B", 0xC000, 0xF1C0, op1_EA, op2_Dn, 1},
   {"AND.B", 0xC100, 0xF1C0, op2_Dn, op1_EA, 1},
   {"AND.W", 0xC040, 0xF1C0, op1_EA, op2_Dn, 2},
@@ -129,12 +134,12 @@ struct instr m68k_instr[] =
   {"ASL.L", 0xE1A0, 0xF1F8, op2_Dn, op1_Dn, 4},
   {"ASL.B", 0xE1C0, 0xFFC0, op1_EA, op_none, 1},
 
-  {"BRA.W", 0x6000, 0xFFFF, ope_dp, op_none, 2},
-  {"BRA.B", 0x6000, 0xFF00, ope_dp, op_none, 2},
-  {"BSR.W", 0x6100, 0xFFFF, ope_dp, op_none, 2},
-  {"BSR.B", 0x6100, 0xFF00, ope_dp, op_none, 2},
-  cc("B", ".W", 0x6000, 0xFFFF, ope_dp, op_none, 2),
-  cc("B", ".B", 0x6000, 0xFF00, ope_dp, op_none, 1),
+  {"BRA.W", 0x6000, 0xFFFF, op_bra, op_none, 2},
+  {"BRA.B", 0x6000, 0xFF00, op_bra, op_none, 2},
+  {"BSR.W", 0x6100, 0xFFFF, op_bra, op_none, 2},
+  {"BSR.B", 0x6100, 0xFF00, op_bra, op_none, 2},
+  cc("B", ".W", 0x6000, 0xFFFF, op_bra, op_none, 2),
+  cc("B", ".B", 0x6000, 0xFF00, op_bra, op_none, 1),
 
   {"BCHG.L", 0x0140, 0xF1C0, op2_Dn, op1_EA, 4},
   {"BCHG.B", 0x0840, 0xFFC0, ope_ims, op1_EA, 1},
@@ -162,9 +167,9 @@ struct instr m68k_instr[] =
   {"CMPI.W", 0x0C40, 0xFFC0, ope_ims, op1_EA, 2},
   {"CMPI.L", 0x0C80, 0xFFC0, ope_ims, op1_EA, 4},
 
-  {"CMPM.B", 0xB108, 0xF1F8, op2_AnPI, op1_AnPI, 1},
-  {"CMPM.W", 0xB148, 0xF1F8, op2_AnPI, op1_AnPI, 2},
-  {"CMPM.L", 0xB188, 0xF1F8, op2_AnPI, op1_AnPI, 4},
+  {"CMPM.B", 0xB108, 0xF1F8, op1_AnPI, op2_AnPI, 1},
+  {"CMPM.W", 0xB148, 0xF1F8, op1_AnPI, op2_AnPI, 2},
+  {"CMPM.L", 0xB188, 0xF1F8, op1_AnPI, op2_AnPI, 4},
 
   {"DBRA", 0x51C8, 0xFFF8, op1_Dn, ope_dp, 2},
   cc("DB", "", 0x50C8, 0xFFF8, op1_Dn, ope_dp, 2),
@@ -180,12 +185,8 @@ struct instr m68k_instr[] =
 
   {"EORI", 0x0A3C, 0xFFFF, ope_imm, op_ccr, 1},
   {"EORI.B", 0x0A00, 0xFFC0, ope_imm, op1_EA, 1},
-  {"EORI.W", 0x0A00, 0xFFC0, ope_imm, op1_EA, 2},
-  {"EORI.L", 0x0A00, 0xFFC0, ope_imm, op1_EA, 4},
-
-  {"EXG", 0xC140, 0xF1F8, op2_Dn, op1_Dn, 4},
-  {"EXG", 0xC144, 0xF1F8, op2_An, op1_An, 4},
-  {"EXG", 0xC184, 0xF1F8, op2_Dn, op1_Dn, 4},
+  {"EORI.W", 0x0A40, 0xFFC0, ope_imm, op1_EA, 2},
+  {"EORI.L", 0x0A80, 0xFFC0, ope_imm, op1_EA, 4},
 
   {"EXT.W", 0x4480, 0xFFF8, op1_Dn, op_none, 2},
   {"EXT.L", 0x44C0, 0xFFF8, op1_Dn, op_none, 4},
@@ -605,9 +606,10 @@ void print_operand(enum iop ot)
       }
       break;
 
-    case ope_dp:
+    case op_bra:
       s = (int)(char)(opcode);
       if(!s) {
+    case ope_dp:
         s = fetch(2);
         signext(&s, 16);
       }
