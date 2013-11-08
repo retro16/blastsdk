@@ -22,6 +22,7 @@ enum iop
   ope_rl,     //        MOVEM register list (A7-A0/D7-D0)
   ope_rld,    //        MOVEM pre-decrement register list (D0-D7/A0-A7)
   ope_dp,     //        Relative pointer in extension word
+  ope_mmovem, //        MOVEM immediate address then register list
 
   opo_dis8v,  // 07..00 Immediate displacement
   opo_dis8p,  // 07..00 Immediate pointer displacement
@@ -84,6 +85,9 @@ struct instr m68k_instr[] =
   {"ABCD", 0xC100, 0xF1F8, op1_Dn, op2_Dn, 1},
   {"ABCD", 0xC108, 0xF1F8, op1_AnPD, op2_AnPD, 1},
 
+  {"SBCD", 0x8100, 0xF1F8, op1_Dn, op2_Dn, 1},
+  {"SBCD", 0x8108, 0xF1F8, op1_AnPD, op2_AnPD, 1},
+
   {"ADD.B", 0xD000, 0xF1C0, op1_EA, op2_Dn, 1},
   {"ADD.B", 0xD100, 0xF1C0, op2_Dn, op1_EA, 1},
   {"ADD.W", 0xD040, 0xF1C0, op1_EA, op2_Dn, 2},
@@ -103,8 +107,8 @@ struct instr m68k_instr[] =
   {"ADDQ.L", 0x5080, 0xF1C0, op2_imm, op1_EA, 4},
 
   {"EXG", 0xC140, 0xF1F8, op2_Dn, op1_Dn, 4},
-  {"EXG", 0xC144, 0xF1F8, op2_An, op1_An, 4},
-  {"EXG", 0xC184, 0xF1F8, op2_Dn, op1_Dn, 4},
+  {"EXG", 0xC148, 0xF1F8, op2_An, op1_An, 4},
+  {"EXG", 0xC188, 0xF1F8, op2_Dn, op1_An, 4},
 
   {"AND.B", 0xC000, 0xF1C0, op1_EA, op2_Dn, 1},
   {"AND.B", 0xC100, 0xF1C0, op2_Dn, op1_EA, 1},
@@ -140,6 +144,11 @@ struct instr m68k_instr[] =
   {"BSR.B", 0x6100, 0xFF00, op_bra, op_none, 2},
   cc("B", ".W", 0x6000, 0xFFFF, op_bra, op_none, 2),
   cc("B", ".B", 0x6000, 0xFF00, op_bra, op_none, 1),
+
+  {"MOVEP.W", 0x0108, 0xF1F8, op1e_AnDis, op2_Dn, 2},
+  {"MOVEP.L", 0x0148, 0xF1F8, op1e_AnDis, op2_Dn, 4},
+  {"MOVEP.W", 0x0188, 0xF1F8, op2_Dn, op1e_AnDis, 2},
+  {"MOVEP.L", 0x01C8, 0xF1F8, op2_Dn, op1e_AnDis, 4},
 
   {"BCHG.L", 0x0140, 0xF1C0, op2_Dn, op1_EA, 4},
   {"BCHG.B", 0x0840, 0xFFC0, ope_ims, op1_EA, 1},
@@ -188,8 +197,8 @@ struct instr m68k_instr[] =
   {"EORI.W", 0x0A40, 0xFFC0, ope_imm, op1_EA, 2},
   {"EORI.L", 0x0A80, 0xFFC0, ope_imm, op1_EA, 4},
 
-  {"EXT.W", 0x4480, 0xFFF8, op1_Dn, op_none, 2},
-  {"EXT.L", 0x44C0, 0xFFF8, op1_Dn, op_none, 4},
+  {"EXT.W", 0x4880, 0xFFF8, op1_Dn, op_none, 2},
+  {"EXT.L", 0x48C0, 0xFFF8, op1_Dn, op_none, 4},
 
   {"ILLEGAL", 0x4AFC, 0xFFFF, op_none, op_none, 0},
 
@@ -216,61 +225,6 @@ struct instr m68k_instr[] =
   {"LSL.L", 0xE188, 0xF1F8, op2_imm, op1_Dn, 4},
   {"LSL.L", 0xE1A8, 0xF1F8, op2_Dn, op1_Dn, 4},
   {"LSL.B", 0xE3C0, 0xFFC0, op1_EA, op_none, 1},
-
-  {"MOVEA.W", 0x3040, 0xF1C0, op1_EA, op2_An, 2},
-  {"MOVEA.L", 0x2040, 0xF1C0, op1_EA, op2_An, 2},
-
-  {"MOVE.B", 0x1000, 0x3000, op1_EA, op2_EA, 1},
-  {"MOVE.W", 0x3000, 0x3000, op1_EA, op2_EA, 2},
-  {"MOVE.L", 0x2000, 0x3000, op1_EA, op2_EA, 4},
-
-  {"MOVE", 0x42C0, 0xFFC0, op_ccr, op1_EA, 2},
-  {"MOVE", 0x44C0, 0xFFC0, op1_EA, op_ccr, 2},
-  {"MOVE", 0x40C0, 0xFFC0, op_sr, op1_EA, 2},
-
-  // Pre-decrement modes
-  {"MOVEM.W", 0x48A0, 0xFFF8, op1_EA, ope_rld, 2},
-  {"MOVEM.L", 0x48E0, 0xFFF8, op1_EA, ope_rld, 4},
-  // Other MOVEM modes
-  {"MOVEM.W", 0x4880, 0xFFC0, op1_EA, ope_rl, 2},
-  {"MOVEM.L", 0x48C0, 0xFFC0, op1_EA, ope_rl, 4},
-  {"MOVEM.W", 0x4C80, 0xFFC0, ope_rl, op1_EA, 2},
-  {"MOVEM.L", 0x4CC0, 0xFFC0, ope_rl, op1_EA, 4},
-
-  {"MOVEP.W", 0x0108, 0xF1F8, op1e_AnDis, op2_Dn, 2},
-  {"MOVEP.L", 0x0148, 0xF1F8, op1e_AnDis, op2_Dn, 4},
-  {"MOVEP.W", 0x0188, 0xF1F8, op2_Dn, op1e_AnDis, 2},
-  {"MOVEP.L", 0x01C8, 0xF1F8, op2_Dn, op1e_AnDis, 4},
-
-  {"MOVEQ", 0x7000, 0xF100, opo_dis8v, op2_Dn, 4},
-
-  {"NBCD", 0x4800, 0xFFC0, op1_EA, op_none, 1},
-
-  {"NEG.B", 0x4400, 0xFFC0, op1_EA, op_none, 1},
-  {"NEG.W", 0x4440, 0xFFC0, op1_EA, op_none, 2},
-  {"NEG.L", 0x4480, 0xFFC0, op1_EA, op_none, 4},
-
-  {"NEGX.B", 0x4000, 0xFFC0, op1_EA, op_none, 1},
-  {"NEGX.W", 0x4040, 0xFFC0, op1_EA, op_none, 2},
-  {"NEGX.L", 0x4080, 0xFFC0, op1_EA, op_none, 4},
-
-  {"NOP", 0x4E71, 0xFFFF, op_none, op_none, 0},
-
-  {"NOT.B", 0x4600, 0xFFC0, op1_EA, op_none, 1},
-  {"NOT.W", 0x4640, 0xFFC0, op1_EA, op_none, 2},
-  {"NOT.L", 0x4680, 0xFFC0, op1_EA, op_none, 4},
-
-  {"OR.B", 0x8000, 0xF1C0, op1_EA, op2_Dn, 1},
-  {"OR.B", 0x8100, 0xF1C0, op2_Dn, op1_EA, 1},
-  {"OR.W", 0x8040, 0xF1C0, op1_EA, op2_Dn, 2},
-  {"OR.W", 0x8140, 0xF1C0, op2_Dn, op1_EA, 2},
-  {"OR.L", 0x8080, 0xF1C0, op1_EA, op2_Dn, 4},
-  {"OR.L", 0x8180, 0xF1C0, op2_Dn, op1_EA, 4},
-
-  {"ORI", 0x003C, 0xFFFF, ope_imm, op_ccr, 1},
-  {"ORI.B", 0x0000, 0xFFC0, ope_imm, op1_EA, 1},
-  {"ORI.W", 0x0040, 0xFFC0, ope_imm, op1_EA, 2},
-  {"ORI.L", 0x0080, 0xFFC0, ope_imm, op1_EA, 4},
 
   {"ROR.B", 0xE018, 0xF1F8, op2_imm, op1_Dn, 1},
   {"ROR.B", 0xE038, 0xF1F8, op2_Dn, op1_Dn, 1},
@@ -304,24 +258,70 @@ struct instr m68k_instr[] =
   {"ROXL.L", 0xE1B0, 0xF1F8, op2_Dn, op1_Dn, 4},
   {"ROXL.B", 0xE5C0, 0xFFC0, op1_EA, op_none, 1},
 
+  cc("S", "", 0x50C0, 0xFFC0, op1_EA, op_none, 1),
+
+  {"MOVEA.W", 0x3040, 0xF1C0, op1_EA, op2_An, 2},
+  {"MOVEA.L", 0x2040, 0xF1C0, op1_EA, op2_An, 2},
+
+  {"MOVE", 0x42C0, 0xFFC0, op_ccr, op1_EA, 2},
+  {"MOVE", 0x44C0, 0xFFC0, op1_EA, op_ccr, 2},
+  {"MOVE", 0x46C0, 0xFFC0, op1_EA, op_sr, 2},
+  {"MOVE", 0x40C0, 0xFFC0, op_sr, op1_EA, 2},
+
+  // Pre-decrement modes
+  {"MOVEM.W", 0x48A0, 0xFFF8, ope_rld, op1_EA, 2},
+  {"MOVEM.L", 0x48E0, 0xFFF8, ope_rld, op1_EA, 4},
+  // Other MOVEM modes
+  {"MOVEM.W", 0x4CB8, 0xFFFE, ope_mmovem, op_none, 2},
+  {"MOVEM.L", 0x4CF8, 0xFFFE, ope_mmovem, op_none, 4},
+  {"MOVEM.W", 0x4880, 0xFFC0, ope_rl, op1_EA, 2},
+  {"MOVEM.L", 0x48C0, 0xFFC0, ope_rl, op1_EA, 4},
+  {"MOVEM.W", 0x4C80, 0xFFC0, op1_EA, ope_rl, 2},
+  {"MOVEM.L", 0x4CC0, 0xFFC0, op1_EA, ope_rl, 4},
+
+  {"MOVEQ", 0x7000, 0xF100, opo_dis8v, op2_Dn, 4},
+
+  {"NBCD", 0x4800, 0xFFC0, op1_EA, op_none, 1},
+
+  {"NEG.B", 0x4400, 0xFFC0, op1_EA, op_none, 1},
+  {"NEG.W", 0x4440, 0xFFC0, op1_EA, op_none, 2},
+  {"NEG.L", 0x4480, 0xFFC0, op1_EA, op_none, 4},
+
+  {"NEGX.B", 0x4000, 0xFFC0, op1_EA, op_none, 1},
+  {"NEGX.W", 0x4040, 0xFFC0, op1_EA, op_none, 2},
+  {"NEGX.L", 0x4080, 0xFFC0, op1_EA, op_none, 4},
+
+  {"NOP", 0x4E71, 0xFFFF, op_none, op_none, 0},
+
+  {"NOT.B", 0x4600, 0xFFC0, op1_EA, op_none, 1},
+  {"NOT.W", 0x4640, 0xFFC0, op1_EA, op_none, 2},
+  {"NOT.L", 0x4680, 0xFFC0, op1_EA, op_none, 4},
+
+  {"OR.B", 0x8000, 0xF1C0, op1_EA, op2_Dn, 1},
+  {"OR.B", 0x8100, 0xF1C0, op2_Dn, op1_EA, 1},
+  {"OR.W", 0x8040, 0xF1C0, op1_EA, op2_Dn, 2},
+  {"OR.W", 0x8140, 0xF1C0, op2_Dn, op1_EA, 2},
+  {"OR.L", 0x8080, 0xF1C0, op1_EA, op2_Dn, 4},
+  {"OR.L", 0x8180, 0xF1C0, op2_Dn, op1_EA, 4},
+
+  {"ORI", 0x003C, 0xFFFF, ope_imm, op_ccr, 1},
+  {"ORI.B", 0x0000, 0xFFC0, ope_imm, op1_EA, 1},
+  {"ORI.W", 0x0040, 0xFFC0, ope_imm, op1_EA, 2},
+  {"ORI.L", 0x0080, 0xFFC0, ope_imm, op1_EA, 4},
+
   {"RESET", 0x4E70, 0xFFFF, op_none, op_none, 0},
   {"RTE", 0x4E73, 0xFFFF, op_none, op_none, 0},
   {"RTR", 0x4E77, 0xFFFF, op_none, op_none, 0},
   {"RTS", 0x4E75, 0xFFFF, op_none, op_none, 0},
 
-  cc("S", "", 0x50C0, 0xF0C0, op1_EA, op_none, 1),
+  {"STOP", 0x4E72, 0xFFFF, ope_imm, op_none, 2},
 
-  {"STOP", 0x4E72, 0xFFFF, ope_imm, op_none, 0},
-
-  {"SUBX.B", 0x9100, 0xF1F8, op2_Dn, op1_Dn, 1},
-  {"SUBX.B", 0x9108, 0xF1F8, op2_AnPD, op1_AnPD, 1},
-  {"SUBX.W", 0x9140, 0xF1F8, op2_Dn, op1_Dn, 2},
-  {"SUBX.W", 0x9148, 0xF1F8, op2_AnPD, op1_AnPD, 2},
-  {"SUBX.L", 0x9180, 0xF1F8, op2_Dn, op1_Dn, 4},
-  {"SUBX.L", 0x9188, 0xF1F8, op2_AnPD, op1_AnPD, 4},
-
-  {"SBCD", 0x8100, 0xF1F8, op2_Dn, op1_Dn, 1},
-  {"SBCD", 0x8108, 0xF1F8, op2_AnPD, op1_AnPD, 1},
+  {"SUBX.B", 0x9100, 0xF1F8, op1_Dn, op2_Dn, 1},
+  {"SUBX.B", 0x9108, 0xF1F8, op1_AnPD, op2_AnPD, 1},
+  {"SUBX.W", 0x9140, 0xF1F8, op1_Dn, op2_Dn, 2},
+  {"SUBX.W", 0x9148, 0xF1F8, op1_AnPD, op2_AnPD, 2},
+  {"SUBX.L", 0x9180, 0xF1F8, op1_Dn, op2_Dn, 4},
+  {"SUBX.L", 0x9188, 0xF1F8, op1_AnPD, op2_AnPD, 4},
 
   {"SUB.B", 0x9000, 0xF1C0, op1_EA, op2_Dn, 1},
   {"SUB.B", 0x9100, 0xF1C0, op2_Dn, op1_EA, 1},
@@ -351,6 +351,10 @@ struct instr m68k_instr[] =
   {"TST.B", 0x4500, 0xFFC0, op1_EA, op_none, 1},
   {"TST.W", 0x4540, 0xFFC0, op1_EA, op_none, 2},
   {"TST.L", 0x4580, 0xFFC0, op1_EA, op_none, 4},
+
+  {"MOVE.B", 0x1000, 0x3000, op1_EA, op2_EA, 1},
+  {"MOVE.W", 0x3000, 0x3000, op1_EA, op2_EA, 2},
+  {"MOVE.L", 0x2000, 0x3000, op1_EA, op2_EA, 4},
 
   {"UNLK", 0x4E58, 0xFFF8, op1_An, op_none, 0},
 #undef cc
@@ -449,7 +453,7 @@ void print_rl(u32 list)
   int rn; // Register number
   for(rt = 'D'; rt >= 'A'; rt -= 'D' - 'A')
   {
-    for(rn = 0; rn < 7; ++rn)
+    for(rn = 0; rn <= 7; ++rn)
     {
       int r = list & 1;
       if(r && !ls)
@@ -472,9 +476,10 @@ void print_rl(u32 list)
       }
       else if(!r && ls)
       {
+	ls = 0;
         if(sc >= 2)
         {
-          TPRINTF("-%c%d", rt, rn);
+          TPRINTF("-%c%d", rt, rn - 1);
         }
       }
 
@@ -485,7 +490,7 @@ void print_rl(u32 list)
       ls = 0;
       if(sc >= 2)
       {
-        TPRINTF("-%c%d", rt, rn);
+        TPRINTF("-%c%d", rt, rn - 1);
       }
     }
   }
@@ -598,12 +603,19 @@ void print_operand(enum iop ot)
         int i = 0;
         for(i = 0; i < 16; ++i)
         {
+          inverse <<= 1;
           inverse |= u & 1;
           u >>= 1;
-          inverse <<= 1;
         }
         print_rl(inverse);
       }
+      break;
+
+    case ope_mmovem:
+      u = fetch(2);
+      print_ea((opcode >> 3) & 7, opcode & 7);
+      TPRINTF(", ");
+      print_rl(u);
       break;
 
     case op_bra:
@@ -684,7 +696,11 @@ void print_operand(enum iop ot)
     case op1e_AnDis:
       s = fetch(2);
       signext(&s, 16);
-      TPRINTF("%d(A%d)", s, opcode & 7);
+      if(s) {
+        TPRINTF("%d(A%d)", s, opcode & 7);
+      } else {
+        TPRINTF("(A%d)", opcode & 7);
+      }
       break;
   }
 
