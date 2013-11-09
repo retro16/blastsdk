@@ -1,6 +1,7 @@
-TARGETS = d68k bdb blsbuild d68ktest scdupload
+TARGETS = d68k bdb blsbuild scdupload
 
 INSTALL_DIR ?= $(HOME)/bin
+INSTALL_TARGETS = $(TARGETS) d68ktest
 
 all: $(TARGETS)
 clean:
@@ -38,10 +39,10 @@ BLAST_NM ?= m68k-elf-nm
 BLAST_ASMX ?= asmx
 
 install: $(TARGETS)
-	for f in $(TARGETS); do cp "$$f" "$(INSTALL_DIR)"; done
+	for f in $(INSTALL_TARGETS); do cp "$$f" "$(INSTALL_DIR)"; done
 
 uninstall:
-	for f in $(TARGETS); do rm -f "$(INSTALL_DIR)/$$f"; done
+	for f in $(INSTALL_TARGETS); do rm -f "$(INSTALL_DIR)/$$f"; done
 
 %.o: %.c bls.h
 	$(CC) $(CFLAGS) $(CFLAGS_$*) -o $@ -c $<
