@@ -205,6 +205,8 @@ struct instr m68k_instr[] =
   {"JMP", 0x4EC0, 0xFFC0, op1_EA, op_none, 4},
   {"JSR", 0x4E80, 0xFFC0, op1_EA, op_none, 4},
 
+  {"SWAP", 0x4840, 0xFFF8, op1_Dn, op_none, 2},
+
   {"PEA", 0x4840, 0xFFC0, op1_EA, op_none, 4},
   {"LEA", 0x41C0, 0xF1C0, op1_EA, op2_An, 4},
 
@@ -341,16 +343,14 @@ struct instr m68k_instr[] =
   {"SUBQ.W", 0x5140, 0xF1C0, op2_imm, op1_EA, 2},
   {"SUBQ.L", 0x5180, 0xF1C0, op2_imm, op1_EA, 4},
   
-  {"SWAP", 0x4840, 0xFFF8, op1_Dn, op_none, 2},
-
   {"TAS", 0x4AC0, 0xFFC0, op1_EA, op_none, 1},
 
   {"TRAP", 0x4E40, 0xFFF0, opo_vect, op_none, 0},
   {"TRAPV", 0x4E76, 0xFFFF, op_none, op_none, 0},
 
-  {"TST.B", 0x4500, 0xFFC0, op1_EA, op_none, 1},
-  {"TST.W", 0x4540, 0xFFC0, op1_EA, op_none, 2},
-  {"TST.L", 0x4580, 0xFFC0, op1_EA, op_none, 4},
+  {"TST.B", 0x4A00, 0xFFC0, op1_EA, op_none, 1},
+  {"TST.W", 0x4A40, 0xFFC0, op1_EA, op_none, 2},
+  {"TST.L", 0x4A80, 0xFFC0, op1_EA, op_none, 4},
 
   {"MOVE.B", 0x1000, 0x3000, op1_EA, op2_EA, 1},
   {"MOVE.W", 0x3000, 0x3000, op1_EA, op2_EA, 2},
@@ -729,10 +729,11 @@ static void d68k_pass()
       {
         continue;
       }
-      TPRINTF("%s\t", op->name);
+      TPRINTF("%s", op->name);
 
       if(op->op1 != op_none)
       {
+        TPRINTF("\t");
         print_operand(op->op1);
       }
       if(op->op2 != op_none)

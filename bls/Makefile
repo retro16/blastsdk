@@ -1,4 +1,4 @@
-TARGETS = d68k bdb blsbuild test_d68k scdupload
+TARGETS = d68k bdb blsbuild d68ktest scdupload
 
 INSTALL_DIR ?= $(HOME)/bin
 
@@ -9,9 +9,9 @@ clean:
 # Per-source rules
 blsbuild: blsbuild.o address.o compile.o config.o output.o source.o utils.o img.o
 bdb: bdb.o bdp.o d68k_mod.o symtable.o utils.o binparse.o
-test_d68k: test_d68k.o d68k_mod.o symtable.o utils.o
 d68k: d68k.o d68k_mod.o symtable.o utils.o
 scdupload: scdupload.o bdp.o utils.o
+d68ktest:
 
 # Per-source flags
 CFLAGS_img = $(shell libpng-config --cflags)
