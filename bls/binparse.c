@@ -6,6 +6,7 @@
 // 2 = CD
 // 3 = SCD WRAM program
 // 4 = Genesis RAM program
+// 5 = SCD PRAM program
 int getimgtype(const u8 *img, int size)
 {
   if(size < 0x200)
@@ -19,15 +20,19 @@ int getimgtype(const u8 *img, int size)
   if(strncmp((const char *)img + 0x100, "SEGA", 4) == 0)
   {
     // Cart image
-    if(img[5] == 0x20)
-    {
-      return 3;
-    }
-    if(img[5] == 0xFF)
-    {
-      return 4;
-    }
     return 1;
+  }
+  if(strncmp((const char *)img + 0x100, "WRAM", 4) == 0)
+  {
+    return 3;
+  }
+  if(strncmp((const char *)img + 0x100, "MRAM", 4) == 0)
+  {
+    return 4;
+  }
+  if(strncmp((const char *)img + 0x100, "PRAM", 4) == 0)
+  {
+    return 5;
   }
 
   return 0;

@@ -431,7 +431,21 @@ void out_genheader()
 #undef INTVECT2
 
   // 0x100
-  out_padchar("SEGA MEGA DRIVE", ' ', 16);
+  switch(pgmchip) {
+    case chip_cart:
+    default:
+      out_padchar("SEGA MEGA DRIVE", ' ', 16);
+      break;
+    case chip_pram:
+      out_padchar("PRAM MEGA DRIVE", ' ', 16);
+      break;
+    case chip_wram:
+      out_padchar("WRAM MEGA DRIVE", ' ', 16);
+      break;
+    case chip_ram:
+      out_padchar("MRAM MEGA DRIVE", ' ', 16);
+      break;
+  }
   out_padchar(copyright, ' ', 16);
   out_padchar(title, ' ', 48);
   out_padchar(title, ' ', 48);
