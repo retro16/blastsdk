@@ -14,6 +14,8 @@ EOF
 exit 0
 fi
 
+cd `dirname "$0"`
+
 make -s -C bin2c
 
 if ! [ -r "$1" ]; then
@@ -43,5 +45,9 @@ dd if=extract.tmp of="$OUTFILE" bs=$SIZE count=1 &>/dev/null
 bin2c/bin2c "$OUTFILE"
 
 rm extract.tmp extract.tmp.c "$OUTFILE" bin2c/bin2c
+
+if [ -d .git ]; then
+  git update-index --assume-unchanged "$OUTFILE.c"
+fi
 
 echo "C code generated. Please run './setup force' to recompile blsbuild with correct data."
