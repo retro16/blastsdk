@@ -103,6 +103,7 @@ static inline void setint(u32 value, u8 *target, int size)
 ////// utils.c : Utility functions //////
 extern size_t filesize(const char *file);
 extern size_t getbasename(char *output, const char *name);
+extern size_t getext(char *output, const char *name);
 extern size_t getsymname(char *output, const char *path);
 extern int nextpoweroftwo(int v);
 extern int fileexists(const char *f);
@@ -202,6 +203,8 @@ typedef enum type {
   type_asm, // asmx asm file
   type_c_m68k, // gcc m68k c source
   type_cxx_m68k, // gcc m68k c++ source
+  type_elf, // m68k elf binary
+  type_as, // gnu as (assembler) source
   type_c_z80, // sdcc z80 c source
   type_png, // PNG background graphics
   type_pngspr, // Square (32x32, 16x16, 8x8) sprite tileset
@@ -285,6 +288,8 @@ extern void src_map_phys(); // Compute physaddr for all unallocated sources
 extern char cc[1024];
 extern char cxx[1024];
 extern char cflags[1024];
+extern char as[1024];
+extern char asflags[1024];
 extern char ld[1024];
 extern char ldflags[1024];
 extern char objcopy[1024];

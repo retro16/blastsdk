@@ -39,6 +39,10 @@ int compute_size_cxx_m68k(int srcid);
 void compile_cxx_m68k(int srcid);
 void link_cxx_m68k(int srcid);
 
+int compute_size_as(int srcid);
+void compile_as(int srcid);
+void link_as(int srcid);
+
 int compute_size_gcc_m68k(int srcid, const char *compiler);
 void compile_gcc_m68k(int srcid);
 void link_gcc_m68k(int srcid);
@@ -266,6 +270,7 @@ int compute_size_all()
       SRCTYPE(pngpal);
       SRCTYPE(c_m68k);
       SRCTYPE(cxx_m68k);
+      SRCTYPE(as);
 #undef SRCTYPE
     }
     if(oldsize != -1 && oldsize == src[i].binsize && src[i].dirty)
@@ -311,6 +316,7 @@ void compile_all()
         SRCTYPE(pngpal);
         SRCTYPE(c_m68k);
         SRCTYPE(cxx_m68k);
+        SRCTYPE(as);
 #undef SRCTYPE
       }
     }
@@ -336,6 +342,7 @@ void link_all()
         SRCTYPE(pngpal);
         SRCTYPE(c_m68k);
         SRCTYPE(cxx_m68k);
+        SRCTYPE(as);
 #undef SRCTYPE
       }
     }
@@ -675,6 +682,138 @@ void parse_lst(const char *file, int srcid, int setsym)
     }
   }
   fclose(f);
+}
+
+/* Compiling AS :
+ *
+ * m68k-elf-as -as -o test.o test.s
+ * m68k-elf-ld -Ttext=org -R symtable -o test test.o
+symtable:
+m1 = 0xFF0000;
+m2 = 0xFF0008;
+ * m68k-elf-objcopy -O binary -j text test test.bin
+ * m68k-elf-nm test
+00002230 B __bss_start
+00002230 B _edata
+00002238 B _end
+00002234 B m1
+00002230 B m2
+00000200 T main
+         U _start
+00000218 T toto
+*/
+
+int compute_size_as(int srcid)
+{
+  src_t *s = &(src[srcid]);
+  char cmdline[1024];
+  char object[1024];
+  char elf[1024];
+
+  sprintf(s->binname, TMPDIR"/%s.bin", s->sym.name);
+  sprintf(object, TMPDIR"/%s.o", s->sym.name);
+  sprintf(elf, TMPDIR"/%s.elf", s->sym.name);
+
+  gen_symbols(srcid, s->bus, 0);
+
+  snprintf(cmdline, 1024, "%s %s -as -o %s %s", as, asflags, object, s->filename);
+  printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  snprintf(cmdline, 1024, "%s %s -r -R "TMPDIR"/%s.sym.sym %s -o %s", ld, ldflags, s->sym.name, object, elf);
+  printf("First pass linking of %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Extract non-linked output
+  snprintf(cmdline, 1024, "%s -O binary %s %s", objcopy, elf, s->binname);
+  printf("Computing binary size of %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Leave a small room because GCC linking may make the binary grow
+  s->binsize = filesize(s->binname);
+  s->binsize += 8 + s->binsize / 64;
+  unlink(s->binname);
+  unlink(elf);
+
+  return 1;
+}
+
+void compile_as(int srcid)
+{
+  src_t *s = &(src[srcid]);
+  char cmdline[1024];
+  char object[1024];
+  char elf[1024];
+  u32 org = get_org(srcid);
+
+  if(org == 0)
+  {
+    printf("Could not find ORG for source %s\n", s->name);
+    exit(1);
+  }
+
+  sprintf(object, TMPDIR"/%s.o", s->sym.name);
+  sprintf(elf, TMPDIR"/%s.elf", s->sym.name);
+
+  gen_symbols(srcid, s->bus, 0);
+
+  // Link to get internal symbols
+  snprintf(cmdline, 1024, "%s %s -Ttext=0x%06X -r -R "TMPDIR"/%s.sym.sym %s -o %s", ld, ldflags, org, s->sym.name, object, elf);
+  printf("Get symbols from %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Generate and parse symbols from elf binary
+  snprintf(cmdline, 1024, "%s %s", nm, elf);
+  printf("Extract sybols from %s :\n%s\n", s->name, cmdline);
+  FILE *f = popen(cmdline, "r");
+  if(!f)
+  {
+    printf("Could not execute nm on source %s\n", s->name);
+    exit(1);
+  }
+  parse_nm(srcid, f);
+  pclose(f);
+
+  unlink(elf);
+}
+
+void link_as(int srcid)
+{
+  src_t *s = &(src[srcid]);
+  char cmdline[1024];
+  char object[1024];
+  char elf[1024];
+  u32 org = get_org(srcid);
+
+  if(org == 0)
+  {
+    printf("Could not find ORG for source %s\n", s->name);
+    exit(1);
+  }
+
+  sprintf(s->binname, TMPDIR"/%s.bin", s->sym.name);
+  sprintf(object, TMPDIR"/%s.o", s->sym.name);
+  sprintf(elf, TMPDIR"/%s.elf", s->sym.name);
+
+  gen_symbols(srcid, s->bus, 1);
+
+  // Link with all symbols defined
+  snprintf(cmdline, 1024, "%s %s -nostdlib -Ttext=0x%06X -R "TMPDIR"/%s.sym.sym %s -o %s", ld, ldflags, org, s->sym.name, object, elf);
+  printf("Linking binary %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Extract the text section of elf to binary
+  snprintf(cmdline, 1024, "%s -O binary %s %s", objcopy, elf, s->binname);
+  printf("Extracting text section of %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  if((size_t)filesize(s->binname) > (size_t)s->binsize)
+  {
+    printf("Error: Linking %s generated a bigger binary file : %08X -> %08X\n", s->name, (unsigned int)s->binsize, (unsigned int)filesize(s->binname));
+    exit(1);
+  }
+
+  unlink(elf);
 }
 
 /* Compiling C :

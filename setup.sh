@@ -42,29 +42,29 @@ trap 'popd &>/dev/null' EXIT
 cd "$(dirname "$0")"
 
 if [ "$1" = "force" ]; then
-	FORCE=1
+  FORCE=1
 fi
 
 if [ "$1" = "uninstall" ]; then
-	echo ""
-	echo "Warning: uninstall cannot remove GCC and binutils."
-	echo "Please remove them by hand."
-	echo ""
-	echo "Ready to uninstall Blast SDK. Press enter to continue or Ctrl-C to abort."
-	read dummy
-	make -C asmx2 uninstall
-	make -C bls uninstall
-	rm -rf "$BLSPREFIX/share/blastsdk"
-	exit
+  echo ""
+  echo "Warning: uninstall cannot remove GCC and binutils."
+  echo "Please remove them by hand."
+  echo ""
+  echo "Ready to uninstall Blast SDK. Press enter to continue or Ctrl-C to abort."
+  read dummy
+  make -C asmx2 uninstall
+  make -C bls uninstall
+  rm -rf "$BLSPREFIX/share/blastsdk"
+  exit
 fi
 
 if [ "$1" = "clean" ]; then
-	if [ -e "build" ]; then
-		rm -rf build
-	fi
-	make -C asmx2 clean
-	make -C bls clean
-	exit
+  if [ -e "build" ]; then
+    rm -rf build
+  fi
+  make -C asmx2 clean
+  make -C bls clean
+  exit
 fi
 
 mkdir -p "$BLSPREFIX/bin"
@@ -92,14 +92,22 @@ requirecmd() {
   return 0
 }
 
+installsrc() {
+  if [ "$FORCE" ] && [ -e "$BLSPREFIX/share/blastsdk/$1" ]; then
+    rm -rf "$BLSPREFIX/share/blastsdk/$1"
+  fi
+  if ! [ -e "$BLSPREFIX/share/blastsdk/$1" ]; then
+    echo "Installing blastsdk sources : $1"
+    cp -r $1 "$BLSPREFIX/share/blastsdk/$1"
+  fi
+}
 
-if [ "$FORCE" ] && [ -e "$BLSPREFIX/share/blastsdk/inc" ]; then
-	rm -rf "$BLSPREFIX/share/blastsdk/inc"
-fi
-if ! [ -e "$BLSPREFIX/share/blastsdk/inc" ]; then
-  echo "Installing blastsdk includes"
-  cp -r inc "$BLSPREFIX/share/blastsdk/inc"
-fi
+# Install sources
+
+installsrc inc
+installsrc include
+installsrc src
+
 
 # Install asmx
 
@@ -173,6 +181,8 @@ exit 1
 fi
 echo "Installing bls"
 export INCDIR="$BLSPREFIX/share/blastsdk/inc"
+export INCLUDEDIR="$BLSPREFIX/share/blastsdk/include"
+export SRCDIR="$BLSPREFIX/share/blastsdk/src"
 export BLAST_AS="$(which m68k-elf-as 2>/dev/null)"
 export BLAST_CC="$(which m68k-elf-gcc 2>/dev/null)"
 export BLAST_CXX="$(which m68k-elf-g++ 2>/dev/null)"

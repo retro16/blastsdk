@@ -18,6 +18,9 @@
 #ifndef BLAST_LDFLAGS
 #define BLAST_LDFLAGS ""
 #endif
+#ifndef BLAST_ASFLAGS
+#define BLAST_ASFLAGS ""
+#endif
 #ifndef BLAST_OBJCOPY
 #define BLAST_OBJCOPY "m68k-elf-objcopy"
 #endif
@@ -31,6 +34,8 @@
 char cc[1024] = BLAST_CC;
 char cxx[1024] = BLAST_CXX;
 char cflags[1024] = BLAST_CFLAGS;
+char as[1024] = BLAST_AS;
+char asflags[1024] = BLAST_ASFLAGS;
 char ld[1024] = BLAST_LD;
 char ldflags[1024] = BLAST_LDFLAGS;
 char objcopy[1024] = BLAST_OBJCOPY;
@@ -153,6 +158,30 @@ size_t getbasename(char *output, const char *name)
     if(*name == '.') {
       len = 0;
     } else if(*name == '/' || *name == '\\') {
+      op = output;
+      len = 63;
+    } else {
+      if(len) {
+        *op = *name;
+        ++op;
+        --len;
+      }
+    }
+    ++name;
+  }
+
+  *op = '\0';
+
+  return op - output;
+}
+
+size_t getext(char *output, const char *name)
+{
+  int len = 63;
+  char *op = output;
+
+  while(*name) {
+    if(*name == '/' || *name == '\\' || *name == '.') {
       op = output;
       len = 63;
     } else {

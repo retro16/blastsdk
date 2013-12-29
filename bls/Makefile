@@ -16,7 +16,7 @@ d68ktest:
 
 # Per-source flags
 CFLAGS_img = $(shell libpng-config --cflags)
-CFLAGS_blsbuild = -DINCDIR="\"$(INCDIR)\"" -DBLAST_AS="\"$(BLAST_AS)\"" -DBLAST_CC="\"$(BLAST_CC)\"" -DBLAST_CXX="\"$(BLAST_CXX)\"" -DBLAST_CFLAGS="\"$(BLAST_CFLAGS)\"" -DBLAST_LD="\"$(BLAST_LD)"\" -DBLAST_LDFLAGS="\"$(BLAST_LDFLAGS)\"" -DBLAST_NM="\"$(BLAST_NM)\"" -DBLAST_OBJCOPY="\"$(BLAST_OBJCOPY)\"" -DBLAST_ASMX="\"$(BLAST_ASMX)\""
+CFLAGS_blsbuild = -DINCDIR="\"$(INCDIR)\"" -DINCLUDEDIR="\"$(INCLUDEDIR)\"" -DSRCDIR="\"$(SCDIR)\"" -DBLAST_AS="\"$(BLAST_AS)\"" -DBLAST_CC="\"$(BLAST_CC)\"" -DBLAST_CXX="\"$(BLAST_CXX)\"" -DBLAST_CFLAGS="\"$(BLAST_CFLAGS)\"" -DBLAST_LD="\"$(BLAST_LD)"\" -DBLAST_LDFLAGS="\"$(BLAST_LDFLAGS)\"" -DBLAST_NM="\"$(BLAST_NM)\"" -DBLAST_OBJCOPY="\"$(BLAST_OBJCOPY)\"" -DBLAST_ASMX="\"$(BLAST_ASMX)\""
 CFLAGS_config = $(CFLAGS_blsbuild)
 CFLAGS_compile = $(CFLAGS_blsbuild)
 LDFLAGS_blsbuild = $(shell libpng-config --ldflags)
@@ -28,6 +28,8 @@ CC = gcc
 LD = gcc
 
 INCDIR ?= $(CURDIR)/../inc/
+INCLUDEDIR ?= $(CURDIR)/../include/
+SRCDIR ?= $(CURDIR)/../src/
 BLAST_AS ?= m68k-elf-as
 BLAST_CC ?= m68k-elf-gcc
 BLAST_CXX ?= m68k-elf-g++

@@ -60,6 +60,8 @@ type_t parse_type(const char *s)
   TYPE(bin);
   TYPE(asm);
   TYPE(c_m68k);
+  TYPE(cxx_m68k);
+  TYPE(as);
   TYPE(c_z80);
   TYPE(png);
   TYPE(pngspr);
@@ -145,6 +147,8 @@ void parse_ini(const char *file)
       STRFIELD(cc, 1024)
       STRFIELD(cxx, 1024)
       STRFIELD(cflags, 1024)
+      STRFIELD(as, 1024)
+      STRFIELD(asflags, 1024)
       STRFIELD(ld, 1024)
       STRFIELD(ldflags, 1024)
       STRFIELD(objcopy, 1024)
@@ -181,10 +185,19 @@ void parse_ini(const char *file)
       {
         if(src[s].type == type_none)
         {
+          // Add a new source
           src_clear(s);
           strncpy(src[s].name, name, NAMELEN);
           strncpy(src[s].filename, name, NAMELEN);
           getsymname(src[s].sym.name, name);
+          char ext[64];
+          getext(ext, name);
+          if(strcasecmp(name, "asm") == 0) src[s].type = type_asm;
+          else if(strcasecmp(name, "c") == 0) src[s].type = type_c_m68k;
+          else if(strcasecmp(name, "cxx") == 0) src[s].type = type_cxx_m68k;
+          else if(strcasecmp(name, "s") == 0) src[s].type = type_as;
+          else if(strcasecmp(name, "png") == 0) src[s].type = type_png;
+          else if(strcasecmp(name, "bin") == 0) src[s].type = type_bin;
           break;
         }
       }
