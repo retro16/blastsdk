@@ -130,8 +130,6 @@ void mdconfparsekeyvalue(const char *line, mdconfnode *node)
   }
   *key = '\0';
 
-  printf("key=%s line=%s\n", node->key, line);
- 
   // Skip any separator
   while(*line && !mdconfistoken(*line))
   {
@@ -196,7 +194,6 @@ mdconfnode * mdconfparse(const char *filename)
   FILE *f = fopen(filename, "r");
   if(!f)
   {
-    printf("Cannot open file %s\n", filename);
     return NULL;
   }
 
@@ -251,8 +248,6 @@ mdconfnode * mdconfparse(const char *filename)
     }
     l = line;
     
-    printf("node=%s line=[%s]\n", curnode->key, l);
-    
     linebullet = 0;
     
     if(lastlineempty || lastlinebullet)
@@ -275,12 +270,10 @@ mdconfnode * mdconfparse(const char *filename)
       }
       if((*l == '-' || *l == '*' || *l == '+') && l[1] == ' ')
       {
-        printf("Bullet [%s]\n", l);
         l += 2;
         // Found a bullet
         if(depthonewidth == -1 || listdepth == depthonewidth)
         {
-          printf("Bullet depth=1\n");
           depthonewidth = listdepth;
           if(curdepth == 0)
           {
@@ -294,10 +287,8 @@ mdconfnode * mdconfparse(const char *filename)
         }
         else
         {
-          printf("Bullet depth=2\n");
           if(curdepth == 0)
           {
-            printf("Parse error : subelement following title.\n");
             mdconffree(root);
             return NULL;
           } else if(curdepth == 1) {
@@ -308,7 +299,6 @@ mdconfnode * mdconfparse(const char *filename)
           curdepth = 2;
         }
         mdconfparsekeyvalue(l, curnode);
-        printf("child=%p\n", (void*)curnode->next);
         linebullet = 1;
       }
     }
@@ -334,10 +324,8 @@ mdconfnode * mdconfparse(const char *filename)
       }
     }
     
-    printf("curdepth=%d listnodedepth=%d\n", curdepth, listnodedepth);
     if(curdepth < listnodedepth)
     {
-      printf("listnode=%s listnode.child=%p\n", listnode->key, (void*)listnode->child);
       // Fill all children with a copy of listnode child
       mdconfnode *n = listnode;
       if(listnode->child) while(n)
@@ -407,17 +395,13 @@ const mdconfnode *mdconfsearch(const mdconfnode *node, const char *path)
   
   while(node)
   {
-    printf("Compare %s == %.*s\n", node->key, namelen, namestart);
     if(namelen == 0 || tokencmp(node->key, namestart, namelen))
     {
-      printf("Matched\n");
       if(!valuestart || (node->value && strncmp(node->value, valuestart, valuelen) == 0))
       {
         // Found matching node : descend
         if(*path) {
-          printf("Search in subnode\n");
           const mdconfnode *subnode = mdconfsearch(node->child, path + 1);
-          if(subnode) printf("Found\n");
           if(subnode) return subnode;
         }
         else
