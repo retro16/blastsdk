@@ -375,81 +375,59 @@ mdconfnode * mdconfparse(const char *filename)
   return root;
 }
 
+int tokencmp(const char *token, const char *string, unsigned int stringlen)
+{
+  size_t tlen = strlen(token);
+  if(tlen != stringlen) {
+    return 0;
+  }
+
+  return strncasecmp(token, string, tlen) == 0;
+}
+
 /* Finds first node matching first part of path */
-const mdconfnode *mdconffindfirst(const mdconfnode *node, const char *path)
+const mdconfnode *mdconfsearch(const mdconfnode *node, const char *path)
 {
   if(!node || !path)
   {
     return NULL;
   }
   
-  const char *nameend = path;
-  while(*nameend && *nameend != '/' && *nameend != '[') ++nameend;
-  unsigned int namelen = nameend - path;
-  const char *value = NULL;
-  const char *valueend = NULL;
+  const char *namestart = path;
+  while(*path && *path != ';' && *path != '=') ++path;
+  unsigned int namelen = path - namestart;
+  const char *valuestart = NULL;
   int valuelen = -1;
-  if(*nameend == '[')
+  if(*path == '=')
   {
-    value  = nameend + 1;
-    valueend = value;
-    while(*valueend && *valueend != ']') ++valueend;
-    valuelen = valueend - value;
+    valuestart = ++path;
+    while(*path && *path != ';') ++path;
+    valuelen = path - valuestart;
   }
   
   while(node)
   {
-    if(strnicmp(node->key, path, namelen) == 0)
+    printf("Compare %s == %.*s\n", node->key, namelen, namestart);
+    if(namelen == 0 || tokencmp(node->key, namestart, namelen))
     {
-      if(!value || (node->value && strncmp(node->value, value, valuelen) == 0))
+      printf("Matched\n");
+      if(!valuestart || (node->value && strncmp(node->value, valuestart, valuelen) == 0))
       {
-        return node;
+        // Found matching node : descend
+        if(*path) {
+          printf("Search in subnode\n");
+          const mdconfnode *subnode = mdconfsearch(node->child, path + 1);
+          if(subnode) printf("Found\n");
+          if(subnode) return subnode;
+        }
+        else
+          return node;
       }
     }
     node = node->next;
   }
   
   return NULL;
-}
-
-const mdconfnode *mdconfnext(const mdconfnode *node, const char *path)
-{
-  if(!node)
-  {
-    return NULL;
-  }
-  
-  return mdconffindfirst(node->next, path);
-}
-
-
-/* Searches in children
-
-Path format :
- key1/key2 matches :
-  - key1
-   - key2
-  
- key1[a] matches :
-  - key1 a
-*/
-const mdconfnode *mdconfsearch(const mdconfnode *root, const char *path)
-{
-  if(!path || !root)
-  {
-    return root;
-  }
-
-  do
-  {
-    if(*path == '/')
-      ++path;
-    root = mdconffindfirst(root->child, path);
-    while(*path && *path != '/') ++path;
-  }
-  while(*path && root);
-  
-  return root;
 }
 
 /* Searches depth-first and returns value */
@@ -466,14 +444,14 @@ const char *mdconfget(const mdconfnode *root, const char *path)
 
 void mdconfprint(const mdconfnode *root, int depth)
 {
-  do {
+  while(root) {
     printf("%.*s[%s]: %s\n", depth * 2, "                     ", root->key, root->value ? root->value : "(null)");
     if(root->child)
     {
       mdconfprint(root->child, depth + 1);
     }
     root = root->next;
-  } while(root);
+  }
 }
 
 int main(int argc, char **argv)
