@@ -1,18 +1,10 @@
+#include "mdconf.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-
-typedef struct mdconfnode {
-  char key[64];
-  char *value; // malloc()ed
-  struct mdconfnode *next;
-  struct mdconfnode *child;
-  struct mdconfnode *parent;
-} mdconfnode;
-
-
-mdconfnode *mdconfappendsibling(mdconfnode *node)
+mdconfnode * mdconfappendsibling(mdconfnode *node)
 {
   if(!node)
   {
@@ -22,15 +14,16 @@ mdconfnode *mdconfappendsibling(mdconfnode *node)
   while(node->next) node = node->next;
   
   node->next = (mdconfnode *)malloc(sizeof(mdconfnode));
-  node->next->key[0] = '\0';
+  node->next->key = NULL;
   node->next->value = NULL;
+  node->next->prev = node;
   node->next->next = NULL;
   node->next->child = NULL;
   node->next->parent = node->parent;
   return node->next;
 }
 
-mdconfnode *mdconfappendchild(mdconfnode *node)
+mdconfnode * mdconfappendchild(mdconfnode *node)
 {
   if(!node)
   {
@@ -43,15 +36,16 @@ mdconfnode *mdconfappendchild(mdconfnode *node)
   }
   
   node->child = (mdconfnode *)malloc(sizeof(mdconfnode));
-  node->child->key[0] = '\0';
+  node->child->key = NULL;
   node->child->value = NULL;
+  node->child->prev = NULL;
   node->child->next = NULL;
   node->child->child = NULL;
   node->child->parent = node;
   return node->child;
 } 
 
-int mdconfistoken(char c)
+static int mdconfistoken(char c)
 {
   return
      c == '_'
@@ -72,11 +66,12 @@ int mdconfistoken(char c)
 mdconfnode * mdconfcopy(const mdconfnode *node)
 {
   mdconfnode *copy = (mdconfnode *)malloc(sizeof(mdconfnode));
-  strcpy(copy->key, node->key);
+  copy->key = strdup(node->key);
   if(node->value)
     copy->value = strdup(node->value);
   else
     copy->value = NULL;
+  copy->prev = NULL;
   copy->next = NULL;
   copy->parent = NULL;
   if(node->child)
@@ -88,7 +83,9 @@ mdconfnode * mdconfcopy(const mdconfnode *node)
     while(node->next)
     {
       copy->next = mdconfcopy(node->next);
+      copy->next->prev = copy;
       copy->next->parent = copy->parent;
+
       copy = copy->next;
       node = node->next;
     }
@@ -99,36 +96,38 @@ mdconfnode * mdconfcopy(const mdconfnode *node)
 
 void mdconffree(mdconfnode *root)
 {
-  if(root->value)
+  while(root)
   {
-    free(root->value);
+    if(root->key)
+    {
+      free(root->key);
+    }
+    if(root->value)
+    {
+      free(root->value);
+    }
+    if(root->child)
+    {
+      mdconffree(root->child);
+    }
+    mdconfnode * tofree = root;
+    root = root->next;
+    free(tofree);
   }
-  if(root->next)
-  {
-    mdconffree(root->next);
-  }
-  if(root->child)
-  {
-    mdconffree(root->child);
-  }
-  free(root);
 }
 
-void mdconfparsekeyvalue(const char *line, mdconfnode *node)
+static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
 {
   unsigned int keysize = 0;
-  char *key = node->key;
+  const char *key = line;
   while(mdconfistoken(*line))
   {
-    if(keysize < sizeof(node->key) - 1)
-    {
-      ++keysize;
-      *key = *line;
-      ++key;
-    }
+    ++keysize;
     ++line;
   }
-  *key = '\0';
+  node->key = (char*)malloc(keysize + 1);
+  memcpy(node->key, key, keysize);
+  node->key[keysize] = '\0';
 
   // Skip any separator
   while(*line && !mdconfistoken(*line))
@@ -179,7 +178,7 @@ void mdconfparsekeyvalue(const char *line, mdconfnode *node)
       // List of values : create a sibling node with the same key
       const char *key = node->key;
       node = mdconfappendsibling(node);
-      strcpy(node->key, key);
+      node->key = strdup(key);
       line = l;
     }
     else
@@ -189,7 +188,7 @@ void mdconfparsekeyvalue(const char *line, mdconfnode *node)
   }
 }
 
-mdconfnode * mdconfparse(const char *filename)
+mdconfnode * mdconfparsefile(const char *filename)
 {
   FILE *f = fopen(filename, "r");
   if(!f)
@@ -199,7 +198,7 @@ mdconfnode * mdconfparse(const char *filename)
 
   // Create root node
   mdconfnode *root = (mdconfnode *)malloc(sizeof(mdconfnode));
-  strcpy(root->key, "file");
+  root->key = strdup("file");
   root->value = strdup(filename);
   root->next = NULL;
   root->child = NULL;
@@ -363,7 +362,7 @@ mdconfnode * mdconfparse(const char *filename)
   return root;
 }
 
-int tokencmp(const char *token, const char *string, unsigned int stringlen)
+static int tokencmp(const char *token, const char *string, unsigned int stringlen)
 {
   size_t tlen = strlen(token);
   if(tlen != stringlen) {
@@ -374,7 +373,7 @@ int tokencmp(const char *token, const char *string, unsigned int stringlen)
 }
 
 /* Finds first node matching first part of path */
-const mdconfnode *mdconfsearch(const mdconfnode *node, const char *path)
+const mdconfnode * mdconfsearch(const mdconfnode *node, const char *path)
 {
   if(!node || !path)
   {
@@ -438,6 +437,7 @@ void mdconfprint(const mdconfnode *root, int depth)
   }
 }
 
+/* Test main
 int main(int argc, char **argv)
 {
   if(argc < 2)
@@ -446,7 +446,7 @@ int main(int argc, char **argv)
      return 1;
   }
   
-  mdconfnode *node = mdconfparse(argv[1]);
+  mdconfnode *node = mdconfparsefile(argv[1]);
   if(!node)
   {
      printf("Parse error.\n");
@@ -470,3 +470,4 @@ int main(int argc, char **argv)
   
   mdconffree(node);
 }
+//*/

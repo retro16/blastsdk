@@ -43,6 +43,9 @@ source main
  - type gcc
  - chip rom
 
+source blsloader.asm
+--------------------
+
 source splash
 -------------
  - file splash.png
@@ -67,7 +70,7 @@ source maincharacter
 Binaries
 =========
 
-Resources are elements loaded by loading routines. For cartridge, the loader initializes data or uploads to VRAM. For CD, all sources in the resource are copied from the physical medium to their target addresses.
+Binaries are elements loaded by loading routines. For cartridge, the loader initializes data or uploads to VRAM. For CD, all sources in the resource are copied from the physical medium to their target addresses.
 
 binary initial
 --------------
@@ -75,7 +78,7 @@ binary initial
 
 binary level1
 -------------
- - avoid blsloader.asm (do not overwrite main since the loader is in main)
+ - avoid blsloader.asm (do not overwrite blsloader.asm)
  - source levelcode.c (uses default values)
  - source maincharacter
  - source level1
@@ -87,3 +90,4 @@ Output
  - region JUE
  - name testbin (binary output)
  - entry main (symbol name)
+
