@@ -1,3 +1,9 @@
+*WARNING*
+
+This project is currently evolving. Please do not base any new project on the current version of Blast SDK.
+
+However, the monitor will stay stable, so you can use it without fear of bit rot.
+
 The Blast ! Software Development Kit
 ====================================
 
