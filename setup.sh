@@ -53,18 +53,18 @@ if [ "$1" = "uninstall" ]; then
   echo ""
   echo "Ready to uninstall Blast SDK. Press enter to continue or Ctrl-C to abort."
   read dummy
-  make -C asmx2 uninstall
-  make -C bls uninstall
+  make -C tools/asmx2 uninstall
+  make -C tools/bls uninstall
   rm -rf "$BLSPREFIX/share/blastsdk"
   exit
 fi
 
 if [ "$1" = "clean" ]; then
-  if [ -e "build" ]; then
-    rm -rf build
+  if [ -e "$BUILDDIR" ]; then
+    rm -rf "$BUILDDIR"
   fi
-  make -C asmx2 clean
-  make -C bls clean
+  make -C tools/asmx2 clean
+  make -C tools/bls clean
   exit
 fi
 
@@ -94,20 +94,19 @@ requirecmd() {
 }
 
 installsrc() {
-  if [ "$FORCE" ] && [ -e "$BLSPREFIX/share/blastsdk/$1" ]; then
-    rm -rf "$BLSPREFIX/share/blastsdk/$1"
+  if [ "$FORCE" ] && [ -e "$BLSPREFIX$2/$1" ]; then
+    rm -rf "$BLSPREFIX$2/$1"
   fi
-  if ! [ -e "$BLSPREFIX/share/blastsdk/$1" ]; then
+  if ! [ -e "$BLSPREFIX$2/$1" ]; then
     echo "Installing blastsdk sources : $1"
-    cp -r $1 "$BLSPREFIX/share/blastsdk/$1"
+    cp -r $1 "$BLSPREFIX$2/$1"
   fi
 }
 
 # Install sources
 
-installsrc inc
-installsrc include
-installsrc src
+installsrc inc /share/blastsdk
+installsrc include /
 
 
 # Install asmx
@@ -119,7 +118,7 @@ if ! ( "$BLSPREFIX/bin/asmx" 2>&1 | grep -- '-I prefix' &>/dev/null ); then
 fi
 else
 echo "Installing asmx"
-make -C asmx2 install || exit $?
+make -C tools/asmx2 install || exit $?
 fi
 
 [ -d "$BUILDDIR" ] || mkdir -p "$BUILDDIR"
@@ -191,12 +190,15 @@ export BLAST_LD="$(which m68k-elf-ld 2>/dev/null)"
 export BLAST_NM="$(which m68k-elf-nm 2>/dev/null)"
 export BLAST_OBJCOPY="$(which m68k-elf-objcopy 2>/dev/null)"
 export BLAST_ASMX="$(which asmx 2>/dev/null)"
-make -C bls -j7 install
+make -C tools/bls -j7 install
 if ! "$BLSPREFIX/bin/d68ktest"; then
 echo "d68k self-test failed"
 exit 1
 fi
 fi
+
+echo "Compiling bls library"
+make -C src install
 
 echo ""
 echo "Installation finished."
