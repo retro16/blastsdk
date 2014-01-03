@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+export PATH="$PATH:$HOME/opt/blastsdk/bin"
+
+LANG=C m68k-elf-gcc -fomit-frame-pointer -std=gnu99 -nostdlib -nodefaultlibs -g -o test -Os -mshort -Wall blsth.c
+m68k-elf-objdump -S test|less
+

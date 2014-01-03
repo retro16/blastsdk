@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # Alter these variables to suit your need
-BINUTILS_VERSION="2.23.52"
-GCC_VERSION="4.7.3"
-BINUTILS_URL="http://www.mirrorservice.org/sites/sources.redhat.com/pub/binutils/snapshots/binutils-$BINUTILS_VERSION.tar.bz2"
+BINUTILS_VERSION="2.24"
+GCC_VERSION="4.8.2"
+#BINUTILS_URL="http://www.mirrorservice.org/sites/sources.redhat.com/pub/binutils/snapshots/binutils-$BINUTILS_VERSION.tar.bz2"
+BINUTILS_URL="http://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.bz2"
 #GCC_URL="ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.bz2"
 GCC_URL="ftp://ftp.lip6.fr/pub/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.bz2"
 
