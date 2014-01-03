@@ -19,13 +19,13 @@
 *.iso
 *.gen
 *.ram
-/asmx2/src/asmx
-/bls/bdb
-/bls/blsbuild
-/bls/d68k
-/bls/scdupload
-/bls/test_d68k
-/bin2c/bin2c
+/tools/asmx2/src/asmx
+/tools/bls/bdb
+/tools/bls/blsbuild
+/tools/bls/d68k
+/tools/bls/scdupload
+/tools/bls/test_d68k
+/tools/bin2c/bin2c
 
 # Build directories
 /build
