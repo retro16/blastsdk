@@ -37,6 +37,7 @@ fi
 fi
 
 # INSTALL_DIR for asmx and bls Makefiles
+export BLSPREFIX
 export INSTALL_DIR="$BLSPREFIX/bin"
 
 pushd . &>/dev/null
@@ -64,6 +65,7 @@ if [ "$1" = "clean" ]; then
   if [ -e "$BUILDDIR" ]; then
     rm -rf "$BUILDDIR"
   fi
+  [ -e "sgdk" ] && rm -rf sgdk
   make -C tools/asmx2 clean
   make -C tools/bls clean
   exit
@@ -104,12 +106,6 @@ installsrc() {
   fi
 }
 
-# Install sources
-
-installsrc inc /share/blastsdk
-installsrc asm /share/blastsdk
-installsrc include /share/blastsdk
-
 
 # Install sgdk
 requirecmd svn
@@ -118,6 +114,8 @@ if [ -e "sgdk" ]; then
 else
   svn checkout http://sgdk.googlecode.com/svn/trunk/ sgdk
 fi
+cp tools/makelib.sgdk sgdk
+make -f sgdk/makelib.sgdk
 
 
 # Install asmx
@@ -210,6 +208,13 @@ fi
 
 echo "Compiling bls library"
 make -C src install
+
+echo "Installing sources"
+
+installsrc inc /share/blastsdk
+installsrc asm /share/blastsdk
+installsrc include /share/blastsdk
+
 
 echo ""
 echo "Installation finished."
