@@ -25,7 +25,8 @@ fi
 
 if [ -z "$BLSPREFIX" ]; then
 cat <<EOF
-Please select the installation prefix for compilation tools :
+Please select the installation prefix for compilation tools.
+You can automate this step by setting the BLSPREFIX variable.
 
 (default = $DEFAULTPREFIX)
 EOF
@@ -106,7 +107,17 @@ installsrc() {
 # Install sources
 
 installsrc inc /share/blastsdk
-installsrc include /
+installsrc asm /share/blastsdk
+installsrc include /share/blastsdk
+
+
+# Install sgdk
+requirecmd svn
+if [ -e "sgdk" ]; then
+  svn update sgdk
+else
+  svn checkout http://sgdk.googlecode.com/svn/trunk/ sgdk
+fi
 
 
 # Install asmx

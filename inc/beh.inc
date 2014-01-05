@@ -64,7 +64,7 @@ beh_display_exception
 		move.w	#$2700, sr		; Disable exceptions
 		movem.l	d0-d7/a0-a7, -(a7)	; Push registers to be displayed
 
-		VDPSETADDRREG
+		VDPSETADDRREG			; Set a4 and a5 to data and control registers resp.
 
 ;		VDPSETALLREGS beh_vdp_regs
 
@@ -80,17 +80,17 @@ beh_display_exception
 		lsl.b	#1, d1
 		roxl.l	#1, d3
 		dbra	d2, .expandchar
-		move.l	d3, (a5)
+		move.l	d3, (a4)
 		dbra	d0, .unpackbyte
 
 		; Clear the rest of VRAM
 		move.w	#$3DDF, d0
 		clr.l	d3			; d3 = 0 from now on
-.vramclear	move.l	d3, (a5)
+.vramclear	move.l	d3, (a4)
 		dbra	d0, .vramclear
 
 		VDPSETWRITE 0, CRAM
-		move.l  #$00000AAA, (a5)        ; Set background to black and text to grey
+		move.l  #$00000AAA, (a4)        ; Set background to black and text to grey
 
 		moveq	#1, d4			; Column count
 		moveq	#16, d7			; Line count
@@ -99,14 +99,14 @@ beh_display_exception
 .1		VDPSETWRITEVAR d6, VRAM
 		move.l	(a7)+, d0		; d0 = value to display
 		moveq	#7, d5			; 8 nybbles to display
-		move.l	d3, (a5)		; 2 spaces before data
+		move.l	d3, (a4)		; 2 spaces before data
 .2		rol.l	#4, d0			; Select nybble
 		move.w	d0, d1			; d1 = plane entry
 		andi.w	#$000F, d1
 		addq.b	#1, d1
-		move.w	d1, (a5)		; Display nybble
+		move.w	d1, (a4)		; Display nybble
 		dbra	d5, .2
-		move.l	d3, (a5)		; 2 spaces after data
+		move.l	d3, (a4)		; 2 spaces after data
 .3		addi.w	#64*2, d6		; Go to next line
 		cmp.w	#9, d7			; Jump one line at line 8
 		dbne	d7, .3

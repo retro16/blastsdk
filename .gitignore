@@ -27,6 +27,9 @@
 /tools/bls/test_d68k
 /tools/bin2c/bin2c
 
+# Dependencies
+/sgdk
+
 # Build directories
 /build
 /samples/*/tmp

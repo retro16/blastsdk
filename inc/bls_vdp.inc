@@ -4,13 +4,13 @@ VDPCTRL		set	$C00004
 VDPUSEADDR	macro	; Use address constants
 _VDPREG		set	0
 		endm
-VDPUSEREG	macro	; Use a5 for VDPDATA and a6 for VDPCTRL
+VDPUSEREG	macro	; Use a4 for VDPDATA and a5 for VDPCTRL
 _VDPREG		set	1
 		endm
-VDPSETADDRREG	macro	; Use a5 / a6 and set them
+VDPSETADDRREG	macro	; Use a4 / a5 and set them
 		VDPUSEREG
-		lea	VDPDATA, a5
-		lea	VDPCTRL, a6
+		lea	VDPDATA, a4
+		lea	VDPCTRL, a5
 		endm
 		VDPUSEADDR
 
@@ -105,7 +105,7 @@ VDPSETALLREGS	macro	reg_table
 		move.w	#$8000, d2
 vdpsetuploop\?	move.b	(a0)+, d2
 		if _VDPREG
-		move.w	d2, (a6)
+		move.w	d2, (a5)
 		else
 		move.w	d2, VDPCTRL
 		endif
@@ -115,15 +115,19 @@ vdpsetuploop\?	move.b	(a0)+, d2
 
 VDPSETREG	macro	r, v		; Set a VDP register r to value v
 		if _VDPREG
-		move.w	#($8000 | (r<<8) | v), (a6)
+		move.w	#($8000 | (r<<8) | v), (a5)
 		else
 		move.w	#($8000 | (r<<8) | v), VDPCTRL
 		endif
 		endm
 
+VDPPREPREG	macro	r, v
+		dw	#($8000 | (r<<8) | v)
+		endm
+
 VDPSETREG2	macro	r1, v1, r2, v2	; Set twp VDP registesr r1 and r2 to values v1 and v2 respectively
 		if _VDPREG
-		move.l	#((($8000 | (r1<<8) | v1) << 16) | ($8000 | (r2<<8) | v2)), (a6)
+		move.l	#((($8000 | (r1<<8) | v1) << 16) | ($8000 | (r2<<8) | v2)), (a5)
 		else
 		move.l	#((($8000 | (r1<<8) | v1) << 16) | ($8000 | (r2<<8) | v2)), VDPCTRL
 		endif
@@ -133,13 +137,16 @@ VDPSETAUTOINCR	macro	s		; Set VDP auto increment by writing to register 15
 		VDPSETREG 15, s
 		endm
 
+VDPPREPAUTOINCR	macro	s
+		VDPPREPREG 15, s
+
 VRAM		equ	$00000000
 CRAM		equ	$80000000
 VSRAM		equ	$00000010
 
 VDPSETREAD	macro	addr, ram	; Setup VDP to read from address addr from specified ram
 		if _VDPREG
-		move.l	#(((addr & $3FFF) << 16) | (addr >> 14) | (ram & $7FFFFFFF) | ((ram >> 26) & $20)), (a6)
+		move.l	#(((addr & $3FFF) << 16) | (addr >> 14) | (ram & $7FFFFFFF) | ((ram >> 26) & $20)), (a5)
 		else
 		move.l	#(((addr & $3FFF) << 16) | (addr >> 14) | (ram & $7FFFFFFF) | ((ram >> 26) & $20)), VDPCTRL
 		endif
@@ -147,7 +154,7 @@ VDPSETREAD	macro	addr, ram	; Setup VDP to read from address addr from specified 
 
 VDPSETWRITE	macro	addr, ram	; Setup VDP to write to address addr into specified ram
 		if _VDPREG
-		move.l	#(((addr & $3FFF) << 16) | (addr >> 14) | $40000000 | ram), (a6)
+		move.l	#(((addr & $3FFF) << 16) | (addr >> 14) | $40000000 | ram), (a5)
 		else
 		move.l	#(((addr & $3FFF) << 16) | (addr >> 14) | $40000000 | ram), VDPCTRL
 		endif
@@ -160,7 +167,7 @@ VDPSETREADVAR	macro	reg, ram	; Setup VDP to read from address (reg.w) of specifi
 		ori.w	#(ram >> 16) & $7FFF, reg
 		; Send first half
 		if _VDPREG
-		move.w	reg, (a6)
+		move.w	reg, (a5)
 		else
 		move.w	reg, VDPCTRL
 		endif
@@ -171,7 +178,7 @@ VDPSETREADVAR	macro	reg, ram	; Setup VDP to read from address (reg.w) of specifi
 		ori.w	#(ram | ((ram >> 26) & $20)) & $FFFF, reg
 		; Send second half
 		if _VDPREG
-		move.w	reg, (a6)
+		move.w	reg, (a5)
 		else
 		move.w	reg, VDPCTRL
 		endif
@@ -185,7 +192,7 @@ VDPSETWRITEVAR	macro	reg, ram	; Setup VDP to write to address (reg.w) of specifi
 		ori.w	#(ram >> 16) | $4000, reg
 		; Send first half
 		if _VDPREG
-		move.w	reg, (a6)
+		move.w	reg, (a5)
 		else
 		move.w	reg, VDPCTRL
 		endif
@@ -196,7 +203,7 @@ VDPSETWRITEVAR	macro	reg, ram	; Setup VDP to write to address (reg.w) of specifi
 		ori.w	#ram & $FFFF, reg
 		; Send second half
 		if _VDPREG
-		move.w	reg, (a6)
+		move.w	reg, (a5)
 		else
 		move.w	reg, VDPCTRL
 		endif
@@ -205,6 +212,11 @@ VDPSETWRITEVAR	macro	reg, ram	; Setup VDP to write to address (reg.w) of specifi
 
 VDPSETDMASIZE	macro	s
 		VDPSETREG2 19, (s & $FF), 20, ((s >> 8) & $FF)
+		endm
+
+VDPPREPDMASIZE	macro	s
+		VDPPREPREG 19, (s & $FF)
+		VDPPREPREG 20, ((s >> 8) & $FF)
 		endm
 
 VDPDMASEND	macro	src, tgt, sz, ram	; Copy sz words to vram address tgt from address src
@@ -218,9 +230,9 @@ VDPDMASEND	macro	src, tgt, sz, ram	; Copy sz words to vram address tgt from addr
 
 		if _VDPREG
 		; Set destination address and start DMA
-		move.w  #((tgt & $3FFF) | (ram >> 16) | $4000), (a6)
+		move.w  #((tgt & $3FFF) | (ram >> 16) | $4000), (a5)
 		move.w	#((tgt >> 14) | (ram & $FFFF) | $80), -(a7)	; Use stack to ensure RAM access during DMA
-		move.w	(a7), (a6)					; Write destination address with word write
+		move.w	(a7), (a5)					; Write destination address with word write
 		addq.l	#2, a7						; (circumvents documented hardware flaws)
 
 		else
@@ -233,6 +245,15 @@ VDPDMASEND	macro	src, tgt, sz, ram	; Copy sz words to vram address tgt from addr
 		endif
 		endm
 
+VDPPREPDMASEND	macro	src, tgt, sz, ram
+		VDPPREPDMASIZE sz
+		VDPPREPREG 21, ((src >> 1) & $FF)
+		VDPPREPREG 22, ((src >> 9) & $FF)
+		VDPPREPREG 23, ((src >> 17) & $7F)
+		dw	((tgt & $3FFF) | (ram >> 16) | $4000)
+		dw	((tgt >> 14) | (ram & $FFFF) | $80)
+		endm
+
 VDPDMAFILL	macro	data, tgt, sz, ram	; Fill sz words to vram address tgt using data word
 						; DMA must be enabled beforehand and autoincrement must be set correctly
 
@@ -243,17 +264,23 @@ VDPDMAFILL	macro	data, tgt, sz, ram	; Fill sz words to vram address tgt using da
 
 		if _VFPREG
 		; Set destination address
-		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a6)
+		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a5)
 		; Set data word and start DMA
 		move.w	data, VDPDATA
 
 		else
 		; Set destination address
-		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a5)
+		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a4)
 		; Set data word and start DMA
 		move.w	data, VDPDATA
 		endif
 
+		endm
+
+VDPPREPFILL	macro	data, tgt, sz, ram
+		VDPPREPDMASIZE sz
+		VDPPREPREG 23, $80
+		dl	(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram)
 		endm
 
 VDPSETPALETTE	macro	data, palette		; Set a 16 color palette using data. palette is 0 to 3.
@@ -261,10 +288,15 @@ VDPSETPALETTE	macro	data, palette		; Set a 16 color palette using data. palette 
 		VDPDMASEND data, (palette * 32), 32, CRAM
 		endm
 
+VDPPREPPALETTE	macro	data, palette
+		VDPPREPREG 15, 2
+		VDPPREPDMASEND data, (palette * 32), 32, CRAM
+		endm
+
 VDPSETBG	macro	color
 		VDPSETWRITE 0, CRAM
 		if _VDPREG
-		move.w	#color, (a5)
+		move.w	#color, (a4)
 		else
 		move.w	#color, VDPDATA
 		endif
@@ -280,6 +312,10 @@ VDPSETWRITEVSCROLL	macro	column		; Place VDP write address in vscroll table
 
 VDPSETWRITEPLANE	macro	plane, w, x, y	; Place VDP write address in plane name table for a screen width of W tiles
 		VDPSETWRITE (x * 2 + y * w * 2 + plane), VRAM
+		endm
+
+VDPPREPTERMINATE	macro
+		dw	$FFFF
 		endm
 
 VDPTILE_PRIO	equ	$8000
