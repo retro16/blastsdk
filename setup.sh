@@ -57,6 +57,7 @@ if [ "$1" = "uninstall" ]; then
   read dummy
   make -C tools/asmx2 uninstall
   make -C tools/bls uninstall
+  make -C src uninstall
   rm -rf "$BLSPREFIX/share/blastsdk"
   exit
 fi
@@ -68,6 +69,7 @@ if [ "$1" = "clean" ]; then
   [ -e "sgdk" ] && rm -rf sgdk
   make -C tools/asmx2 clean
   make -C tools/bls clean
+  make -C src clean
   exit
 fi
 
@@ -106,16 +108,6 @@ installsrc() {
   fi
 }
 
-
-# Install sgdk
-requirecmd svn
-if [ -e "sgdk" ]; then
-  svn update sgdk
-else
-  svn checkout http://sgdk.googlecode.com/svn/trunk/ sgdk
-fi
-cp tools/makelib.sgdk sgdk
-make -f sgdk/makelib.sgdk
 
 
 # Install asmx
@@ -206,11 +198,21 @@ exit 1
 fi
 fi
 
-echo "Compiling bls library"
+echo "Installing sgdk library"
+requirecmd svn
+if [ -e "sgdk" ]; then
+  svn update sgdk
+else
+  svn checkout http://sgdk.googlecode.com/svn/trunk/ sgdk
+fi
+cp tools/makelib.sgdk sgdk
+make -C sgdk -f makelib.sgdk
+
+
+echo "Installing bls library"
 make -C src install
 
-echo "Installing sources"
-
+echo "Installing bls sources"
 installsrc inc /share/blastsdk
 installsrc asm /share/blastsdk
 installsrc include /share/blastsdk

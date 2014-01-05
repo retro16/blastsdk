@@ -9,8 +9,19 @@ char * strdupnul(const char *s) {
 
 struct section;
 
+typedef enum {
+  format_auto, // Guess from extension
+  format_bin, // Section ""
+  format_asmx, // Section ""
+  format_sdcc, // Sections .text .rodata .data .bss
+  format_gcc, // Sections .text .rodata .data .bss
+  format_as, // GNU AS. Sections .text .rodata .data .bss
+  format_png // Sections .img .map
+} format_t;
+BLSENUM(format);
+
 typedef struct source {
-  char *format;
+  format_t format;
   char *name;
 
   struct section *sections;

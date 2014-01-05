@@ -19,12 +19,12 @@ blsload.h
 #define blsload_main() {} // No load since target chip == physical medium chip
 #define blsload_loader() {}
 #define blsload_character() { \
-  blsload_cart_mram($FF1000, $380, $80); \
-  blsload_cart_vram($0, $500, $100); \
+  blsload_cart_mram_raw($FF1000, $380, $80); \
+  blsload_cart_vram_raw($0, $500, $100); \
 }
 #define blsload_level1() { \
-  blsload_cart_mram($FF2000, $680, $80); \
-  blsload_cart_vram($100, $700, $100); \
+  blsload_cart_mram_raw($FF2000, $680, $80); \
+  blsload_cart_vram_lzo($100, $700, $100); \
 }
 
 
@@ -40,10 +40,10 @@ blsload_character	macro
 		move.l	#$80, -(sp)
 		move.l	#$380, -(sp)
 		move.l	#$FF1000, -(sp)
-		jsr	blsload_cart_mram
+		jsr	blsload_cart_mram_raw
 		move.l	#$80, -(sp)
 		move.l	#$680, -(sp)
 		move.l	#$FF2000, -(sp)
-		jsr	blsload_cart_vram
+		jsr	blsload_cart_vram_raw
 		lea	24(sp), sp
 		endm

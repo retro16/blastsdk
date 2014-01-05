@@ -4,6 +4,11 @@ Displays a scrollable hello world on screen.
 It generates both Genesis, SCD and vcart programs.
 
 
+Source test.c
+======
+ - type gcc
+ - section .text
+  - addr $300
 
 
 Output **Genesis**
