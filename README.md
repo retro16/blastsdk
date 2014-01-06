@@ -115,7 +115,7 @@ The tool is not finished and most features like breakpoints are still buggy, esp
 
 ### d68k ###
 
-A 68k disassembler. Not finished. It may be removed and replaced by another one in the future.
+A 68k disassembler.
 
 
 ### doc ###
@@ -138,14 +138,39 @@ Currently only "monitor" and "blstest" work (mostly).
 Status
 ------
 
-The project is still in early development stages.
+The project is currently reworked. Especially blsbuild.
 
-Problems that will be solved as soon as possible :
-* blsbuild code is ugly
-* documentation is sparse
-* most features don't work
-* the SDK provides virtually no functions except basic VDP and controller macros.
-* C support is totally untested
-* Z80 is totally untested
-* Library is ASM only
-* The debugger does not work for sub CPU and Z80
+Things that work as expected (ready to use) :
+
+ * asmx2 patches
+ * d68k (may have still a few bugs)
+ * bdbridge (tested only on arduino duemilanove)
+ * bda (now works really well and is very compact)
+ * bdb (still featureless, but the main idea is there)
+ * bin2c
+
+Things that will be removed
+
+ * blsbuild (replaced by blsgen)
+
+Things that will be available in the near future
+
+ * blsgen
+  * allows for more complex setups than blsbuild
+  * smooth configuration format, based on markdown !
+  * supports multi-section binaries
+  * integration with a runtime loader to be able to reuse static RAM more efficiently (say goodbye to malloc)
+  * will retain all the features of blsbuild, especially automatic memory mapping
+  * will support SGDK officially (with restrictions)
+  * will support Z80 (maybe SDCC for C support)
+  * will contain hardcoded paths to ease integration in IDEs
+  * will convert PNGs to genesis format, with the ability to extract image maps (using brute force) and palettes
+
+ * blsloader
+  * binary loader integrated in blsgen : blsgen generates loading macros for all binaries
+  * each binary can be made of many sections from multiple sources
+  * loading a binary is as simple as calling a macro
+  * minimal runtime overhead
+  * upcoming support for transparent CD-ROM loading
+  * will be able to load code, GFX, sound, raw binaries in one bundle
+  * each binary can target multiple memory chips
