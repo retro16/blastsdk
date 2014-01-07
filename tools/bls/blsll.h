@@ -26,4 +26,13 @@
     if(strcmp(s, name##_names[i]) == 0) return (name##_t)i; \
   return (name##_t)0; }
 
+
+
+
+typedef struct blsll_node {
+  void *value;
+  struct blsll_node *next;
+} blsll_node_t;
+
+
 #endif

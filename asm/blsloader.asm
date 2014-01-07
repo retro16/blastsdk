@@ -7,7 +7,7 @@
 ;;;;;
 ; blsload_cart_mram_raw(void *dest, void *src, unsigned int len);
 ; Copies from cartridge to main RAM
-blsload_cart_mram_raw	equ	memcpy
+blsload_cart_ram_raw	equ	memcpy
 
 ;;;;;
 ; blsload_cart_zram_raw(void *dest, void *src, unsigned int len);

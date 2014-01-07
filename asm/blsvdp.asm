@@ -73,7 +73,7 @@ blsvdp_dma
 ; void blsvdp_prepare_init(short *prepared);
 blsvdp_prepare_init
 		move.l	4(sp), a0
-		clr.w	(a0)
+		movei.w	#$FFFF, (a0)
 		rts
 
 ;;;;;
@@ -143,9 +143,10 @@ blsvdp_exec
 		lea	VDPCTRL, a1
 		endif
 
-vdp_send	move.w	(a0)+, d0	; Read word count
+		move.w	(a0)+, d0	; Read word count
+		cmpi.w	#$FFFF, d0	; FFFF = empty queue
 		beq.b	vdp_send_finished
-
+vdp_send
 		move.w	(a0)+, (a1)	; Send data to VDP control port
 		dbra	d0, vdp_send
 
