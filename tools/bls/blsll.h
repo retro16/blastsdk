@@ -8,7 +8,7 @@
     node->data = data; node->next = list; return node; } \
   static inline BLSLL(name) * blsll_create_##name(BLSLL(name) *list) { \
     BLSLL(name) * node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); \
-    node->data = (name *)malloc(sizeof(name)); node->next = list; return node; } \
+    node->data = (name *)calloc(sizeof(name)); node->next = list; return node; } \
   static inline void blsll_free_##name(BLSLL(name) *list) { BLSLL(name) *next; \
     for(; (list); (list) = next) { next = (list)->next; free(list); } } \
   static inline void blsll_freedata_##name(BLSLL(name) *list) { BLSLL(name) *next; \

@@ -6,7 +6,8 @@ void source_free(source_t *p) {
   free(p);
 }
 
-const char format_names[][8] = {"raw"};
+const char format_names[][8] = {"auto", "empty", "bin", "asmx", "sdcc", "gcc", "as", "png"};
+const char pfmt_names[][8] = {"ignore", "zero", "raw"};
 
 void section_free(section_t *p) {
   if(p->name) free(p->name);
