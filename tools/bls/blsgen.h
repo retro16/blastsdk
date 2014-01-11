@@ -1,13 +1,13 @@
 #ifndef BLS_BLSGEN_H
 #define BLS_BLSGEN_H
 
-char * strdupnul(const char *s) {
+#include "mdconf.h"
+
+static inline char * strdupnul(const char *s) {
   if(!s)
     return 0;
   return strdup(s);
 }
-
-struct section;
 
 typedef enum {
   format_auto, // Guess from extension
@@ -20,14 +20,15 @@ typedef enum {
 } format_t;
 BLSENUM(format);
 
+struct section;
 typedef struct source {
   format_t format;
   char *name;
 
-  struct section *sections;
-  struct source *next;
+  const struct section *sections;
 } source_t;
-BLSLL(source);
+void source_free(source_t *source);
+BLSLL_DECLARE(source_t, source_free);
 
 typedef enum {
   fmt_raw = 0
@@ -46,28 +47,26 @@ typedef struct section {
   sv_t size; // Size once loaded
 
   const source_t *source;
-
-  struct section *next;
 } section_t;
-BLSLL(section);
+void section_free(section_t *section);
+BLSLL_DECLARE(section_t, section_free);
 
 
 typedef struct symbol {
   char *name;
   chipaddr_t value;
   const section_t *section;
-  struct symbol *next;
 } symbol_t;
-BLSLL(symbol);
+void symbol_free(symbol_t *symbol);
+BLSLL_DECLARE(symbol_t, symbol_free);
 
 
 typedef struct binary {
   char *name;
-  section_t *sections;
-
-  struct binary *next;
+  const section_t *sections;
 } binary_t;
-BLSLL(binary);
+void binary_free(binary_t *binary);
+BLSLL_DECLARE(binary_t, binary_free);
 
 
 typedef enum target {
@@ -75,7 +74,7 @@ typedef enum target {
   target_scd,
   target_vcart
 } target_t;
-BLSENUM(target)
+BLSENUM(target_t)
 
 typedef struct output {
   target_t target;
@@ -86,9 +85,9 @@ typedef struct output {
   const section_t *ip;
   const section_t *sp;
 
-  binary_t *binary;
-  struct output *next;
+  const binary_t *binary;
 } output_t;
-BLSLL(output);
+void output_free(output_t *output);
+BLSLL_DECLARE(output_t, output_free);
 
 #endif

@@ -2,10 +2,10 @@
 #include "mdconf.h"
 
 mdconfnode_t *mdconf = 0;
-source_t *sources = 0;
-section_t *sections = 0;
-output_t *outputs = 0;
-symbol_t *symbols = 0;
+BLSLL(source_t) *sources = 0;
+BLSLL(section_t) *sections = 0;
+BLSLL(output_t) *outputs = 0;
+BLSLL(symbol_t) *symbols = 0;
 
 void blsconf_load(const char *file) {
   mdconf = mdconfparsefile(file);
@@ -13,9 +13,8 @@ void blsconf_load(const char *file) {
   mdconfnode_t *n;
 
   for(n = mdconf->child; (n = mdconfsearch(n, "source")); n = n->next) {
-    source_t *s = source_create();
-    s->next = sources;
-    sources = s;
+    sources = blsll_create_source_t(sources);
+    source_t *s = sources->data;
 
     s->name = strdupnul(mdconfget(n->child, "name"));
     if(!s->name) s->name = strdupnul(n->value);
@@ -55,10 +54,9 @@ void blsconf_load(const char *file) {
     }
   }
 
-  for(n = mdconf; n = mdconfsearch(n, ";output"); n = n->next) {
-    output_t *o = output_create();
-    o->next = outputs;
-    outputs = o;
+  for(n = mdconf->child; n = mdconfsearch(n, "output"); n = n->next) {
+    outputs = blsll_create_output_t(outputs);
+    output_t *o = outputs->data;
 
     o->target = target_parse(mdconfsearch(n, "target"));
     o->name = strdupnul(mdconfget(n, "name"));
@@ -68,14 +66,13 @@ void blsconf_load(const char *file) {
     if(!o->file) o->file = strdupnul(o->name);
 
     if(o->target == target_scd) {
-      const section_t *section;
-      section = sections;
+      const BLSLL(section_t) *section = sections;
       BLSLL_FINDSTR(section, name, "ip.asm");
-      o->ip = section;
+      o->ip = section->data;
 
       section = sections;
       BLSLL_FINDSTR(section, name, "sp.asm");
-      o->sp = section;
+      o->sp = section->data;
     } else {
       const symbol_t *entry = symbols;
       BLSLL_FINDSTR(entry, name, "MAIN");

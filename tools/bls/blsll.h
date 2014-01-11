@@ -1,23 +1,25 @@
 #ifndef BLSLL
 
-#define BLSLL(name) \
- struct name * name##_create() { return (struct name *)calloc(1, sizeof(struct name)); } \
- static inline struct name * name##_append(struct name * node) { \
-   struct node * next = name##_create(); \
-   next->next = node->next; \
-   node->next = next; \
-   return next; } \
- void name##_free(struct name *) \
- struct name * name##_copy(struct name *) \
- static inline struct name * name##_copylist(struct name *l) { \
-   struct name *first = name##_copy(l); \
-   struct name *tgt = first;
-   while(l->next) { tgt->next = name##_copy(l->next); tgt = tgt->next; l = l->next; } }
+#define BLSLL(name) struct blsll_node_##name
 
-#define BLSLL_FOREACH(var, list) for((var) = (list); (var); (var) = (var)->next)
-#define BLSLL_FIND(var, field, value) for(; var && (var)->field != (value); (var) = (var)->next)
-#define BLSLL_FINDSTR(var, field, value) for(; var && strcmp((var)->field, (value)); (var) = (var)->next)
-#define BLSLL_FINDSTRCASE(var, field, value) for(; var && strcasecmp((var)->field, (value)); (var) = (var)->next)
+#define BLSLL_DECLARE(name, freedata) BLSLL(name) { name *data, BLSLL(name) *next; }; \
+  static inline BLSLL(name) * blsll_insert_##name(BLSLL(name) *list, name *data) { \
+    BLSLL(name) * node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); \
+    node->data = data; node->next = list; return node; } \
+  static inline BLSLL(name) * blsll_create_##name(BLSLL(name) *list) { \
+    BLSLL(name) * node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); \
+    node->data = (name *)malloc(sizeof(name)); node->next = list; return node; } \
+  static inline void blsll_free_##name(BLSLL(name) *list) { BLSLL(name) *next; \
+    for(; (list); (list) = next) { next = (list)->next; free(list); } } \
+  static inline void blsll_freedata_##name(BLSLL(name) *list) { BLSLL(name) *next; \
+    for(; (list); (list) = next) { next = (list)->next; if((list)->data) freedata((list)->data); free(list); } } \
+  static inline BLSLL(name) * blsll_copy_##name(BLSLL(name) *list) { BLSLL(name) *prevnode = NULL, *node; \
+    for(; (list); (list) = (list)->next) { node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); node->data = list->data; node->next = NULL; if(prevnode) prevnode->next = node; } } \
+
+#define BLSLL_FOREACH(var, list) for(; (list) && ((var = list->data), list); (list) = (list)->next)
+#define BLSLL_FIND(list, field, value) for(; (list) && (!(list)-data || ((list)->data->(field) != (value))), (list) = (list)->next);
+#define BLSLL_FINDSTR(list, field, value) for(; (list) && (!(list)->data || (strcmp((list)->data->(field), (value)))), (list) = (list)->next);
+#define BLSLL_FINDSTR(list, field, value) for(; (list) && (!(list)->data || (strcasecmp((list)->data->(field), (value)))), (list) = (list)->next);
 
 
 #define BLSENUM(name) static inline name##_t name##_parse(const char *s) { if(!s) return (name##_t)0; \
@@ -25,14 +27,5 @@
   for(i = 0; i < sizeof(name##_names)/sizeof(name##_names[0]); ++i) \
     if(strcmp(s, name##_names[i]) == 0) return (name##_t)i; \
   return (name##_t)0; }
-
-
-
-
-typedef struct blsll_node {
-  void *value;
-  struct blsll_node *next;
-} blsll_node_t;
-
 
 #endif
