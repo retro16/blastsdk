@@ -22,7 +22,7 @@ clean:
 uninstall:
 	rm "$(BLSPREFIX)/lib/libbls.a"
 
-libbls.a: *.c *.h
+libbls.a: *.c ../include/*.h
 	$(CC) $(CFLAGS) -c -o libbls.o *.c
 	$(AR) rs libbls.a libbls.o
 
