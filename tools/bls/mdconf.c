@@ -65,6 +65,10 @@ static int mdconfistoken(char c)
 // Node siblings are not copied
 mdconfnode * mdconfcopy(const mdconfnode *node)
 {
+  if(!node)
+  {
+    return NULL;
+  }
   mdconfnode *copy = (mdconfnode *)malloc(sizeof(mdconfnode));
   copy->key = strdup(node->key);
   if(node->value)

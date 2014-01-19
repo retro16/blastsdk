@@ -40,7 +40,8 @@ void blsconf_load(const char *file) {
         s->sections = blsll_create_section_t(NULL);
         s->sections->data->name = strdup("");
         s->sections->data->datafile = strdup("");
-        parse_section(s->sections->data, n);
+        s->sections->data->source = s;
+        section_parse(s->sections->data, n);
         break;
       case format_bin:
         section_create_bin(s, n);
@@ -89,7 +90,7 @@ void blsconf_load(const char *file) {
   }
 }
 
-void parse_section(const section_t *s, const mdconfnode_t *md)
+void section_parse(const section_t *s, const mdconfnode_t *md)
   const char *v;
 
   if((v = mdconfget(md, "physaddr")))

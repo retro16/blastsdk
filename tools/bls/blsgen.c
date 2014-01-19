@@ -6,6 +6,8 @@ void source_free(source_t *p) {
   free(p);
 }
 
+const char bus_names[][8] = {"none", "main", "sub", "z80"};
+const char chip_names[][8] = {"none", "cart", "bram", "zram", "vram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "bin", "asmx", "sdcc", "gcc", "as", "png"};
 const char pfmt_names[][8] = {"ignore", "zero", "raw"};
 

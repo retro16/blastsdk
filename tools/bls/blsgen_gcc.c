@@ -13,30 +13,33 @@ void section_create_gcc(source_t *source, const mdconfnode_t *mdconf)
   source->sections = blsll_create_section_t(source->sections);
   sections = blsll_insert_section_t(sections, source->sections->data);
   s = source->sections->data;
-  parse_section(s, mdtext);
+  section_parse(s, mdtext);
   s->name = strdup(".text");
   s->datafile = symname2(source->name, "text");
   s->symbol.name = strdup(s->datafile);
+  s->source = source;
 
 
   // Generate the .data section
   source->sections = blsll_create_section_t(source->sections);
   sections = blsll_insert_section_t(sections, source->sections->data);
   s = source->sections->data;
-  parse_section(s, mddata);
+  section_parse(s, mddata);
   s->name = strdup(".data");
   s->datafile = symname2(source->name, "data");
   s->symbol.name = strdup(s->datafile);
+  s->source = source;
 
 
   // Generate the .bss section
   source->sections = blsll_create_section_t(source->sections);
   sections = blsll_insert_section_t(sections, source->sections->data);
   s = source->sections->data;
-  parse_section(s, mdtext);
+  section_parse(s, mdtext);
   s->name = strdup(".bss");
   s->datafile = symname2(source->name, "bss");
   s->symbol.name = strdup(s->datafile);
   s->physsize = 0; // Do not store BSS on physical medium
+  s->source = source;
 }
 

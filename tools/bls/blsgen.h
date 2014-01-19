@@ -9,6 +9,42 @@ static inline char * strdupnul(const char *s) {
   return strdup(s);
 }
 
+// A bus is an address space viewed from a CPU
+typedef enum bus {
+  bus_none,
+  bus_main,
+  bus_sub,
+  bus_z80,
+  bus_max
+} bus_t;
+BLSENUM(bus)
+
+// A chip is a memory space
+typedef enum chip {
+  chip_none,
+  chip_cart,
+  chip_bram, // Genesis in-cartridge battery RAM
+  chip_zram,
+  chip_vram,
+  chip_ram,
+  chip_pram,
+  chip_wram,
+  chip_pcm,
+  chip_max
+} chip_t;
+BLSENUM(chip);
+
+typedef struct busaddr {
+  bus_t bus;
+  sv_t addr;
+  int bank;
+} busaddr_t;
+
+typedef struct chipaddr {
+  chip_t chip;
+  sv_t addr;
+} chipaddr_t;
+
 typedef enum {
   format_auto, // Guess from extension
   format_empty, // Empty space (do not store)
@@ -25,6 +61,7 @@ struct section;
 typedef struct source {
   format_t format;
   char *name;
+  int optimize; // Optimization level
 
   const struct section *sections;
 } source_t;
@@ -69,6 +106,7 @@ BLSLL_DECLARE(symbol_t, symbol_free);
 typedef struct binary {
   char *name;
   const section_t *sections;
+  bus_t bus;
 } binary_t;
 void binary_free(binary_t *binary);
 BLSLL_DECLARE(binary_t, binary_free);
