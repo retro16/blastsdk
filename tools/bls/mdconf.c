@@ -418,7 +418,7 @@ const mdconfnode * mdconfsearch(const mdconfnode *node, const char *path)
 }
 
 /* Searches depth-first and returns value */
-const char *mdconfget(const mdconfnode *root, const char *path)
+const char * mdconfget(const mdconfnode *root, const char *path)
 {
   root = mdconfsearch(root, path);
   if(!root)
@@ -427,6 +427,17 @@ const char *mdconfget(const mdconfnode *root, const char *path)
   }
   
   return root->value;
+}
+
+/* Returns the name of a node by parsing the path or take its title value as a fallback */
+const char * mdconfgetvalue(const mdconfnode *node, const char *path)
+{
+  const char *value = mdconfget(node->child, path);
+  if(!value) {
+    value = node->value;
+  }
+
+  return value;
 }
 
 void mdconfprint(const mdconfnode *root, int depth)

@@ -3,6 +3,18 @@
 
 #include "mdconf.h"
 
+#define MDCONF_GET_INT(md, field, target, dflt) do { \
+  const char *v; if((v = mdconfget(md, #field))) (target) = parse_int(v); else (target) = (dflt); \
+while(0)
+
+#define MDCONF_GET_STR(md, field, target, dflt) do { \
+  const char *v; if((v = mdconfget(md, #field))) (target) = strdup(v); else (target) = strdup(dflt); \
+while(0)
+
+#define MDCONF_GET_ENUM(md, enumname, field, target, dflt) do { \
+  const char *v; if((v = mdconfget(md, #field))) (target) = enumname ## _parse(v); else (target) = (dflt); \
+while(0)
+
 static inline char * strdupnul(const char *s) {
   if(!s)
     return 0;
@@ -22,8 +34,9 @@ BLSENUM(bus)
 // A chip is a memory space
 typedef enum chip {
   chip_none,
+  chip_stack, // Pseudo-chip : push data onto stack.
   chip_cart,
-  chip_bram, // Genesis in-cartridge battery RAM
+  chip_bram, // Optional genesis in-cartridge battery RAM
   chip_zram,
   chip_vram,
   chip_ram,
@@ -37,7 +50,7 @@ BLSENUM(chip);
 typedef struct busaddr {
   bus_t bus;
   sv_t addr;
-  int bank;
+  int bank; // -1 = unknown
 } busaddr_t;
 
 typedef struct chipaddr {
@@ -48,7 +61,8 @@ typedef struct chipaddr {
 typedef enum {
   format_auto, // Guess from extension
   format_empty, // Empty space (do not store)
-  format_bin, // Section ""
+  format_zero, // zero-filled space (filled at runtime, no storage)
+  format_raw, // Section ""
   format_asmx, // Section ""
   format_sdcc, // Sections .text .data .bss
   format_gcc, // Sections .text .data .bss
@@ -58,58 +72,49 @@ typedef enum {
 BLSENUM(format);
 
 struct section;
-typedef struct source {
+struct blsll_node_section_t;
+typedef struct group {
   format_t format;
   char *name;
   int optimize; // Optimization level
 
-  const struct section *sections;
-} source_t;
-void source_free(source_t *source);
-BLSLL_DECLARE(source_t, source_free);
+  const struct blsll_node_section_t *sections;
+} group_t;
+void group_free(group_t *group);
+BLSLL_DECLARE(group_t, group_free);
 
-// Physical format
-typedef enum {
-  pfmt_ignore = 0, // Ignore data, leave as-is
-  pfmt_zero = 1, // Zero-fill
-  pfmt_raw = 2
-} pfmt_t;
-BLSENUM(pfmt);
+struct section;
+typedef struct symbol {
+  char *name;
+  chipaddr_t value;
+  const struct section *section; // Section providing the symbol
+} symbol_t;
 
-struct symbol;
+struct blsll_node_section_t;
 typedef struct section {
   char *name; // Segment name in source
   char *datafile; // Data file name
 
   sv_t physaddr; // Physical address on medium
   sv_t physsize; // Size on physical medium
-  pfmt_t pfmt; // Format on physical storage
+  int physalign; // Alignment on physical medium
 
-  struct symbol *symbol; // Target address
+  const struct symbol *symbol; // Target address
+  int align;
   sv_t size; // Size once loaded
 
-  const source_t *source;
+  const BLSLL(symbol_t) *intsym; // Internal symbols
+  const BLSLL(symbol_t) *extsym; // External symbols (dependencies)
+
+  const struct blsll_node_section_t *deps; // Added by "uses", "provides" or symbol dependencies
+
+  const group_t *source;
 } section_t;
 void section_free(section_t *section);
 BLSLL_DECLARE(section_t, section_free);
 
-
-typedef struct symbol {
-  char *name;
-  chipaddr_t value;
-  const section_t *section;
-} symbol_t;
 void symbol_free(symbol_t *symbol);
 BLSLL_DECLARE(symbol_t, symbol_free);
-
-
-typedef struct binary {
-  char *name;
-  const section_t *sections;
-  bus_t bus;
-} binary_t;
-void binary_free(binary_t *binary);
-BLSLL_DECLARE(binary_t, binary_free);
 
 
 typedef enum target {
@@ -128,7 +133,8 @@ typedef struct output {
   const section_t *ip;
   const section_t *sp;
 
-  const binary_t *binary;
+  const BLSLL(group_t) *binaries; // Binaries to put in the image
+  const BLSLL(group_t) *bol; // Build order list
 } output_t;
 void output_free(output_t *output);
 BLSLL_DECLARE(output_t, output_free);

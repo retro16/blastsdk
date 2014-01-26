@@ -133,7 +133,6 @@ blsvdp_prepare_dma
 
 ;;;;;
 ; Sends a prepared buffer to the VDP control port.
-; Stream is terminated by $FFFF (all prepare functions add proper termination)
 ; void blsvdp_exec(short *prepared);
 blsvdp_exec
 		move.l	4(sp), a0

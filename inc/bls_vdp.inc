@@ -314,8 +314,13 @@ VDPSETWRITEPLANE	macro	plane, w, x, y	; Place VDP write address in plane name ta
 		VDPSETWRITE (x * 2 + y * w * 2 + plane), VRAM
 		endm
 
+VDPPREPSTART	macro
+		dw	((.__vdpprepterminate-.__vdpprepstart) / 2) - 1
+.__vdpprepstart
+		endm
+
 VDPPREPTERMINATE	macro
-		dw	$FFFF
+.__vdpprepterminate
 		endm
 
 VDPTILE_PRIO	equ	$8000
