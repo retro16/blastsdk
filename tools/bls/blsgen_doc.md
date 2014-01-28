@@ -29,8 +29,8 @@ Determine the source used by entry point. Use it as the starting point for the f
     Add the source to the BOL
     For each section in source
         For each external symbol
-            Find section holding this symbol
-            When found, recurse with this section
+            Find source defining this symbol
+            When found, recurse with this source
 
 Compute binary sizes
 --------------------

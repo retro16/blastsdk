@@ -76,7 +76,7 @@ struct blsll_node_section_t;
 typedef struct group {
   format_t format;
   char *name;
-  int optimize; // Optimization level
+  int optimize; // Optimization level (used for compilation or compression level)
 
   const struct blsll_node_section_t *sections;
 } group_t;
