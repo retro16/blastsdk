@@ -5,16 +5,23 @@ Create high level structures
 ----------------------------
 
  * Parse conf file
+  - parse sources
+	- parse sections
+	- parse binaries
+	- parse outputs
+
+ * Generate binaries from outputs
 
  * Generate sources from binaries
 
  * Generate sections from sources
 
  * Finalize all sources
-  - source.name, source.format
 
  * Finalize all sections
   - section.pfmt, section.name, section.symbol.name, section.symbol.value.chip
+
+ * Finalize all binaries
 
  * Determine entry points
 
@@ -29,7 +36,8 @@ Determine the source used by entry point. Use it as the starting point for the f
     Add the source to the BOL
     For each section in source
         For each external symbol
-            Find source defining this symbol
+            Find section defining this symbol
+						Find source associated with this section
             When found, recurse with this source
 
 Compute binary sizes

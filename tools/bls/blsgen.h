@@ -71,6 +71,9 @@ typedef enum {
 } format_t;
 BLSENUM(format);
 
+// Sources are groups of sections
+// Binaries are groups of sections
+
 struct section;
 struct blsll_node_section_t;
 typedef struct group {
