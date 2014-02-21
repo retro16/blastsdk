@@ -95,7 +95,7 @@ typedef struct symbol {
 
 struct blsll_node_section_t;
 typedef struct section {
-  char *name; // Segment name in source
+  char *name; // Segment name in source: "", ".text", ".img", ".pal", ...
   char *datafile; // Data file name
 
   sv_t physaddr; // Physical address on medium
@@ -111,7 +111,7 @@ typedef struct section {
 
   const struct blsll_node_section_t *deps; // Added by "uses", "provides" or symbol dependencies
 
-  const group_t *source;
+  const group_t *source; // Source that generates this section
 } section_t;
 void section_free(section_t *section);
 BLSLL_DECLARE(section_t, section_free);
