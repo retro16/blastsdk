@@ -105,7 +105,7 @@ BLSLL_DECLARE(symbol, symbol_free)
 
 struct blsll_node_section;
 typedef struct section {
-  char *name; // Segment name in source
+  char *name; // Segment name in source: "", ".text", ".img", ".pal", ...
   char *datafile; // Data file name
 
   sv physaddr; // Physical address on medium
@@ -126,7 +126,6 @@ typedef struct section {
 section * section_new();
 void section_free(section *section);
 BLSLL_DECLARE(section, section_free)
-
 
 
 typedef enum target {
