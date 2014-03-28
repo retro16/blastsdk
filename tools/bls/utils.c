@@ -374,7 +374,7 @@ sv_t parse_int(const char **cp, int len)
       val *= 10;
       val += *c - '0';
     }
-    else if(*c == 'x' || *c == "*")
+    else if(*c == 'x' || *c == '*')
     {
       *cp = c + 1;
       sv_t second = parse_int(cp, len);

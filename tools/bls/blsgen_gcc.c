@@ -1,20 +1,22 @@
+#include "blsgen.h"
+
 /* blsgen functions to generate binaries from gcc sources */
 
-void section_create_gcc(source_t *source, const mdconfnode_t *mdconf)
+void section_create_gcc(group *source, const mdconfnode *mdconf)
 {
   mdconf = mdconf->child;
 
-  mdconfnode_t *mdtext = mdconfsearch(mdconf, "section=.text");
-  mdconfnode_t *mddata = mdconfsearch(mdconf, "section=.data");
-  mdconfnode_t *mdbss = mdconfsearch(mdconf, "section=.bss");
+  mdconfnode *mdtext = mdconfsearch(mdconf, "section=.text");
+  mdconfnode *mddata = mdconfsearch(mdconf, "section=.data");
+  mdconfnode *mdbss = mdconfsearch(mdconf, "section=.bss");
 
 
-  section_t *s;
+  section *s;
 
   // Generate the .text section
-  source->sections = blsll_create_section_t(source->sections);
-  sections = blsll_insert_section_t(sections, source->sections->data);
-  s = source->sections->data;
+  source->provides = blsll_create_section(source->provides);
+  sections = blsll_insert_section(sections, source->provides->data);
+  s = source->provides->data;
   section_parse(s, mdtext);
   s->name = strdup(".text");
   s->datafile = symname2(source->name, "text");
@@ -23,9 +25,9 @@ void section_create_gcc(source_t *source, const mdconfnode_t *mdconf)
 
 
   // Generate the .data section
-  source->sections = blsll_create_section_t(source->sections);
-  sections = blsll_insert_section_t(sections, source->sections->data);
-  s = source->sections->data;
+  source->provides = blsll_create_section(source->provides);
+  sections = blsll_insert_section(sections, source->provides->data);
+  s = source->provides->data;
   section_parse(s, mddata);
   s->name = strdup(".data");
   s->datafile = symname2(source->name, "data");
@@ -34,9 +36,9 @@ void section_create_gcc(source_t *source, const mdconfnode_t *mdconf)
 
 
   // Generate the .bss section
-  source->sections = blsll_create_section_t(source->sections);
-  sections = blsll_insert_section_t(sections, source->sections->data);
-  s = source->sections->data;
+  source->provides = blsll_create_section(source->provides);
+  sections = blsll_insert_section(sections, source->provides->data);
+  s = source->provides->data;
   section_parse(s, mdtext);
   s->name = strdup(".bss");
   s->datafile = symname2(source->name, "bss");

@@ -1,4 +1,4 @@
-TARGETS = d68k bdb blsbuild scdupload
+TARGETS = d68k bdb scdupload blsgen
 
 INSTALL_DIR ?= $(HOME)/bin
 INSTALL_TARGETS = $(TARGETS) d68ktest
@@ -8,6 +8,7 @@ clean:
 	rm -f *.o $(TARGETS)
 
 # Per-source rules
+blsgen: blsgen.o blsgen_gcc.o blsconf.o mdconf.o
 blsbuild: blsbuild.o address.o compile.o config.o output.o source.o utils.o img.o
 bdb: bdb.o bdp.o d68k_mod.o symtable.o utils.o binparse.o
 d68k: d68k.o d68k_mod.o symtable.o utils.o

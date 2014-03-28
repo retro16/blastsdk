@@ -1,24 +1,24 @@
 #include "blsgen.h"
 #include "mdconf.h"
 
-mdconfnode_t *mdconf = 0;
+mdconfnode *mdconf = 0;
 
 // Global linked lists
-#define GLOBLL(name) \
-BLSLL(name ## _t) *name ## _s = 0; \
-name ## _t * name ## _new() { \
-  name ## s = blsll_create_ ## name ## _t(name ## s); \
+#define GLOBLL(type, name) \
+BLSLL(type) *name = 0; \
+type * name ## _new() { \
+  name = blsll_create_ ## type (name); \
   return name ## s->data; \
 }
-GLOBLL(source)
-GLOBLL(section)
-GLOBLL(output)
-GLOBLL(symbol)
+GLOBLL(group, sources)
+GLOBLL(section, sections)
+GLOBLL(group, binaries)
+GLOBLL(output, outputs)
+GLOBLL(symbol, symbols)
 #undef GLOBLL
 
-void source_parse(source_t *s, const mdconfnode_t *n) {
-  s->name = strdupnul(mdconfgetvalue(n, "name"));
-  n = n->child;
+void source_parse(group *s, const mdconfnode *n, const char *name) {
+  s->name = strdupnul(name);
   s->format = format_parse(mdconfget(n, "format"));
   if(s->format == format_auto && s->name) {
     // Try to deduce format from file name
@@ -38,11 +38,11 @@ void source_parse(source_t *s, const mdconfnode_t *n) {
   
   switch(s->format) {
     case format_empty:
-      s->sections = blsll_insert_section_t(NULL, section_new());
-      s->sections->data->name = strdup("");
-      s->sections->data->datafile = strdup("");
-      s->sections->data->source = s;
-      section_parse(s->sections->data, n->child);
+      s->provides = blsll_insert_section(NULL, section_new());
+      s->provides->data->name = strdup("");
+      s->provides->data->datafile = strdup("");
+      s->provides->data->source = s;
+      section_parse(s->provides->data, n->child);
       break;
     case format_bin:
       section_create_bin(s, n);
@@ -62,7 +62,7 @@ void source_parse(source_t *s, const mdconfnode_t *n) {
   }
 }
 
-void output_parse(output_t *o, const mdconfnode *n, const char *name)
+void output_parse(output *o, const mdconfnode *n, const char *name)
 {
   o->target = target_parse(mdconfsearch(n, "target"));
   o->name = strdupnul(mdconfget(n, "name"));
@@ -72,7 +72,7 @@ void output_parse(output_t *o, const mdconfnode *n, const char *name)
   if(!o->file) o->file = strdupnul(o->name);
 
   if(o->target == target_scd) {
-    const BLSLL(section_t) *section = sections;
+    const BLSLL(section) *section = sections;
     BLSLL_FINDSTR(section, name, "ip.asm");
     o->ip = section->data;
 
@@ -80,7 +80,7 @@ void output_parse(output_t *o, const mdconfnode *n, const char *name)
     BLSLL_FINDSTR(section, name, "sp.asm");
     o->sp = section->data;
   } else {
-    const symbol_t *entry = symbols;
+    const symbol *entry = symbols;
     BLSLL_FINDSTR(entry, name, "MAIN");
     o->entry = entry;
   }
@@ -89,27 +89,80 @@ void output_parse(output_t *o, const mdconfnode *n, const char *name)
 void blsconf_load(const char *file) {
   mdconf = mdconfparsefile(file);
 
-  mdconfnode_t *n;
+  mdconfnode *n;
   for(n = mdconf->child; (n = mdconfsearch(n, "source")); n = n->next) {
-    source_parse(n->child, source_new(), mdconfgetvalue(n, "name"));
+    sources = blsll_insert_group(sources, group_new());
+    source_parse(sources->data, n->child, mdconfgetvalue(n, "name"));
   }
 
   for(n = mdconf->child; n = mdconfsearch(n, "output"); n = n->next) {
-    output_parse(n->child, output_new(), mdconfgetvalue(n, "name"));
+    outputs = blsll_insert_output(outputs, output_new());
+    output_parse(outputs->data, n->child, mdconfgetvalue(n, "name"));
   }
 }
 
-void section_parse(const section_t *s, const mdconfnode_t *md)
+void section_parse(const section *s, const mdconfnode *md)
   MDCONF_GET_INT(md, physaddr, s->physaddr, -1);
   MDCONF_GET_INT(md, physsize, s->physsize, -1);
   MDCONF_GET_ENUM(md, format, format, s->format, format_raw);
 
-  symbols = blsll_create_symbol_t(symbols);
+  symbols = blsll_create_symbol(symbols);
   s->symbol = symbols->data;
 
   MDCONF_GET_ENUM(md, chip, chip, s->symbol->value.chip, chip_none);
   MDCONF_GET_INT(md, addr, s->symbol->value.addr, -1);
   MDCONF_GET_INT(md, size, s->size, -1);
+}
+
+void binary_parse(group *b, const mdconfnode *mdnode) {
+  group *bin = group_new();
+  bin->name = strdupnul(mdconfgetvalue(mdnode, "name"));
+  binaries = blsll_insert_group(binaries, bin);
+
+  group *g;
+  section *s;
+  for(n = mdnode->child; (n = mdconfsearch(n, "provides")); n = n->next) {
+    const char *name = n->value;
+    if((s = section_find(name))) {
+      // Represents a section name
+      bin->provides = blsll_insert_section(bin->provides, s);
+      continue;
+    }
+    if((g = source_find(name))) {
+      // Represents a source
+      bin->provides = blsll_copy_section(g->provides, bin->provides);
+      continue;
+    }
+
+    // Name not found : create a source with that name
+    g = source_new();
+    if(g->format != format_empty) {
+      // Represents a newly created source
+      sources = blsll_insert_group(sources, g);
+      bin->provides = blsll_copy_section(g->provides, bin->provides);
+      continue;
+    } else {
+      source_free(g);
+    }
+
+    printf("Warning in binary %s: could not find source or section %s\n", bin->name, name);
+  }
+
+  for(n = mdnode->child; (n = mdconfsearch(n, "uses")); n = n->next) {
+    const char *name = n->value;
+    if((s = section_find(name))) {
+      // Represents a section name
+      bin->uses = blsll_insert_section(bin->uses, s);
+      continue;
+    }
+    if((g = source_find(name))) {
+      // Represents a source
+      bin->uses = blsll_copy_section(g->uses, bin->uses);
+      continue;
+    }
+
+    printf("Warning in binary %s: could not find dependency source or section %s\n", bin->name, name);
+  }
 }
 
 char *symname(const char *s)

@@ -1,8 +1,13 @@
 #include "blsll.h"
+#include "blsgen.h"
+#include "blsconf.h"
 
-void source_free(source_t *p) {
-  if(p->format) free(p->format);
-   if(p->name) free(p->name);
+group * group_new() {
+  return (group *)malloc(sizeof(group));
+}
+
+void group_free(group *p) {
+  if(p->name) free(p->name);
   free(p);
 }
 
@@ -10,26 +15,28 @@ const char bus_names[][8] = {"none", "main", "sub", "z80"};
 const char chip_names[][8] = {"none", "stack", "cart", "bram", "zram", "vram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
 
-void section_free(section_t *p) {
+section * section_new() {
+  return (section *)malloc(sizeof(section));
+}
+
+void section_free(section *p) {
   if(p->name) free(p->name);
   if(p->datafile) free(p->datafile);
-  if(p->format) free(p->format);
   free(p);
 }
 
-void symbol_free(symbol_t *p) {
-  free(name);
-  free(p);
+symbol * symbol_new() {
+  return (symbol *)malloc(sizeof(symbol));
 }
 
-void binary_free(binary_t *p) {
+void symbol_free(symbol *p) {
   if(p->name) free(p->name);
   free(p);
 }
 
 const char target_name[][8] = {"gen", "scd", "vcart"};
 
-void output_free(output_t *p) {
+void output_free(output *p) {
   if(p->name) free(p->name);
   if(p->region) free(p->region);
   if(p->file) free(p->file);

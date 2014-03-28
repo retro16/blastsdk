@@ -1,3 +1,40 @@
+High level structures
+=====================
+
+Section
+-------
+
+Low level unit, represents one memory-mapped binary stream on the target system.
+Sections can be groupped together in a group.
+
+
+Source
+------
+
+A source is a group of sections linked to a source file.
+
+For example, a ".c" file generates 4 sections : .text; .rodata, .data and .bss ; these sections are linked to the same ".c" source.
+
+
+Binary
+------
+
+A binary is a group of sections loaded at the same time.
+
+You call BLS loading functions on binaries, thus loading every section of the given group.
+
+In the future, binary loading will be parallelized and optimized better.
+
+
+Output
+------
+
+An output is a target for a given architecture. It represents the final ".bin" or ".iso" file. An output is a group of sections that will be put into the image.
+
+There can be multiple outputs for a given project. Outputs can share sections as long as compiling sections do not require different parameters.
+
+
+
 Process to generate an output
 =============================
 
@@ -9,6 +46,8 @@ Create high level structures
 	- parse sections
 	- parse binaries
 	- parse outputs
+
+ * Find entry point
 
  * Generate binaries from outputs
 
@@ -37,7 +76,7 @@ Determine the source used by entry point. Use it as the starting point for the f
     For each section in source
         For each external symbol
             Find section defining this symbol
-						Find source associated with this section
+            Find source associated with this section
             When found, recurse with this source
 
 Compute binary sizes
