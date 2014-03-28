@@ -4,6 +4,15 @@
 #include <stdint.h>
 #include <string.h>
 #include "mdconf.h"
+#include "blsll.h"
+
+
+extern BLSLL(group) *sources;
+extern BLSLL(section) *sections;
+extern BLSLL(group) *binaries;
+extern BLSLL(output) *outputs;
+extern BLSLL(symbol) *symbols;
+
 
 #define MDCONF_GET_INT(md, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = parse_int(v); else (target) = (dflt); \
@@ -86,8 +95,8 @@ typedef struct group {
   char *name;
   int optimize; // Optimization level (used for compilation or compression level)
 
-  const struct blsll_node_section *provides;
-  const struct blsll_node_section *uses;
+  struct blsll_node_section *provides;
+  struct blsll_node_section *uses;
 } group;
 group * group_new();
 void group_free(group *group);
@@ -97,7 +106,7 @@ struct section;
 typedef struct symbol {
   char *name;
   chipaddr value;
-  const struct section *section; // Section providing the symbol
+  struct section *section; // Section providing the symbol
 } symbol;
 symbol * symbol_new();
 void symbol_free(symbol *symbol);
@@ -116,10 +125,10 @@ typedef struct section {
   int align;
   sv size; // Size once loaded
 
-  const BLSLL(symbol) *intsym; // Internal symbols
-  const BLSLL(symbol) *extsym; // External symbols (dependencies)
+  BLSLL(symbol) *intsym; // Internal symbols
+  BLSLL(symbol) *extsym; // External symbols (dependencies)
 
-  const struct blsll_node_section *deps; // Added by "uses", "provides" or symbol dependencies
+  struct blsll_node_section *deps; // Added by "uses", "provides" or symbol dependencies
 
   const group *source;
 } section;

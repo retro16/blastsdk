@@ -6,9 +6,9 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
 {
   mdconf = mdconf->child;
 
-  mdconfnode *mdtext = mdconfsearch(mdconf, "section=.text");
-  mdconfnode *mddata = mdconfsearch(mdconf, "section=.data");
-  mdconfnode *mdbss = mdconfsearch(mdconf, "section=.bss");
+  const mdconfnode *mdtext = mdconfsearch(mdconf, "section=.text");
+  const mdconfnode *mddata = mdconfsearch(mdconf, "section=.data");
+  const mdconfnode *mdbss = mdconfsearch(mdconf, "section=.bss");
 
 
   section *s;
