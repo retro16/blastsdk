@@ -157,8 +157,8 @@ typedef struct output {
   const section *ip;
   const section *sp;
 
-  const BLSLL(group) *binaries; // Binaries to put in the image
-  const BLSLL(group) *bol; // Build order list
+  BLSLL(group) *binaries; // Binaries to put in the image
+  BLSLL(group) *bol; // Build order list
 } output;
 output * output_new();
 void output_free(output *output);

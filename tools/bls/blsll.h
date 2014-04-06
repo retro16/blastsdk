@@ -20,8 +20,8 @@
 
 #define BLSLL_FOREACH(var, list) for(; (list) && ((var = list->data), list); (list) = (list)->next)
 #define BLSLL_FIND(list, field, value) for(; (list) && (!(list)-data || ((list)->data->(field) != (value))), (list) = (list)->next);
-#define BLSLL_FINDSTR(list, field, value) for(; (list) && (!(list)->data || (strcmp((list)->data->field, (value)))); (list) = (list)->next);
-#define BLSLL_FINDSTRCASE(list, field, value) for(; (list) && (!(list)->data || (strcasecmp((list)->data->field, (value)))); (list) = (list)->next);
+#define BLSLL_FINDSTR(list, field, value) for(; (list) && (!(list)->data || !(list)->data->field || (strcmp((list)->data->field, (value)))); (list) = (list)->next);
+#define BLSLL_FINDSTRCASE(list, field, value) for(; (list) && (!(list)->data || !(list)->data->field || (strcasecmp((list)->data->field, (value)))); (list) = (list)->next);
 
 
 #define BLSENUM(name, size) extern const char name##_names[][size];\

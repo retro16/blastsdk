@@ -93,7 +93,9 @@ sv parse_int(const char *cp) {
 
 
 group * group_new() {
-  return (group *)malloc(sizeof(group));
+  group *g = (group *)calloc(1, sizeof(group));
+  g->optimize = -1;
+  return g;
 }
 
 void group_free(group *p) {
@@ -104,9 +106,14 @@ void group_free(group *p) {
 const char bus_names[][8] = {"none", "main", "sub", "z80"};
 const char chip_names[][8] = {"none", "stack", "cart", "bram", "zram", "vram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
+const char target_names[][8] = {"gen", "scd", "vcart"};
 
 section * section_new() {
-  return (section *)calloc(1, sizeof(section));
+  section *sec = (section *)calloc(1, sizeof(section));
+  sec->physaddr = -1;
+  sec->physsize = -1;
+  sec->size = -1;
+  return sec;
 }
 
 void section_free(section *p) {
@@ -116,7 +123,9 @@ void section_free(section *p) {
 }
 
 symbol * symbol_new() {
-  return (symbol *)calloc(1, sizeof(symbol));
+  symbol *sym = (symbol *)calloc(1, sizeof(symbol));
+  sym->value.addr = -1;
+  return sym;
 }
 
 void symbol_free(symbol *p) {
@@ -177,7 +186,212 @@ group * binary_find(const char *name) {
   return NULL;
 }
 
+void group_dump(const group *grp, FILE *out) {
+  BLSLL(section) *secl;
+  section *sec;
+
+  fprintf(out, " - format %s\n", format_names[grp->format]);
+
+  if(grp->optimize >= 0) {
+    fprintf(out, " - optimize %d\n", grp->optimize);
+  }
+
+  if(grp->provides) {
+    secl = grp->provides;
+
+    fprintf(out, " - provides ");
+    BLSLL_FOREACH(sec, secl) {
+      fprintf(out, "%s", sec->source->name);
+      fprintf(out, "%s", sec->name);
+      if(secl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, "\n");
+  }
+
+  if(grp->uses) {
+    BLSLL(section) *secl = grp->uses;
+    section *sec;
+
+    fprintf(out, " - uses ");
+    BLSLL_FOREACH(sec, secl) {
+      fprintf(out, "%s", sec->source->name);
+      fprintf(out, "%s", sec->name);
+      if(secl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, "\n");
+  }
+}
+
+void symtable_dump(const BLSLL(symbol) *syml, FILE *out)
+{
+  const symbol *sym;
+  BLSLL_FOREACH(sym, syml) {
+    if(!sym->name) {
+      fprintf(out, "Unnamed symbol\n");
+      continue;
+    }
+    fprintf(out, "%5.5s", chip_names[sym->value.chip]);
+    if(sym->value.addr >= 0) {
+      fprintf(out, "0x%08X", (uint32_t)sym->value.addr);
+    } else {
+      fprintf(out, "??????????");
+    }
+    fprintf(out, " %s\n", sym->name);
+  }
+}
+
+void section_dump(const section *sec, FILE *out)
+{
+    fprintf(out, " - datafile %s\n", sec->datafile);
+    fprintf(out, " - format %s\n", format_names[sec->format]);
+
+    if(sec->physaddr != -1) {
+      fprintf(out, " - physaddr $%08lX\n", (uint64_t)sec->physaddr);
+    }
+    if(sec->physsize != -1) {
+      fprintf(out, " - physsize $%08lX\n", (uint64_t)sec->physsize);
+    }
+    if(sec->physalign) {
+      fprintf(out, " - physalign %d\n", sec->physalign);
+    }
+
+    if(sec->symbol) {
+      fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
+      if(sec->symbol->value.addr != -1) {
+        fprintf(out, " - addr $%08lX\n", (uint64_t)sec->symbol->value.addr);
+      }
+    }
+
+    if(sec->align) {
+      fprintf(out, " - align %d\n", sec->align);
+    }
+    if(sec->size >= 0) {
+      fprintf(out, " - size $%lX\n", (uint64_t)sec->size);
+    }
+    fprintf(out, "\n");
+
+    if(sec->symbol) {
+      if(sec->symbol->name) {
+        fprintf(out, "Symbol name %s\n\n", sec->symbol->name);
+      }
+    }
+
+    if(sec->intsym) {
+      fprintf(out, "Internal symbol table :\n");
+      symtable_dump(sec->intsym, out);
+    }
+
+    if(sec->extsym) {
+      fprintf(out, "External symbol table :\n");
+      symtable_dump(sec->extsym, out);
+    }
+}
+
+void output_dump(output *outp, FILE *out) {
+  fprintf(out, " - target %s\n", target_names[outp->target]);
+  if(outp->region) {
+    fprintf(out, " - region %s\n", outp->region);
+  }
+  if(outp->file) {
+    fprintf(out, " - file %s\n", outp->file);
+  }
+  if(outp->target == target_scd) {
+    if(outp->ip) {
+      fprintf(out, " - ip %s%s\n", outp->ip->source->name, outp->ip->name);
+    }
+    if(outp->sp) {
+      fprintf(out, " - sp %s%s\n", outp->sp->source->name, outp->sp->name);
+    }
+  } else if(outp->entry) {
+    fprintf(out, " - entry %s\n", outp->entry->name);
+  }
+
+  const BLSLL(group) *grpl;
+  group *grp;
+  if(outp->binaries) {
+    fprintf(out, " - binaries ");
+    grpl = outp->binaries;
+    BLSLL_FOREACH(grp, grpl) {
+      fprintf(out, "%s", grp->name);
+      if(grpl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, "\n");
+  }
+
+  if(outp->bol) {
+    fprintf(out, "\nBuild order list: ");
+    grpl = outp->bol;
+    BLSLL_FOREACH(grp, grpl) {
+      fprintf(out, "%s", grp->name);
+      if(grpl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, "\n");
+  }
+}
+
+void blsconf_dump(FILE *out) {
+  // Dumps the whole configuration to a FILE
+
+  fprintf(out, "blsgen configuration dump\n");
+
+  BLSLL(section) *secl;
+  section *sec;
+  BLSLL(group) *grpl;
+  group *grp;
+  BLSLL(output) *outl;
+  output *outp;
+
+  // Dump sources
+  fprintf(out, "\n----------------------------------------\n");
+  fprintf(out, "\nSources\n=======\n\n");
+  grpl = sources;
+  BLSLL_FOREACH(grp, grpl) {
+    fprintf(out, "Source %s\n------\n\n", grp->name);
+    group_dump(grp, out);
+    fprintf(out, "\n");
+  }
+
+  // Dump sections
+  fprintf(out, "\n----------------------------------------\n");
+  fprintf(out, "\nSections\n========\n\n");
+  secl = sections;
+  BLSLL_FOREACH(sec, secl) {
+    fprintf(out, "Section %s%s\n-------\n\n", sec->source && sec->source->name ? sec->source->name : "___", sec->name);
+    section_dump(sec, out);
+    fprintf(out, "\n");
+  }
+
+  // Dump binaries
+  fprintf(out, "\n----------------------------------------\n");
+  fprintf(out, "\nBinaries\n========\n\n");
+  grpl = binaries;
+  BLSLL_FOREACH(grp, grpl) {
+    fprintf(out, "Binary %s\n------\n\n", grp->name);
+    group_dump(grp, out);
+    fprintf(out, "\n");
+  }
+
+  // Dump outputs
+  fprintf(out, "\n----------------------------------------\n");
+  fprintf(out, "\nOutputs\n=======\n\n");
+  outl = outputs;
+  BLSLL_FOREACH(outp, outl) {
+    fprintf(out, "Output %s\n------\n\n", outp->name);
+    output_dump(outp, out);
+    fprintf(out, "\n");
+  }
+}
+
 int main() {
   blsconf_load("blsgen.md");
 
+  blsconf_dump(stdout);
 }

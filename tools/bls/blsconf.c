@@ -72,8 +72,8 @@ void source_parse(group *s, const mdconfnode *n, const char *name) {
 void output_parse(output *o, const mdconfnode *n, const char *name)
 {
   o->name = strdupnul(name);
-  /*
   o->target = target_parse(mdconfget(n, "target"));
+  /*
   o->name = strdupnul(mdconfget(n, "name"));
   if(!o->name) o->name = strdupnul(n->value);
   */
@@ -122,8 +122,12 @@ void section_parse(section *s, const mdconfnode *md) {
   MDCONF_GET_INT(md, physsize, s->physsize, -1);
   MDCONF_GET_ENUM(md, format, format, s->format, format_raw);
 
-  symbols = blsll_create_symbol(symbols);
-  s->symbol = symbols->data;
+  if(!s->symbol)
+  {
+    symbols = blsll_create_symbol(symbols);
+    s->symbol = symbols->data;
+    s->symbol->name = symname(s->name);
+  }
 
   MDCONF_GET_ENUM(md, chip, chip, s->symbol->value.chip, chip_none);
   MDCONF_GET_INT(md, addr, s->symbol->value.addr, -1);
@@ -193,7 +197,7 @@ char *symname(const char *s)
   char *sname = (char *)malloc(slen + 1);
   char *sn = sname;
   while(*s) {
-    while(*s && (*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'z' || *s >= 'A' && *s <= 'Z')) {
+    while(*s && ((*s >= '0' && *s <= '9') || (*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z'))) {
       if(*s >= 'a') {
         *sn = *s + 'A' - 'a';
       } else {
@@ -208,7 +212,7 @@ char *symname(const char *s)
       *sn = '_';
       ++sn;
     }
-    while(*s && !(*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'z' || *s >= 'A' && *s <= 'Z')) {
+    while(*s && !((*s >= '0' && *s <= '9') || (*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z'))) {
       ++s;
     }
   }
@@ -222,7 +226,7 @@ char *symname2(const char *s, const char *s2)
   char *sname = (char *)malloc(slen + 1);
   char *sn = sname;
   while(*s) {
-    while(*s && (*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'z' || *s >= 'A' && *s <= 'Z')) {
+    while(*s && ((*s >= '0' && *s <= '9') || (*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z'))) {
       if(*s >= 'a') {
         *sn = *s + 'A' - 'a';
       } else {
@@ -237,7 +241,7 @@ char *symname2(const char *s, const char *s2)
       *sn = '_';
       ++sn;
     }
-    while(*s && !(*s >= '0' && *s <= '9' ||* s >= 'a' && *s <= 'z' || *s >= 'A' && *s <= 'Z')) {
+    while(*s && !((*s >= '0' && *s <= '9') || (*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z'))) {
       ++s;
     }
 

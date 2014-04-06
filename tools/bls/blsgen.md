@@ -83,7 +83,7 @@ Section myfont.png.img
 ----------------------
 
  - addr $0
- - pfmt lzo (compress to lzo. BLS loader will decompress at runtime)
+ - pfmt lz4 (compress to lz4. BLS loader will decompress at runtime)
  
 (png implies chip vram by default)
 
@@ -127,4 +127,4 @@ Output mygame.img
  - author Retro 16
  - binaries mainbinary blsload.asm splash.c copyright.png
  
- - entrypoint splash
+ - entry splash
