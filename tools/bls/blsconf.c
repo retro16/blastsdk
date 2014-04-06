@@ -111,6 +111,11 @@ void blsconf_load(const char *file) {
     source_parse(sources->data, n->child, mdconfgetvalue(n, "name"));
   }
 
+  for(n = mdconf->child; (n = mdconfsearch(n, "binary")); n = n->next) {
+    binaries = blsll_insert_group(binaries, group_new());
+    binary_parse(binaries->data, n->child, mdconfgetvalue(n, "name"));
+  }
+
   for(n = mdconf->child; (n = mdconfsearch(n, "output")); n = n->next) {
     outputs = blsll_insert_output(outputs, output_new());
     output_parse(outputs->data, n->child, mdconfgetvalue(n, "name"));
@@ -134,16 +139,14 @@ void section_parse(section *s, const mdconfnode *md) {
   MDCONF_GET_INT(md, size, s->size, -1);
 }
 
-void binary_parse(group *b, const mdconfnode *mdnode) {
-  group *bin = group_new();
-  bin->name = strdupnul(mdconfgetvalue(mdnode, "name"));
-  binaries = blsll_insert_group(binaries, bin);
+void binary_parse(group *bin, const mdconfnode *mdnode, const char *name) {
+  bin->name = strdupnul(name);
 
   const mdconfnode *n;
 
   group *g;
   section *s;
-  for(n = mdnode->child; (n = mdconfsearch(n, "provides")); n = n->next) {
+  for(n = mdnode; (n = mdconfsearch(n, "provides")); n = n->next) {
     const char *name = n->value;
     if((s = section_find(name))) {
       // Represents a section name
@@ -171,7 +174,7 @@ void binary_parse(group *b, const mdconfnode *mdnode) {
     printf("Warning in binary %s: could not find source or section %s\n", bin->name, name);
   }
 
-  for(n = mdnode->child; (n = mdconfsearch(n, "uses")); n = n->next) {
+  for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
     const char *name = n->value;
     if((s = section_find(name))) {
       // Represents a section name
