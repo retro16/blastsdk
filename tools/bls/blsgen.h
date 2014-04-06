@@ -1,6 +1,7 @@
 #ifndef BLS_BLSGEN_H
 #define BLS_BLSGEN_H
 
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include "mdconf.h"
@@ -16,15 +17,15 @@ extern BLSLL(symbol) *symbols;
 
 #define MDCONF_GET_INT(md, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = parse_int(v); else (target) = (dflt); \
-while(0)
+} while(0)
 
 #define MDCONF_GET_STR(md, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = strdup(v); else (target) = strdup(dflt); \
-while(0)
+} while(0)
 
 #define MDCONF_GET_ENUM(md, enumname, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = enumname ## _parse(v); else (target) = (dflt); \
-while(0)
+} while(0)
 
 static inline char * strdupnul(const char *s) {
   if(!s)
@@ -117,11 +118,13 @@ typedef struct section {
   char *name; // Segment name in source: "", ".text", ".img", ".pal", ...
   char *datafile; // Data file name
 
+  format format;
+
   sv physaddr; // Physical address on medium
   sv physsize; // Size on physical medium
   int physalign; // Alignment on physical medium
 
-  const struct symbol *symbol; // Target address
+  struct symbol *symbol; // Target address
   int align;
   sv size; // Size once loaded
 
@@ -157,11 +160,27 @@ typedef struct output {
   const BLSLL(group) *binaries; // Binaries to put in the image
   const BLSLL(group) *bol; // Build order list
 } output;
+output * output_new();
 void output_free(output *output);
 BLSLL_DECLARE(output, output_free)
 
 group * source_find(const char *name);
 section * section_find(const char *name);
+symbol * symbol_find(const char *name);
+output * output_find(const char *name);
 group * binary_find(const char *name);
+
+static inline sv neg_int(sv v) {
+  if(v < 0) return v;
+  return (-v) & 0xFFFFFFFF;
+}
+
+static inline sv not_int(sv v) {
+  if(v < 0) return v;
+  return (~v) & 0xFFFFFFFF;
+}
+
+void skipblanks(const char **cp);
+sv parse_int(const char *cp);
 
 #endif
