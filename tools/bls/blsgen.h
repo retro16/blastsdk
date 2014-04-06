@@ -15,17 +15,27 @@ extern BLSLL(output) *outputs;
 extern BLSLL(symbol) *symbols;
 
 
-#define MDCONF_GET_INT(md, field, target, dflt) do { \
+#define MDCONF_GET_INT(md, field, target) do { \
+  const char *v; if((v = mdconfget(md, #field))) (target) = parse_int(v); \
+} while(0)
+#define MDCONF_GET_INT_DFL(md, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = parse_int(v); else (target) = (dflt); \
 } while(0)
 
-#define MDCONF_GET_STR(md, field, target, dflt) do { \
+#define MDCONF_GET_STR(md, field, target) do { \
+  const char *v; if((v = mdconfget(md, #field))) (target) = strdup(v); \
+} while(0)
+#define MDCONF_GET_STR_DFL(md, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = strdup(v); else (target) = strdup(dflt); \
 } while(0)
 
-#define MDCONF_GET_ENUM(md, enumname, field, target, dflt) do { \
+#define MDCONF_GET_ENUM(md, enumname, field, target) do { \
+  const char *v; if((v = mdconfget(md, #field))) (target) = enumname ## _parse(v); \
+} while(0)
+#define MDCONF_GET_ENUM_DFL(md, enumname, field, target, dflt) do { \
   const char *v; if((v = mdconfget(md, #field))) (target) = enumname ## _parse(v); else (target) = (dflt); \
 } while(0)
+
 
 static inline char * strdupnul(const char *s) {
   if(!s)

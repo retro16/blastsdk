@@ -3,10 +3,9 @@ Sources
 
 A source references one file or one element. One source may generate one or more sections.
 
-Source src1
+Source src1.asm
 -----------
 
- - name src1.asm
  - format asmx
 
 
@@ -39,10 +38,10 @@ A section is a piece of binary data that targets a specific address in a specifi
 Before inclusion in a binary, a section may be transformed (compressed, encrypted or whatever transformation). This transformation is reverted by the runtime loader (uncompressed, decrypted, ...) while being placed into the section's final place.
 
 
-Section src1
+Section src1.asm
 ------------
 
-Force src1 position. When loading function will be called, executable code will be copied into RAM.
+Force src1.asm position. When loading function will be called, executable code will be copied into RAM.
 
  - addr $800
  - chip ram
@@ -79,8 +78,8 @@ Force BSS address in a fixed place in RAM :
  - chip ram
 
 
-Section myfont.png.img
-----------------------
+Section myfont.png.image
+------------------------
 
  - addr $0
  - pfmt lz4 (compress to lz4. BLS loader will decompress at runtime)
@@ -100,15 +99,18 @@ Binary mainbinary
 -----------------
 
 Providing a section makes the loader load it
- - provides myfont.png.img
+
+ - provides myfont.png
  
 Providing whole sources
- - provides src1, src2.c
+
+ - provides src1.asm, src2.c
 
 A binary may provide or use sources, sections or other binaries. Sepcifying a source or a binary eventually adds all its sections.
 
 Using a section, a source or a binary means that it is already present and must not be touched.
 This example is probably unuseful since using any symbol from a section will imply "uses".
+
  - uses blsload.asm
 
 
