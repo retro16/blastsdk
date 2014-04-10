@@ -201,8 +201,7 @@ void group_dump(const group *grp, FILE *out) {
 
     fprintf(out, " - provides ");
     BLSLL_FOREACH(sec, secl) {
-      fprintf(out, "%s", sec->source->name);
-      fprintf(out, "%s", sec->name);
+      fprintf(out, "`%s`", sec->name);
       if(secl->next) {
         fprintf(out, ", ");
       }
@@ -216,8 +215,7 @@ void group_dump(const group *grp, FILE *out) {
 
     fprintf(out, " - uses ");
     BLSLL_FOREACH(sec, secl) {
-      fprintf(out, "%s", sec->source->name);
-      fprintf(out, "%s", sec->name);
+      fprintf(out, "`%s`", sec->name);
       if(secl->next) {
         fprintf(out, ", ");
       }
@@ -246,7 +244,7 @@ void symtable_dump(const BLSLL(symbol) *syml, FILE *out)
 
 void section_dump(const section *sec, FILE *out)
 {
-    fprintf(out, " - datafile %s\n", sec->datafile);
+    fprintf(out, " - datafile `%s`\n", sec->datafile);
     fprintf(out, " - format %s\n", format_names[sec->format]);
 
     if(sec->physaddr != -1) {
@@ -276,7 +274,7 @@ void section_dump(const section *sec, FILE *out)
 
     if(sec->symbol) {
       if(sec->symbol->name) {
-        fprintf(out, "Symbol name %s\n\n", sec->symbol->name);
+        fprintf(out, "Symbol name `%s`\n\n", sec->symbol->name);
       }
     }
 
@@ -297,17 +295,17 @@ void output_dump(output *outp, FILE *out) {
     fprintf(out, " - region %s\n", outp->region);
   }
   if(outp->file) {
-    fprintf(out, " - file %s\n", outp->file);
+    fprintf(out, " - file `%s`\n", outp->file);
   }
   if(outp->target == target_scd) {
     if(outp->ip) {
-      fprintf(out, " - ip %s%s\n", outp->ip->source->name, outp->ip->name);
+      fprintf(out, " - ip `%s`\n", outp->ip->name);
     }
     if(outp->sp) {
-      fprintf(out, " - sp %s%s\n", outp->sp->source->name, outp->sp->name);
+      fprintf(out, " - sp `%s`\n", outp->sp->name);
     }
   } else if(outp->entry) {
-    fprintf(out, " - entry %s\n", outp->entry->name);
+    fprintf(out, " - entry `%s`\n", outp->entry->name);
   }
 
   const BLSLL(group) *grpl;
@@ -316,7 +314,7 @@ void output_dump(output *outp, FILE *out) {
     fprintf(out, " - binaries ");
     grpl = outp->binaries;
     BLSLL_FOREACH(grp, grpl) {
-      fprintf(out, "%s", grp->name);
+      fprintf(out, "`%s`", grp->name);
       if(grpl->next) {
         fprintf(out, ", ");
       }
@@ -328,7 +326,7 @@ void output_dump(output *outp, FILE *out) {
     fprintf(out, "\nBuild order list: ");
     grpl = outp->bol;
     BLSLL_FOREACH(grp, grpl) {
-      fprintf(out, "%s", grp->name);
+      fprintf(out, "`%s`", grp->name);
       if(grpl->next) {
         fprintf(out, ", ");
       }
@@ -354,7 +352,7 @@ void blsconf_dump(FILE *out) {
   fprintf(out, "\nSources\n=======\n\n");
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
-    fprintf(out, "Source %s\n------\n\n", grp->name);
+    fprintf(out, "Source `%s`\n------\n\n", grp->name);
     group_dump(grp, out);
     fprintf(out, "\n");
   }
@@ -364,7 +362,7 @@ void blsconf_dump(FILE *out) {
   fprintf(out, "\nSections\n========\n\n");
   secl = sections;
   BLSLL_FOREACH(sec, secl) {
-    fprintf(out, "Section %s%s\n-------\n\n", sec->source && sec->source->name ? sec->source->name : "___", sec->name);
+    fprintf(out, "Section `%s`\n-------\n\n", sec->name);
     section_dump(sec, out);
     fprintf(out, "\n");
   }
@@ -374,7 +372,7 @@ void blsconf_dump(FILE *out) {
   fprintf(out, "\nBinaries\n========\n\n");
   grpl = binaries;
   BLSLL_FOREACH(grp, grpl) {
-    fprintf(out, "Binary %s\n------\n\n", grp->name);
+    fprintf(out, "Binary `%s`\n------\n\n", grp->name);
     group_dump(grp, out);
     fprintf(out, "\n");
   }
@@ -384,7 +382,7 @@ void blsconf_dump(FILE *out) {
   fprintf(out, "\nOutputs\n=======\n\n");
   outl = outputs;
   BLSLL_FOREACH(outp, outl) {
-    fprintf(out, "Output %s\n------\n\n", outp->name);
+    fprintf(out, "Output `%s`\n------\n\n", outp->name);
     output_dump(outp, out);
     fprintf(out, "\n");
   }

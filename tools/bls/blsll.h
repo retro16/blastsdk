@@ -15,7 +15,7 @@
     for(; (list); (list) = next) { next = (list)->next; free(list); } } \
   static inline void blsll_freedata_##name(BLSLL(name) *list) { BLSLL(name) *next; \
     for(; (list); (list) = next) { next = (list)->next; if((list)->data) freedata((list)->data); free(list); } } \
-  static inline BLSLL(name) * blsll_copy_##name(BLSLL(name) *list, BLSLL(name) *append) { BLSLL(name) *prevnode = NULL, *node; \
+  static inline BLSLL(name) * blsll_copy_##name(BLSLL(name) *list, BLSLL(name) *append) { BLSLL(name) *prevnode = NULL, *node = NULL; \
     for(; (list); (list) = (list)->next) { node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); node->data = list->data; node->next = append; if(prevnode) prevnode->next = node; prevnode = node; } return node; } \
 
 #define BLSLL_FOREACH(var, list) for(; (list) && ((var = list->data), list); (list) = (list)->next)

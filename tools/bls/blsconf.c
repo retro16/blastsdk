@@ -222,6 +222,46 @@ section * section_parse(const mdconfnode *md, const char *srcname, const char *n
   return s;
 }
 
+BLSLL(section) * section_list_merge(BLSLL(section) *dest, BLSLL(section) *src)
+{
+	BLSLL(section) *result = dest;
+	section *d, *s;
+	BLSLL(section) *dl;
+
+	BLSLL_FOREACH(s, src) {
+		dl = dest;
+		BLSLL_FOREACH(d, dl) {
+			if(strcmp(d->name, s->name) == 0) {
+				break;
+			}
+		}
+    if(!d) {
+			result = blsll_insert_section(result, s);
+		}
+	}
+
+	return result;
+}
+
+BLSLL(section) * section_list_add(BLSLL(section) *dest, section *s)
+{
+	BLSLL(section) *result = dest;
+	section *d;
+	BLSLL(section) *dl;
+
+	dl = dest;
+	BLSLL_FOREACH(d, dl) {
+		if(strcmp(d->name, s->name) == 0) {
+			break;
+		}
+	}
+	if(!d) {
+		result = blsll_insert_section(result, s);
+	}
+
+	return result;
+}
+
 group * binary_parse(const mdconfnode *mdnode, const char *name) {
   group *bin = binary_find(name);
   if(!bin) {
@@ -244,19 +284,19 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 
     // Represents a source
     g = source_parse(NULL, name);
-    bin->provides = blsll_copy_section(g->provides, bin->provides);
+    bin->provides = section_list_merge(bin->provides, g->provides);
   }
 
   for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
     const char *name = n->value;
     if((s = section_find(name))) {
       // Represents a section name
-      bin->uses = blsll_insert_section(bin->uses, s);
+      bin->uses = section_list_add(bin->uses, s);
       continue;
     }
     if((g = source_find(name))) {
       // Represents a source
-      bin->uses = blsll_copy_section(g->uses, bin->uses);
+      bin->uses = section_list_merge(bin->uses, g->uses);
       continue;
     }
 

@@ -100,7 +100,7 @@ Binary mainbinary
 
 Providing a section makes the loader load it
 
- - provides myfont.png
+ - provides myfont.png xtest.c
  
 Providing whole sources
 

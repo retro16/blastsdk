@@ -165,6 +165,26 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
     node->value[l - line - 2] = '\0';
     return;
   }
+
+  if(*line == '`')
+  {
+    // Escaped value
+    l = line + 1;
+    char sep = *line;
+    while(*l && *l != sep)
+    {
+      ++l;
+    }
+    if(!*l)
+    {
+      // To end of line : invalid value
+      return;
+    }
+    node->value = (char *)malloc(l - line);
+    memcpy(node->value, line + 1, l - line - 1);
+    node->value[l - line - 1] = '\0';
+    return;
+  }
   
   for(;;)
   {

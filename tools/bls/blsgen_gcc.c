@@ -5,7 +5,6 @@
 
 void section_create_gcc(group *source, const mdconfnode *mdconf)
 {
-  mdconf = mdconf->child;
   section *s;
 
   // Generate the .text section
