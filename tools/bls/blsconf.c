@@ -61,6 +61,8 @@ group * source_parse(const mdconfnode *n, const char *name) {
   {
     sources = blsll_insert_group(sources, group_new());
     s = sources->data;
+  } else if(!n) {
+    return s;
   }
   s->name = strdupnul(name);
   s->format = format_parse(mdconfget(n, "format"));
@@ -107,6 +109,8 @@ output * output_parse(const mdconfnode *n, const char *name)
   {
     outputs = blsll_insert_output(outputs, output_new());
     o = outputs->data;
+  } else if(!n) {
+    return o;
   }
   o->name = strdupnul(name);
   o->target = target_parse(mdconfget(n, "target"));
@@ -117,6 +121,16 @@ output * output_parse(const mdconfnode *n, const char *name)
   o->region = strdupnul(mdconfget(n, "region"));
   o->file = strdupnul(mdconfget(n, "file"));
   if(!o->file) o->file = strdupnul(o->name);
+
+  const mdconfnode *ni;
+  for(ni = n; (ni = mdconfsearch(ni, "binaries")); ni = ni->next) {
+    const char *name = ni->value;
+
+    // Represents a source
+    group *g = binary_parse(NULL, name);
+    o->binaries = blsll_insert_group(o->binaries, g);
+  }
+
 
   if(o->target == target_scd) {
     const BLSLL(section) *section = sections;
@@ -168,6 +182,8 @@ symbol * symbol_parse(const mdconfnode *md, const char *name) {
     symbols = blsll_insert_symbol(symbols, symbol_new());
     s = symbols->data;
     s->name = strdupnul(name);
+  } else if(!md) {
+    return s;
   }
   MDCONF_GET_INT(md, addr, s->value.addr);
   MDCONF_GET_ENUM(md, chip, chip, s->value.chip);
@@ -202,6 +218,8 @@ section * section_parse(const mdconfnode *md, const char *srcname, const char *n
 
     s->source = source_parse(NULL, srcname);
     s->datafile = symname(name);
+  } else if(!md) {
+    return s;
   }
 
   MDCONF_GET_INT(md, physaddr, s->physaddr);
@@ -229,6 +247,7 @@ BLSLL(section) * section_list_merge(BLSLL(section) *dest, BLSLL(section) *src)
 	BLSLL(section) *dl;
 
 	BLSLL_FOREACH(s, src) {
+        d = NULL;
 		dl = dest;
 		BLSLL_FOREACH(d, dl) {
 			if(strcmp(d->name, s->name) == 0) {
@@ -249,6 +268,7 @@ BLSLL(section) * section_list_add(BLSLL(section) *dest, section *s)
 	section *d;
 	BLSLL(section) *dl;
 
+    d = NULL;
 	dl = dest;
 	BLSLL_FOREACH(d, dl) {
 		if(strcmp(d->name, s->name) == 0) {
@@ -268,13 +288,18 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
     binaries = blsll_insert_group(binaries, group_new());
     bin = binaries->data;
     bin->name = strdupnul(name);
+  } else if(!mdnode) {
+    return bin;
   }
 
   const mdconfnode *n;
 
+  int explicitdeps = 0;
+
   group *g;
   section *s;
   for(n = mdnode; (n = mdconfsearch(n, "provides")); n = n->next) {
+    explicitdeps = 1;
     const char *name = n->value;
     if((s = section_find(name))) {
       // Represents a section name
@@ -288,6 +313,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   }
 
   for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
+    explicitdeps = 1;
     const char *name = n->value;
     if((s = section_find(name))) {
       // Represents a section name
@@ -301,6 +327,12 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
     }
 
     printf("Warning in binary %s: could not find dependency source or section %s\n", bin->name, name);
+  }
+
+  if(!explicitdeps && strchr(name, '.')) {
+    // Binary represents a source
+    g = source_parse(NULL, name);
+    bin->provides = section_list_merge(bin->provides, g->provides);
   }
 
   return bin;
