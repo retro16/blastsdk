@@ -93,7 +93,7 @@ group * source_parse(const mdconfnode *n, const char *name) {
 //      section_create_as(s, n);
       break;
     case format_png:
-//      section_create_png(s, n);
+        section_create_png(s, n);
       break;
     case format_max:
       break;

@@ -143,7 +143,7 @@ typedef struct section {
 
   struct blsll_node_section *deps; // Added by "uses", "provides" or symbol dependencies
 
-  const group *source;
+  group *source;
 } section;
 section * section_new();
 void section_free(section *section);
@@ -163,9 +163,9 @@ typedef struct output {
   char *name;
   char *region;
   char *file;
-  const symbol *entry;
-  const section *ip;
-  const section *sp;
+  symbol *entry;
+  section *ip;
+  section *sp;
 
   BLSLL(group) *binaries; // Binaries to put in the image
   BLSLL(group) *bol; // Build order list

@@ -388,8 +388,63 @@ void blsconf_dump(FILE *out) {
   }
 }
 
+void gen_bol(output *o, group *s)
+{
+  BLSLL(section) *secl;
+  section *sec;
+  BLSLL(group) *grpl;
+  group *grp;
+  BLSLL(symbol) *syml;
+  symbol *sym;
+
+	// Check if the source is already in the BOL
+  grpl = o->bol;
+  BLSLL_FOREACH(grp, grpl) {
+		if(grp == s) {
+			// Source already in the BOL : stop processing it.
+			return;
+		}
+	}
+
+	// For each section provided by the source
+  secl = s->provides;
+  BLSLL_FOREACH(sec, secl) {
+		// For each external symbol
+		syml = sec->extsym;
+		BLSLL_FOREACH(sym, syml) {
+			// Recurse with the source of the external symbol
+			if(sym->section && sym->section->source) {
+   			gen_bol(o, sym->section->source);
+			}
+		}
+	}
+}
+
+void output_gen_bol(output *o)
+{
+	if(o->target == target_scd) {
+		gen_bol(o, o->ip->source);
+		gen_bol(o, o->sp->source);
+	} else {
+		gen_bol(o, o->entry->section->source);
+	}
+}
+
+void bls_gen_bol()
+{
+  BLSLL(output) *outl;
+  output *outp;
+  outl = outputs;
+  BLSLL_FOREACH(outp, outl) {
+    output_gen_bol(outp);
+  }
+}
+
 int main() {
   blsconf_load("blsgen.md");
+
+	bls_get_symbols();
+	bls_gen_bol();
 
   blsconf_dump(stdout);
 }
