@@ -69,13 +69,16 @@ group * source_parse(const mdconfnode *n, const char *name) {
   if(s->format == format_auto && s->name) {
     s->format = format_guess(s->name);
   }
+
+  MDCONF_GET_ENUM(n, bus, bus, s->bus);
+  MDCONF_GET_INT(n, bank, s->banks.bank[s->bus]);
   
   switch(s->format) {
     case format_auto:
       break;
     case format_empty:
     case format_zero:
-      s->provides = blsll_insert_section(NULL, section_parse_ext(n, name, ""));
+      s->provides = blsll_insert_section(NULL, section_parse_ext(NULL, name, ""));
       s->provides->data->source = s;
       break;
     case format_raw:
@@ -93,7 +96,7 @@ group * source_parse(const mdconfnode *n, const char *name) {
 //      section_create_as(s, n);
       break;
     case format_png:
-        section_create_png(s, n);
+//      section_create_png(s, n);
       break;
     case format_max:
       break;
@@ -102,25 +105,17 @@ group * source_parse(const mdconfnode *n, const char *name) {
   return s;
 }
 
-output * output_parse(const mdconfnode *n, const char *name)
+void output_parse(const mdconfnode *n, const char *name)
 {
-  output *o = output_find(name);
-  if(!o)
-  {
-    outputs = blsll_insert_output(outputs, output_new());
-    o = outputs->data;
-  } else if(!n) {
-    return o;
-  }
-  o->name = strdupnul(name);
-  o->target = target_parse(mdconfget(n, "target"));
+  mainout.name = strdupnul(name);
+  mainout.target = target_parse(mdconfget(n, "target"));
   /*
-  o->name = strdupnul(mdconfget(n, "name"));
-  if(!o->name) o->name = strdupnul(n->value);
+  mainout.name = strdupnul(mdconfget(n, "name"));
+  if(!mainout.name) mainout.name = strdupnul(n->value);
   */
-  o->region = strdupnul(mdconfget(n, "region"));
-  o->file = strdupnul(mdconfget(n, "file"));
-  if(!o->file) o->file = strdupnul(o->name);
+  mainout.region = strdupnul(mdconfget(n, "region"));
+  mainout.file = strdupnul(mdconfget(n, "file"));
+  if(!mainout.file) mainout.file = strdupnul(mainout.name);
 
   const mdconfnode *ni;
   for(ni = n; (ni = mdconfsearch(ni, "binaries")); ni = ni->next) {
@@ -128,27 +123,26 @@ output * output_parse(const mdconfnode *n, const char *name)
 
     // Represents a source
     group *g = binary_parse(NULL, name);
-    o->binaries = blsll_insert_group(o->binaries, g);
+    mainout.binaries = blsll_insert_group(mainout.binaries, g);
   }
 
 
-  if(o->target == target_scd) {
+  if(mainout.target == target_scd) {
     const BLSLL(section) *section = sections;
     BLSLL_FINDSTR(section, name, "ip.asm");
     if(section)
-      o->ip = section->data;
+      mainout.ip = section->data;
 
     section = sections;
     BLSLL_FINDSTR(section, name, "sp.asm");
     if(section)
-      o->sp = section->data;
+      mainout.sp = section->data;
   } else {
     const BLSLL(symbol) *entry = symbols;
     BLSLL_FINDSTR(entry, name, "MAIN");
     if(entry)
-      o->entry = entry->data;
+      mainout.entry = entry->data;
   }
-  return o;
 }
 
 void blsconf_load(const char *file) {
@@ -159,20 +153,21 @@ void blsconf_load(const char *file) {
 
   const mdconfnode *n;
 
-  for(n = mdconf->child; (n = mdconfsearch(n, "source")); n = n->next) {
-    source_parse(n->child, mdconfgetvalue(n, "name"));
-  }
-
-  for(n = mdconf->child; (n = mdconfsearch(n, "section")); n = n->next) {
-    section_parse(n->child, NULL, mdconfgetvalue(n, "name"));
+  n = mdconfsearch(mdconf->child, "output");
+  if(n) {
+    output_parse(n->child, mdconfgetvalue(n, "name"));
   }
 
   for(n = mdconf->child; (n = mdconfsearch(n, "binary")); n = n->next) {
     binary_parse(n->child, mdconfgetvalue(n, "name"));
   }
 
-  for(n = mdconf->child; (n = mdconfsearch(n, "output")); n = n->next) {
-    output_parse(n->child, mdconfgetvalue(n, "name"));
+  for(n = mdconf->child; (n = mdconfsearch(n, "source")); n = n->next) {
+    source_parse(n->child, mdconfgetvalue(n, "name"));
+  }
+
+  for(n = mdconf->child; (n = mdconfsearch(n, "section")); n = n->next) {
+    section_parse(n->child, NULL, mdconfgetvalue(n, "name"));
   }
 }
 
@@ -216,7 +211,7 @@ section * section_parse(const mdconfnode *md, const char *srcname, const char *n
       ((char *)srcname)[c - name] = '\0';
     }
 
-    s->source = source_parse(NULL, srcname);
+    s->source = source_parse(md, srcname);
     s->datafile = symname(name);
   } else if(!md) {
     return s;
@@ -296,6 +291,9 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 
   int explicitdeps = 0;
 
+  MDCONF_GET_ENUM(mdnode, bus, bus, bin->bus);
+  MDCONF_GET_INT(mdnode, bank, bin->banks.bank[bin->bus]);
+
   group *g;
   section *s;
   for(n = mdnode; (n = mdconfsearch(n, "provides")); n = n->next) {
@@ -309,6 +307,11 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 
     // Represents a source
     g = source_parse(NULL, name);
+    if(bin->bus != bus_none && g->bus == bus_none)
+    {
+      g->bus = bin->bus;
+      g->banks = bin->banks;
+    }
     bin->provides = section_list_merge(bin->provides, g->provides);
   }
 
@@ -332,7 +335,11 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   if(!explicitdeps && strchr(name, '.')) {
     // Binary represents a source
     g = source_parse(NULL, name);
-    bin->provides = section_list_merge(bin->provides, g->provides);
+    if(bin->bus != bus_none && g->bus == bus_none)
+    {
+      g->bus = bin->bus;
+      g->banks = bin->banks;
+    }
   }
 
   return bin;

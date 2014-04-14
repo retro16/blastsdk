@@ -7,6 +7,18 @@
 #include "mdconf.h"
 #include "blsll.h"
 
+#define ROMHEADERSIZE 0x200
+#define MAXCARTSIZE 0x400000
+
+#define CDHEADERSIZE 0x200 // Size of CD
+#define SECCODESIZE 0x584 // Size of security code
+#define SPHEADERSIZE 0x28 // Size of SP header
+#define CDBLOCKSIZE 2048 // ISO block size
+#define CDBLOCKCNT 360000 // Number of blocks in a 80 minutes CD-ROM
+
+#ifndef MAINSTACK
+#define MAINSTACK 0xFFF800 // Default stack pointer
+#endif
 
 extern BLSLL(group) *sources;
 extern BLSLL(section) *sections;
@@ -55,10 +67,16 @@ typedef enum bus {
 } bus;
 BLSENUM(bus, 8)
 
+typedef struct bankconfig {
+  int bank[bus_max]; // Gives bank based on bus
+} bankconfig;
+
 // A chip is a memory space
 typedef enum chip {
   chip_none,
-  chip_stack, // Pseudo-chip : push data onto stack.
+  chip_mstack, // Pseudo-chip : push data onto main stack.
+  chip_sstack, // Pseudo-chip : push data onto sub stack.
+  chip_zstack, // Pseudo-chip : push data onto z80 stack.
   chip_cart,
   chip_bram, // Optional genesis in-cartridge battery RAM
   chip_zram,
@@ -105,6 +123,8 @@ typedef struct group {
   format format;
   char *name;
   int optimize; // Optimization level (used for compilation or compression level)
+  bus bus;
+  bankconfig banks; // Status of banks when using the source
 
   struct blsll_node_section *provides;
   struct blsll_node_section *uses;
@@ -174,11 +194,16 @@ output * output_new();
 void output_free(output *output);
 BLSLL_DECLARE(output, output_free)
 
+extern output mainout;
+
 group * source_find(const char *name);
 section * section_find(const char *name);
+section * section_find_ext(const char *name, const char *suffix);
 symbol * symbol_find(const char *name);
-output * output_find(const char *name);
 group * binary_find(const char *name);
+
+symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
+symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
 
 static inline sv neg_int(sv v) {
   if(v < 0) return v;
@@ -191,6 +216,10 @@ static inline sv not_int(sv v) {
 }
 
 void skipblanks(const char **cp);
+sv parse_int_skip(const char **cp);
 sv parse_int(const char *cp);
+sv parse_hex_skip(const char **cp);
+sv parse_hex(const char *cp);
+void parse_sym(char *s, const char **cp);
 
 #endif
