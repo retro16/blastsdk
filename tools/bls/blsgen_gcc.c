@@ -139,7 +139,6 @@ void source_get_size_gcc(group *s)
     printf("Could not execute readelf on source %s\n", s->name);
     exit(1);
   }
-  pclose(in);
 
   char sectionname[256] = "";
 
@@ -147,8 +146,11 @@ void source_get_size_gcc(group *s)
   {
     char line[1024];
     fgets(line, 1024, in);
+		if(*line) {
+  		line[strlen(line) - 1] = '\0';
+		}
 
-    printf("  %s", line);
+    printf("  %s\n", line);
 
     if(strlen(line) < 8)
     {
@@ -157,11 +159,10 @@ void source_get_size_gcc(group *s)
 
     if(line[2] == '[') {
       strcpy(sectionname, line + 7);
-    } else if(line[7] != '[' && strlen(line) > 32) {
+    } else if(strlen(line) > 32 && line[31] == ' ') {
       sv size = parse_hex(line + 32);
       section *sec = section_find_ext(s->name, sectionname);
       if(!sec) {
-        printf("Could not find section %s\n", sectionname);
         continue;
       }
       sec->size = size;
@@ -169,4 +170,6 @@ void source_get_size_gcc(group *s)
 
     const char *c = line;
   }
+
+  pclose(in);
 }

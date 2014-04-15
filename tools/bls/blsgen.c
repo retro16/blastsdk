@@ -70,7 +70,7 @@ sv parse_int_skip(const char **cp) {
   else if(**cp == '0' && (cp[0][1] == 'x' || cp[0][1] == 'X'))
   {
     (*cp) += 2; 
-    val = parse_hex(cp);
+    val = parse_hex_skip(cp);
   }
   else while(**cp)
   {
@@ -211,7 +211,7 @@ group * binary_find(const char *name) {
 }
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section) {
-  BLSLL(symbol) *sl;
+  BLSLL(symbol) *sl = *symlist;
   symbol *s;
   BLSLL_FOREACH(s, sl) {
     if(strcmp(symname, s->name) == 0) {
@@ -236,6 +236,7 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
     s->value = value;
   }
 
+	*symlist = sl;
   return s;
 }
 
