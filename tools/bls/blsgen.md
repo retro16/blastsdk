@@ -6,6 +6,11 @@ Binary splash.c
 
  - bus main
 
+Binary loadmenu.c
+-----------------
+
+ - bus main
+
 Outputs
 =======
 
