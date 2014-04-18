@@ -220,21 +220,21 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
   }
   if(!sl) {
     // Symbol not found
-		s = symbol_find(symname);
-		if(!s)
-		{
-			*symlist = blsll_create_symbol(*symlist);
-			s = (*symlist)->data;
-			s->name = strdup(symname);
-			s->value.chip = chip_none;
-			s->value.addr = -1;
-			s->section = section;
-			symbols = blsll_insert_symbol(symbols, s);
-		}
-		else
-		{
-			*symlist = blsll_insert_symbol(*symlist, s);
-		}
+    s = symbol_find(symname);
+    if(!s)
+    {
+      *symlist = blsll_create_symbol(*symlist);
+      s = (*symlist)->data;
+      s->name = strdup(symname);
+      s->value.chip = chip_none;
+      s->value.addr = -1;
+      s->section = section;
+      symbols = blsll_insert_symbol(symbols, s);
+    }
+    else
+    {
+      *symlist = blsll_insert_symbol(*symlist, s);
+    }
   }
 
   if(section != s->section) {
@@ -470,7 +470,7 @@ void gen_bol(group *s)
     }
   }
 
-	mainout.bol = blsll_insert_group(mainout.bol, s);
+  mainout.bol = blsll_append_group(mainout.bol, s);
 
   // For each section provided by the source
   secl = s->provides;
@@ -498,32 +498,35 @@ void bls_gen_bol()
 
 void bls_find_entry()
 {
-	switch(mainout.target)
-	{
-		default:
-			mainout.entry = symbol_find("MAIN");
-			if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
-			if(!mainout.entry) {
-				printf("Could not find MAIN entry point.\n");
-				exit(1);
-			}
-			break;
+  switch(mainout.target)
+  {
+    default:
+      mainout.entry = symbol_find("MAIN");
+      if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
+      if(!mainout.entry) mainout.entry = symbol_find("main");
+      if(!mainout.entry) {
+        printf("Could not find MAIN entry point.\n");
+        exit(1);
+      }
+      break;
 
-		case target_scd:
-			mainout.ip = section_find("IP_ASM");
-			if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
-			if(!mainout.ip) {
-				printf("Could not find IP entry point.\n");
-				exit(1);
-			}
-			mainout.sp = section_find("SP_ASM");
-			if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
-			if(!mainout.sp) {
-				printf("Could not find SP entry point.\n");
-				exit(1);
-			}
-			break;
-	}
+    case target_scd:
+      mainout.ip = section_find("IP_ASM");
+      if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
+      if(!mainout.ip) mainout.ip = section_find("ip_main");
+      if(!mainout.ip) {
+        printf("Could not find IP entry point.\n");
+        exit(1);
+      }
+      mainout.sp = section_find("SP_ASM");
+      if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
+      if(!mainout.sp) mainout.sp = section_find("sp_main");
+      if(!mainout.sp) {
+        printf("Could not find SP entry point.\n");
+        exit(1);
+      }
+      break;
+  }
 }
 
 void bls_get_symbols()
@@ -546,7 +549,7 @@ int main() {
   blsconf_load("blsgen.md");
 
   bls_get_symbols();
-	bls_find_entry();
+  bls_find_entry();
   bls_gen_bol();
 
   blsconf_dump(stdout);

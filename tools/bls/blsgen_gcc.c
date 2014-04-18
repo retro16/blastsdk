@@ -34,7 +34,7 @@ const char *nm = "m68k-elf-nm";
 
 const char *readelf = "m68k-elf-readelf";
 
-void parse_nm(group *s, FILE *in)
+void parse_nm(group *s, FILE *in, int setvalues)
 {
   chipaddr unknown = {chip_none, -1};
   while(!feof(in))
@@ -62,8 +62,12 @@ void parse_nm(group *s, FILE *in)
     section *data = section_find_ext(s->name, ".data");
     section *bss = section_find_ext(s->name, ".bss");
 
-
     busaddr busaddr = {s->bus, addr, s->banks.bank[s->bus]};
+    if(!setvalues) {
+      busaddr.bus = bus_none;
+      busaddr.addr = -1;
+      busaddr.bank = -1;
+    }
 
     switch(type)
     {
@@ -117,7 +121,7 @@ void source_get_symbols_gcc(group *s)
     printf("Could not execute nm on source %s\n", s->name);
     exit(1);
   }
-  parse_nm(s, f);
+  parse_nm(s, f, 0);
   pclose(f);
 
   source_get_size_gcc(s);

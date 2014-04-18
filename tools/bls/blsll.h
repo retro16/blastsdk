@@ -8,6 +8,10 @@
   static inline BLSLL(name) * blsll_insert_##name(BLSLL(name) *list, name *data) { \
     BLSLL(name) * node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); \
     node->data = data; node->next = list; return node; } \
+  static inline BLSLL(name) * blsll_append_##name(BLSLL(name) *list, name *data) { \
+    BLSLL(name) * node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); \
+    node->data = data; node->next = NULL; BLSLL(name) * find = list; \
+    if(!list) { return node; } while(find->next) find = find->next; find->next = node; return list; } \
   static inline BLSLL(name) * blsll_create_##name(BLSLL(name) *list) { \
     BLSLL(name) * node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); \
     node->data = (name *)calloc(1, sizeof(name)); node->next = list; return node; } \

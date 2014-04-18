@@ -5,4 +5,4 @@ int splashscreen() {
   loadmenu();
 }
 
-void MAIN() {}
+void main() {}
