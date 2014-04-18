@@ -220,13 +220,21 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
   }
   if(!sl) {
     // Symbol not found
-    *symlist = blsll_create_symbol(*symlist);
-    s = (*symlist)->data;
-    s->name = strdup(symname);
-    s->value.chip = chip_none;
-    s->value.addr = -1;
-    s->section = section;
-		symbols = blsll_insert_symbol(symbols, s);
+		s = symbol_find(symname);
+		if(!s)
+		{
+			*symlist = blsll_create_symbol(*symlist);
+			s = (*symlist)->data;
+			s->name = strdup(symname);
+			s->value.chip = chip_none;
+			s->value.addr = -1;
+			s->section = section;
+			symbols = blsll_insert_symbol(symbols, s);
+		}
+		else
+		{
+			*symlist = blsll_insert_symbol(*symlist, s);
+		}
   }
 
   if(section != s->section) {
