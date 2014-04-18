@@ -236,7 +236,6 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
     s->value = value;
   }
 
-	*symlist = sl;
   return s;
 }
 
