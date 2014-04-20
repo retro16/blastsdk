@@ -7,6 +7,7 @@
 
 void section_create_gcc(group *source, const mdconfnode *mdconf)
 {
+  (void)mdconf;
   section *s;
 
   // Generate the .text section
@@ -25,6 +26,7 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
 }
 
 const char *compiler = "m68k-elf-gcc";
+const char *precompiler = "m68k-elf-cpp";
 const char *cflags = "-Os -pipe";
 
 const char *ld = "m68k-elf-ld";
@@ -74,25 +76,62 @@ void parse_nm(group *s, FILE *in, int setvalues)
       case 'T':
       // Pointer in text section : associate to bus
         symbol_set_bus(&text->intsym, symname, busaddr, text);
-        printf("%s = %08X  bus = %s\n", symname, addr, bus_names[s->bus]);
+        printf("%s = %08X  bus = %s\n", symname, (unsigned int)addr, bus_names[s->bus]);
         break;
       case 'U':
         symbol_set(&text->extsym, symname, unknown, text);
-        printf("%s unknown\n", symname, addr);
+        printf("%s unknown\n", symname);
       break;
       case 'b':
       case 'B':
         symbol_set_bus(&bss->intsym, symname, busaddr, bss);
-        printf("%s = %08X\n", symname, addr);
+        printf("%s = %08X\n", symname, (unsigned int)addr);
         break;
       case 'd':
       case 'D':
         symbol_set_bus(&data->intsym, symname, busaddr, data);
-        printf("%s = %08X\n", symname, addr);
+        printf("%s = %08X\n", symname, (unsigned int)addr);
         break;
     }
   }
 }
+
+const char *binary_load_function = "BLS_LOAD_BINARY";
+
+void binary_loaded(group *s, const char *symname)
+{
+  group *binary = binary_find(symname);
+  if(binary) {
+    s->loads = blsll_insert_group(s->loads, binary);
+  }
+}
+
+void find_binary_load(group *s, FILE *in)
+{
+  while(!feof(in))
+  {
+    char line[1024];
+    fgets(line, 1024, in);
+
+    const char *find = strstr(line, binary_load_function);
+    if(find) {
+      find += strlen(binary_load_function);
+      skipblanks(&find);
+      if(*find != '(') continue;
+      ++find;
+      skipblanks(&find);
+      char symname[1024];
+      parse_sym(symname, &find);
+      skipblanks(&find);
+      if(*find != ')' && *find != ',') {
+        continue;
+      }
+
+      binary_loaded(s, symname);
+    }
+  }
+}
+
 void source_get_size_gcc(group *s);
 void source_get_symbols_gcc(group *s)
 {
@@ -125,6 +164,18 @@ void source_get_symbols_gcc(group *s)
   pclose(f);
 
   source_get_size_gcc(s);
+
+  // Read binary loading from the source
+  snprintf(cmdline, 1024, "%s -E -fdirectives-only %s", precompiler, s->name);
+  printf("Find binary loadings in %s :\n%s\n", s->name, cmdline);
+  f = popen(cmdline, "r");
+  if(!f)
+  {
+    printf("Could not execute cpp on source %s\n", s->name);
+    exit(1);
+  }
+  find_binary_load(s, f);
+  pclose(f);
 }
 
 void source_get_size_gcc(group *s)
@@ -171,8 +222,6 @@ void source_get_size_gcc(group *s)
       }
       sec->size = size;
     }
-
-    const char *c = line;
   }
 
   pclose(in);

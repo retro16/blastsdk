@@ -291,6 +291,20 @@ void group_dump(const group *grp, FILE *out) {
     }
     fprintf(out, "\n");
   }
+
+  if(grp->loads) {
+    BLSLL(group) *secl = grp->loads;
+    group *sec;
+
+    fprintf(out, " - loads ");
+    BLSLL_FOREACH(sec, secl) {
+      fprintf(out, "`%s`", sec->name);
+      if(secl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, "\n");
+  }
 }
 
 void symtable_dump(const BLSLL(symbol) *syml, FILE *out)
@@ -550,6 +564,8 @@ void bls_map()
   BLSLL(group) *grpl;
   group *grp;
 
+  // Premap all sources
+
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     switch(grp->format) {
@@ -560,6 +576,48 @@ void bls_map()
         break;
     }
   }
+
+}
+
+void bls_expand_binaries()
+{
+  BLSLL(group) *grpl;
+  group *grp;
+
+  // Replace source dependencies with section dependencies
+
+  grpl = binaries;
+  BLSLL_FOREACH(grp, grpl) {
+    if(grp->provides_sources) {
+      BLSLL(group) *srcl = grp->provides_sources;
+      group *src;
+      BLSLL_FOREACH(src, srcl) {
+        BLSLL(section) *sl = src->provides;
+        section *s;
+
+        BLSLL_FOREACH(s, sl) {
+          grp->provides = blsll_insert_section(grp->provides, s);
+        }
+      }
+      blsll_free_group(grp->provides_sources);
+      grp->provides_sources = NULL;
+    }
+
+    if(grp->uses_sources) {
+      BLSLL(group) *srcl = grp->uses_sources;
+      group *src;
+      BLSLL_FOREACH(src, srcl) {
+        BLSLL(section) *sl = src->uses;
+        section *s;
+
+        BLSLL_FOREACH(s, sl) {
+          grp->uses = blsll_insert_section(grp->uses, s);
+        }
+      }
+      blsll_free_group(grp->uses_sources);
+      grp->uses_sources = NULL;
+    }
+  }
 }
 
 int main() {
@@ -567,6 +625,7 @@ int main() {
 
   bls_get_symbols();
   bls_find_entry();
+  bls_expand_binaries();
   bls_gen_bol();
   bls_map();
 

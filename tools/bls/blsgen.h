@@ -119,6 +119,7 @@ BLSENUM(format, 8)
 
 struct section;
 struct blsll_node_section;
+struct blsll_node_group;
 typedef struct group {
   format format;
   char *name;
@@ -127,7 +128,10 @@ typedef struct group {
   bankconfig banks; // Status of banks when using the source
 
   struct blsll_node_section *provides;
+  struct blsll_node_group *provides_sources;
   struct blsll_node_section *uses;
+  struct blsll_node_group *uses_sources;
+  struct blsll_node_group *loads; // List of binaries loaded by this group
 } group;
 group * group_new();
 void group_free(group *group);

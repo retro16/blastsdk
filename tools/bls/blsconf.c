@@ -312,7 +312,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
       g->bus = bin->bus;
       g->banks = bin->banks;
     }
-    bin->provides = section_list_merge(bin->provides, g->provides);
+    bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
   }
 
   for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
@@ -325,7 +325,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
     }
     if((g = source_find(name))) {
       // Represents a source
-      bin->uses = section_list_merge(bin->uses, g->uses);
+      bin->uses_sources = blsll_insert_group(bin->uses_sources, s);
       continue;
     }
 
@@ -340,6 +340,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
       g->bus = bin->bus;
       g->banks = bin->banks;
     }
+    bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
   }
 
   return bin;
