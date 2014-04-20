@@ -177,3 +177,68 @@ void source_get_size_gcc(group *s)
 
   pclose(in);
 }
+
+void source_premap_gcc(group *s)
+{
+  section *text = section_find_ext(s->name, ".text");
+  section *data = section_find_ext(s->name, ".data");
+  section *bss = section_find_ext(s->name, ".bss");
+
+  if(text->symbol->value.chip == chip_none)
+  {
+    switch(s->bus) {
+      case bus_none:
+      case bus_max:
+        break;
+      case bus_main:
+        if(mainout.target == target_scd) {
+          text->symbol->value.chip = chip_ram;
+        } else {
+          text->symbol->value.chip = chip_cart;
+        }
+        break;
+      case bus_sub:
+        text->symbol->value.chip = chip_pram;
+        break;
+      case bus_z80:
+        text->symbol->value.chip = chip_zram;
+        break;
+    }
+  }
+
+  if(data->symbol->value.chip == chip_none)
+  {
+    switch(s->bus) {
+      case bus_none:
+      case bus_max:
+        break;
+      case bus_main:
+        data->symbol->value.chip = chip_ram;
+        break;
+      case bus_sub:
+        data->symbol->value.chip = chip_pram;
+        break;
+      case bus_z80:
+        data->symbol->value.chip = chip_zram;
+        break;
+    }
+  }
+
+  if(bss->symbol->value.chip == chip_none)
+  {
+    switch(s->bus) {
+      case bus_none:
+      case bus_max:
+        break;
+      case bus_main:
+        bss->symbol->value.chip = chip_ram;
+        break;
+      case bus_sub:
+        bss->symbol->value.chip = chip_pram;
+        break;
+      case bus_z80:
+        bss->symbol->value.chip = chip_zram;
+        break;
+    }
+  }
+}

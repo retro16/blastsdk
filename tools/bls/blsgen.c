@@ -545,12 +545,30 @@ void bls_get_symbols()
   }
 }
 
+void bls_map()
+{
+  BLSLL(group) *grpl;
+  group *grp;
+
+  grpl = sources;
+  BLSLL_FOREACH(grp, grpl) {
+    switch(grp->format) {
+      case format_gcc:
+        printf("Premapping %s\n", grp->name);
+        source_premap_gcc(grp);
+      default:
+        break;
+    }
+  }
+}
+
 int main() {
   blsconf_load("blsgen.md");
 
   bls_get_symbols();
   bls_find_entry();
   bls_gen_bol();
+  bls_map();
 
   blsconf_dump(stdout);
 }
