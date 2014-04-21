@@ -328,6 +328,21 @@ group * binary_find_sym(const char *name) {
   return grouplist_find_sym(binaries, name);
 }
 
+group * find_providing(BLSLL(group) * glist, section *section) {
+  group *g;
+  BLSLL_FOREACH(g, glist) {
+    BLSLL(section) *sl = g->provides;
+    section *s;
+    BLSLL_FOREACH(s, sl) {
+      if(s == section) {
+        return g;
+      }
+    }
+  }
+
+  return NULL;
+}
+
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section) {
   BLSLL(symbol) *sl = *symlist;
   symbol *s;
@@ -673,6 +688,20 @@ void bls_get_symbols()
         source_get_symbols_gcc(grp);
       default:
         break;
+    }
+  }
+}
+
+void bls_finalize_dep_graph() {
+  BLSLL(group) *bol = mainout.bol;
+  group *src;
+
+  BLSLL_FOREACH(src, bol) {
+    group *b = find_binary_from_source(src);
+    BLSLL(section) *uses = src->uses;
+    section *sec;
+    BLSLL_FOREACH(sec, uses) {
+      if(!
     }
   }
 }

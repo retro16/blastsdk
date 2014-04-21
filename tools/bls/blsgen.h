@@ -209,6 +209,9 @@ symbol * symbol_find(const char *name);
 group * binary_find(const char *name);
 group * binary_find_sym(const char *name);
 
+group * find_providing(BLSLL(group) * glist, section *section);
+group * find_binary_from_source(group *source);
+
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
 
