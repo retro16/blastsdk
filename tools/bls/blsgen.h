@@ -201,10 +201,13 @@ BLSLL_DECLARE(output, output_free)
 extern output mainout;
 
 group * source_find(const char *name);
+group * source_find_sym(const char *name);
 section * section_find(const char *name);
 section * section_find_ext(const char *name, const char *suffix);
+section * section_find_sym(const char *name);
 symbol * symbol_find(const char *name);
 group * binary_find(const char *name);
+group * binary_find_sym(const char *name);
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
@@ -225,5 +228,6 @@ sv parse_int(const char *cp);
 sv parse_hex_skip(const char **cp);
 sv parse_hex(const char *cp);
 void parse_sym(char *s, const char **cp);
+size_t getsymname(char *output, const char *path);
 
 #endif

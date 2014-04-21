@@ -96,13 +96,16 @@ void parse_nm(group *s, FILE *in, int setvalues)
   }
 }
 
-const char *binary_load_function = "BLS_LOAD_BINARY";
+const char *binary_load_function = "BLS_LOAD_BINARY_";
 
 void binary_loaded(group *s, const char *symname)
 {
-  group *binary = binary_find(symname);
+  group *binary = binary_find_sym(symname);
   if(binary) {
     s->loads = blsll_insert_group(s->loads, binary);
+  } else {
+    printf("Could not find binary with symbol name %s\n", symname);
+    exit(1);
   }
 }
 
@@ -113,23 +116,43 @@ void find_binary_load(group *s, FILE *in)
     char line[1024];
     fgets(line, 1024, in);
 
-    const char *find = strstr(line, binary_load_function);
-    if(find) {
-      find += strlen(binary_load_function);
-      skipblanks(&find);
-      if(*find != '(') continue;
-      ++find;
-      skipblanks(&find);
-      char symname[1024];
-      parse_sym(symname, &find);
-      skipblanks(&find);
-      if(*find != ')' && *find != ',') {
-        continue;
-      }
+    const char *find = line;
+    while(find && *find)
+    {
+      find = strstr(find, binary_load_function);
+      if(find) {
+        find += strlen(binary_load_function);
+        char symname[1024];
+        parse_sym(symname, &find);
+        skipblanks(&find);
+        if(*find != ';') {
+          continue;
+        }
+        ++find;
 
-      binary_loaded(s, symname);
+        binary_loaded(s, symname);
+      }
     }
   }
+}
+
+const char * gen_load_defines(group *b)
+{
+  static char load[1024];
+
+  load[0] = '\0';
+
+  char *ptr = load;
+  BLSLL(group) *lbl = b->loads;
+  group *lb;
+
+  BLSLL_FOREACH(lb, lbl) {
+    char symname[1024];
+    getsymname(symname, lb->name);
+    ptr += snprintf(ptr, 1024 - (load - ptr), "-D%s%s ", binary_load_function, symname);
+  }
+
+  return load;
 }
 
 void source_get_size_gcc(group *s);
@@ -138,32 +161,10 @@ void source_get_symbols_gcc(group *s)
   char cmdline[1024];
   char object[1024];
   char elf[1024];
+  FILE *f;
 
   sprintf(object, "%s.o", s->name);
   sprintf(elf, "%s.elf", s->name);
-
-  snprintf(cmdline, 1024, "%s %s -mcpu=68000 -c %s -o %s", compiler, cflags, s->name, object);
-  printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
-  system(cmdline);
-
-  // Link to get internal symbols
-  snprintf(cmdline, 1024, "%s %s -Ttext=0x40000 -r %s -o %s", ld, ldflags, object, elf);
-  printf("Get symbols from %s :\n%s\n", s->name, cmdline);
-  system(cmdline);
-
-  // Generate and parse symbols from elf binary
-  snprintf(cmdline, 1024, "%s %s", nm, elf);
-  printf("Extract sybols from %s :\n%s\n", s->name, cmdline);
-  FILE *f = popen(cmdline, "r");
-  if(!f)
-  {
-    printf("Could not execute nm on source %s\n", s->name);
-    exit(1);
-  }
-  parse_nm(s, f, 0);
-  pclose(f);
-
-  source_get_size_gcc(s);
 
   // Read binary loading from the source
   snprintf(cmdline, 1024, "%s -E -fdirectives-only %s", precompiler, s->name);
@@ -176,6 +177,31 @@ void source_get_symbols_gcc(group *s)
   }
   find_binary_load(s, f);
   pclose(f);
+
+  const char *defs = gen_load_defines(s);
+
+  snprintf(cmdline, 1024, "%s %s %s -mcpu=68000 -c %s -o %s", compiler, defs, cflags, s->name, object);
+  printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Link to get internal symbols
+  snprintf(cmdline, 1024, "%s %s -Ttext=0x40000 -r %s -o %s", ld, ldflags, object, elf);
+  printf("Get symbols from %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Generate and parse symbols from elf binary
+  snprintf(cmdline, 1024, "%s %s", nm, elf);
+  printf("Extract sybols from %s :\n%s\n", s->name, cmdline);
+  f = popen(cmdline, "r");
+  if(!f)
+  {
+    printf("Could not execute nm on source %s\n", s->name);
+    exit(1);
+  }
+  parse_nm(s, f, 0);
+  pclose(f);
+
+  source_get_size_gcc(s);
 }
 
 void source_get_size_gcc(group *s)

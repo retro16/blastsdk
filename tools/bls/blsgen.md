@@ -1,13 +1,14 @@
 Binaries
 ========
 
-Binary splash.c
----------------
+Binary splash
+-------------
 
  - bus main
+ - provides splash.c loadmenu.c
 
-Binary loadmenu.c
------------------
+Binary menu.c
+-------------
 
  - bus main
 
@@ -24,6 +25,6 @@ Output mygame.img
  - region JUE
  - copyright 2014 GPL
  - author Retro 16
- - binaries splash.c
+ - binaries splash
  
  - entry splash

@@ -117,6 +117,78 @@ void parse_sym(char *s, const char **cp)
   *cp = c;
 }
 
+size_t getsymname(char *output, const char *path)
+{
+  int sep;
+  char *op = output;
+
+  // Parse first character
+
+  if(!path || !*path)
+  {
+    printf("Error : Empty path\n");
+    exit(1);
+  }
+  if(*path >= '0' && *path <= '9')
+  {
+    printf("Warning : symbols cannot start with numbers, prepending underscore to [%s]\n", path);
+    *op = '_';
+    ++op;
+    sep = 0;
+  }
+
+  if(*path >= 'a' && *path <= 'z')
+  {
+    *op = *path - 'a' + 'A';
+    ++op;
+    ++path;
+    sep = 0;
+  }
+  else if(*path >= 'A' && *path <= 'Z')
+  {
+    *op = *path;
+    ++op;
+    ++path;
+    sep = 0;
+  }
+  else
+  {
+    *op = '_';
+    ++op;
+    ++path;
+    sep = 1;
+  }
+
+  while(*path)
+  {
+    if((*path >= '0' && *path <= '9') || (*path >= 'A' && *path <= 'Z') || *path == '_')
+    {
+      *op = *path;
+      ++op;
+      sep = 0;
+    }
+    else if(*path >= 'a' && *path <= 'z')
+    {
+      *op = *path - 'a' + 'A';
+      ++op;
+      sep = 0;
+    }
+    else
+    {
+      if(!sep)
+      {
+        *op = '_';
+        ++op;
+      }
+      sep = 1;
+    }
+    ++path;
+  }
+  *op = '\0';
+
+  return op - output;
+}
+
 group * group_new() {
   group *g = (group *)calloc(1, sizeof(group));
   g->optimize = -1;
@@ -179,12 +251,54 @@ group * source_find(const char *name) {
   return NULL;
 }
 
+group * grouplist_find_sym(BLSLL(group) * groups, const char *name) {
+  char symname[4096];
+  getsymname(symname, name);
+
+  group *g;
+  char sn[4096];
+
+  BLSLL_FOREACH(g, groups) {
+    getsymname(sn, g->name);
+    if(strcmp(symname, sn) == 0) {
+      return g;
+    }
+  }
+
+  return NULL;
+}
+
+section * sectionlist_find_sym(BLSLL(section) * sections, const char *name) {
+  char symname[4096];
+  getsymname(symname, name);
+
+  section *g;
+  char sn[4096];
+
+  BLSLL_FOREACH(g, sections) {
+    getsymname(sn, g->name);
+    if(strcmp(symname, sn) == 0) {
+      return g;
+    }
+  }
+
+  return NULL;
+}
+
+group * source_find_sym(const char *name) {
+  return grouplist_find_sym(sources, name);
+}
+
 section * section_find(const char *name) {
   BLSLL(section) *n = sections;
   BLSLL_FINDSTR(n, name, name);
   if(n)
     return n->data;
   return NULL;
+}
+
+section * section_find_sym(const char *name) {
+  return sectionlist_find_sym(sections, name);
 }
 
 section * section_find_ext(const char *name, const char *suffix) {
@@ -208,6 +322,10 @@ group * binary_find(const char *name) {
   if(n)
     return n->data;
   return NULL;
+}
+
+group * binary_find_sym(const char *name) {
+  return grouplist_find_sym(binaries, name);
 }
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section) {

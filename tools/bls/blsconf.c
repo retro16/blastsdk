@@ -325,7 +325,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
     }
     if((g = source_find(name))) {
       // Represents a source
-      bin->uses_sources = blsll_insert_group(bin->uses_sources, s);
+      bin->uses_sources = blsll_insert_group(bin->uses_sources, g);
       continue;
     }
 
