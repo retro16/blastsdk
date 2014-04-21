@@ -738,8 +738,8 @@ void bls_expand_binaries()
   }
 }
 
-int main() {
-  blsconf_load("blsgen.md");
+int main(int argc, char **argv) {
+  blsconf_load(argc > 1 ? argv[1] : "blsgen.md");
 
   bls_get_symbols();
   bls_find_entry();

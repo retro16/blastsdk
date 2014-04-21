@@ -4,13 +4,11 @@ Binaries
 Binary splash
 -------------
 
- - bus main
  - provides splash.c loadmenu.c
 
 Binary menu.c
 -------------
 
- - bus main
 
 Outputs
 =======

@@ -158,16 +158,16 @@ void blsconf_load(const char *file) {
     output_parse(n->child, mdconfgetvalue(n, "name"));
   }
 
-  for(n = mdconf->child; (n = mdconfsearch(n, "binary")); n = n->next) {
-    binary_parse(n->child, mdconfgetvalue(n, "name"));
+  for(n = mdconf->child; (n = mdconfsearch(n, "section")); n = n->next) {
+    section_parse(n->child, NULL, mdconfgetvalue(n, "name"));
   }
 
   for(n = mdconf->child; (n = mdconfsearch(n, "source")); n = n->next) {
     source_parse(n->child, mdconfgetvalue(n, "name"));
   }
 
-  for(n = mdconf->child; (n = mdconfsearch(n, "section")); n = n->next) {
-    section_parse(n->child, NULL, mdconfgetvalue(n, "name"));
+  for(n = mdconf->child; (n = mdconfsearch(n, "binary")); n = n->next) {
+    binary_parse(n->child, mdconfgetvalue(n, "name"));
   }
 }
 

@@ -23,6 +23,12 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
   s->source = source;
   s->physsize = 0; // Do not store BSS on physical medium
   s->format = format_zero;
+  
+  if(source->bus == bus_none && mainout.target != target_scd)
+  {
+    // For genesis, default to main bus
+    source->bus = bus_main;
+  }
 }
 
 const char *compiler = "m68k-elf-gcc";
