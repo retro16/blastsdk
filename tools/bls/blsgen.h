@@ -129,8 +129,7 @@ typedef struct group {
 
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
-  struct blsll_node_section *uses;
-  struct blsll_node_group *uses_sources;
+  struct blsll_node_group *uses_binaries;
   struct blsll_node_group *loads; // List of binaries loaded by this group
 } group;
 group * group_new();
@@ -165,7 +164,7 @@ typedef struct section {
   BLSLL(symbol) *intsym; // Internal symbols
   BLSLL(symbol) *extsym; // External symbols (dependencies)
 
-  struct blsll_node_section *deps; // Added by "uses", "provides" or symbol dependencies
+  struct blsll_node_section *uses; // Added by "source.uses", "source.provides" or symbol dependencies
 
   group *source;
 } section;

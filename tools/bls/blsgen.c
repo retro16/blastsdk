@@ -411,20 +411,6 @@ void group_dump(const group *grp, FILE *out) {
     fprintf(out, "\n");
   }
 
-  if(grp->uses) {
-    BLSLL(section) *secl = grp->uses;
-    section *sec;
-
-    fprintf(out, " - uses ");
-    BLSLL_FOREACH(sec, secl) {
-      fprintf(out, "`%s`", sec->name);
-      if(secl->next) {
-        fprintf(out, ", ");
-      }
-    }
-    fprintf(out, "\n");
-  }
-
   if(grp->loads) {
     BLSLL(group) *secl = grp->loads;
     group *sec;
@@ -487,6 +473,21 @@ void section_dump(const section *sec, FILE *out)
       fprintf(out, " - size $%lX\n", (uint64_t)sec->size);
     }
     fprintf(out, "\n");
+
+    if(grp->uses) {
+      BLSLL(section) *secl = sec->uses;
+      section *s;
+
+      fprintf(out, " - uses ");
+      BLSLL_FOREACH(s, secl) {
+        fprintf(out, "`%s`", s->name);
+        if(secl->next) {
+          fprintf(out, ", ");
+        }
+      }
+      fprintf(out, "\n");
+    }
+
 
     if(sec->symbol) {
       if(sec->symbol->name) {
@@ -749,20 +750,29 @@ void bls_expand_binaries()
       blsll_free_group(grp->provides_sources);
       grp->provides_sources = NULL;
     }
-
-    if(grp->uses_sources) {
-      BLSLL(group) *srcl = grp->uses_sources;
-      group *src;
-      BLSLL_FOREACH(src, srcl) {
-        BLSLL(section) *sl = src->uses;
+  }
+ 
+  // Adds "uses_binaries" declared in sources and add all sections of binaries in all dependencies of the source sections.
+  grpl = sources;
+  BLSLL_FOREACH(grp, grpl) {
+    if(grp->uses_binaries) {
+      BLSLL(group) *binl = grp->uses_binaries;
+      group *bin;
+      BLSLL_FOREACH(bin, binll) {
+        BLSLL(section) *sl = bin->provides;
         section *s;
 
-        BLSLL_FOREACH(s, sl) {
-          grp->uses = blsll_insert_section(grp->uses, s);
+        BLSLL(section) *grpsl = grp->provides;
+        section *grps;
+
+        BLSLL_FOREACH(grps, grpsl) {
+          BLSLL_FOREACH(s, sl) {
+            grps->uses = blsll_insert_section(grps->uses, s);
+          }
         }
       }
-      blsll_free_group(grp->uses_sources);
-      grp->uses_sources = NULL;
+      blsll_free_group(grp->uses_binaries);
+      grp->provides_sources = NULL;
     }
   }
 }

@@ -217,6 +217,15 @@ section * section_parse(const mdconfnode *md, const char *srcname, const char *n
     return s;
   }
 
+  const mdconfnode *n;
+  for(n = md; (n = mdconfsearch(n, "uses")); n = n->next) {
+    const char *name = n->value;
+    section *dep;
+    if((dep = section_parse(name))) {
+      s->uses = blsll_insert_section(s->uses, dep);
+    }
+  }
+
   MDCONF_GET_INT(md, physaddr, s->physaddr);
   MDCONF_GET_INT(md, physsize, s->physsize);
   MDCONF_GET_ENUM(md, format, format, s->format);
@@ -318,14 +327,9 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
     explicitdeps = 1;
     const char *name = n->value;
-    if((s = section_find(name))) {
-      // Represents a section name
-      bin->uses = section_list_add(bin->uses, s);
-      continue;
-    }
-    if((g = source_find(name))) {
+    if((g = binary_parse(name))) {
       // Represents a source
-      bin->uses_sources = blsll_insert_group(bin->uses_sources, g);
+      bin->uses_binaries = blsll_insert_group(bin->uses_binaries, g);
       continue;
     }
 
