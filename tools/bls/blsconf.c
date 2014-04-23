@@ -186,6 +186,18 @@ symbol * symbol_parse(const mdconfnode *md, const char *name) {
   return s;
 }
 
+section * section_parse_nosrc(const mdconfnode *md, const char *name)
+{
+  size_t slen = strlen(name);
+  char * srcname = (char *)alloca(slen + 1);
+  strcpy(srcname, name);
+	char *lastdot = strrchr(srcname, '.');
+	if(lastdot) {
+		*lastdot = '\0';
+	}
+  return section_parse(md, srcname, name);
+}
+
 section * section_parse_ext(const mdconfnode *md, const char *srcname, const char *name) {
   size_t slen = strlen(srcname) + strlen(name);
   char * sname = (char *)alloca(slen + 1);
@@ -221,7 +233,7 @@ section * section_parse(const mdconfnode *md, const char *srcname, const char *n
   for(n = md; (n = mdconfsearch(n, "uses")); n = n->next) {
     const char *name = n->value;
     section *dep;
-    if((dep = section_parse(name))) {
+    if((dep = section_parse_nosrc(NULL, name))) {
       s->uses = blsll_insert_section(s->uses, dep);
     }
   }
@@ -327,7 +339,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
     explicitdeps = 1;
     const char *name = n->value;
-    if((g = binary_parse(name))) {
+    if((g = binary_parse(NULL, name))) {
       // Represents a source
       bin->uses_binaries = blsll_insert_group(bin->uses_binaries, g);
       continue;

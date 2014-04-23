@@ -148,10 +148,9 @@ BLSLL_DECLARE(symbol, symbol_free)
 
 struct blsll_node_section;
 typedef struct section {
-  char *name; // Segment name in source: "", ".text", ".img", ".pal", ...
-  char *datafile; // Data file name
-
   format format;
+  char *name; // Source name with segment name appended
+  char *datafile; // Data file name
 
   sv physaddr; // Physical address on medium
   sv physsize; // Size on physical medium
@@ -172,6 +171,12 @@ section * section_new();
 void section_free(section *section);
 BLSLL_DECLARE(section, section_free)
 
+typedef struct element {
+  format format;
+  char *name;
+} element;
+static inline void element_free(element *element) { (void)element; printf("Error: tried to free a generic element\n"); exit(1); }
+BLSLL_DECLARE(element, element_free)
 
 typedef enum target {
   target_gen,

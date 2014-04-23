@@ -329,7 +329,8 @@ group * binary_find_sym(const char *name) {
 }
 
 group * find_providing(BLSLL(group) * glist, section *section) {
-  group *g;
+	(void)glist; (void)section;
+/*  group *g;
   BLSLL_FOREACH(g, glist) {
     BLSLL(section) *sl = g->provides;
     section *s;
@@ -339,7 +340,7 @@ group * find_providing(BLSLL(group) * glist, section *section) {
       }
     }
   }
-
+*/
   return NULL;
 }
 
@@ -474,7 +475,7 @@ void section_dump(const section *sec, FILE *out)
     }
     fprintf(out, "\n");
 
-    if(grp->uses) {
+    if(sec->uses) {
       BLSLL(section) *secl = sec->uses;
       section *s;
 
@@ -694,7 +695,7 @@ void bls_get_symbols()
 }
 
 void bls_finalize_dep_graph() {
-  BLSLL(group) *bol = mainout.bol;
+/*  BLSLL(group) *bol = mainout.bol;
   group *src;
 
   BLSLL_FOREACH(src, bol) {
@@ -702,9 +703,9 @@ void bls_finalize_dep_graph() {
     BLSLL(section) *uses = src->uses;
     section *sec;
     BLSLL_FOREACH(sec, uses) {
-      if(!
+			//TODO
     }
-  }
+  }*/
 }
 
 void bls_map()
@@ -758,7 +759,7 @@ void bls_expand_binaries()
     if(grp->uses_binaries) {
       BLSLL(group) *binl = grp->uses_binaries;
       group *bin;
-      BLSLL_FOREACH(bin, binll) {
+      BLSLL_FOREACH(bin, binl) {
         BLSLL(section) *sl = bin->provides;
         section *s;
 
