@@ -328,19 +328,18 @@ group * binary_find_sym(const char *name) {
   return grouplist_find_sym(binaries, name);
 }
 
-group * find_providing(BLSLL(group) * glist, section *section) {
-	(void)glist; (void)section;
-/*  group *g;
+group * find_providing(BLSLL(group) * glist, section *sec) {
+  group *g;
   BLSLL_FOREACH(g, glist) {
     BLSLL(section) *sl = g->provides;
-    section *s;
+		section *s;
     BLSLL_FOREACH(s, sl) {
-      if(s == section) {
+      if(sec == s) {
         return g;
       }
     }
   }
-*/
+
   return NULL;
 }
 
@@ -403,6 +402,20 @@ void group_dump(const group *grp, FILE *out) {
     secl = grp->provides;
 
     fprintf(out, " - provides ");
+    BLSLL_FOREACH(sec, secl) {
+      fprintf(out, "`%s`", sec->name);
+      if(secl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, "\n");
+  }
+
+  if(grp->uses_binaries) {
+    BLSLL(group) *secl = grp->uses_binaries;
+    group *sec;
+
+    fprintf(out, " - uses ");
     BLSLL_FOREACH(sec, secl) {
       fprintf(out, "`%s`", sec->name);
       if(secl->next) {

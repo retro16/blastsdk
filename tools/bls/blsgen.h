@@ -129,7 +129,7 @@ typedef struct group {
 
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
-  struct blsll_node_group *uses_binaries;
+  struct blsll_node_group *uses_binaries; // List of binaries used by this binary
   struct blsll_node_group *loads; // List of binaries loaded by this group
 } group;
 group * group_new();
