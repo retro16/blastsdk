@@ -64,6 +64,14 @@ Create high level structures
 
  * Determine entry points
 
+
+
+Find symbols in sources
+-----------------------
+
+A first compilation pass is done on each source, to find symbols provided by the source. This pass also determines binaries loaded by each section.
+
+
 Create a dependency graph and a build order list (BOL)
 ------------------------------------------------------
 
@@ -79,6 +87,7 @@ Determine the source used by entry point. Use it as the starting point for the f
             Find source associated with this section
             When found, recurse with this source
 
+
 Compute binary sizes
 --------------------
 
@@ -90,10 +99,26 @@ Compute binary sizes
         Compress
         Get the compressed size ; each module should add a small margin if relocation can change compressed size
 
+Known sections prepass
+----------------------
+
+This pass finds all sections provided by each binary based on its 'provides_sources' list.
+
+Create binary dependencies
+--------------------------
+
+For each section not provided by a binary, find another section depending on this one : the two sections are provided by the same binary.
+For each binary, find 'loads'.
+For each binary, find uses_binaries : all binaries used directly or indirectly (find recursively). Remove 'loads' from 'uses_binaries'.
+
+Now all binaries know all their dependencies.
+
+For each section, find its binary and all 'used_binaries' ; add all their provided sections to the 'uses' list of the section.
+
 Map sections
 ------------
 
-Now that all binary sizes, chips and busses are known, the final memory map can be computed :
+Now all sections have a view of their dependencies when loaded, the final memory map can be computed :
 
     Sections that do not have a predefined address should be placed at their final position
         Use the first-match algorithm from blsbuild to do this
@@ -102,13 +127,21 @@ After mapping target addresses, physical addresses should be defined.
 
 Symbols must be updated to reflect changes.
 
+Final compilation
+-----------------
+
+Each source is compiled with final ORG. A first compilation pass is done on every source to find symbol values.
+
+Then the last compilation is done with all external symbols known.
+
+Each section is then extracted to an individual file.
+
 Generate final image
 --------------------
 
 Generate the header for the current medium.
 
-All addresses are known. Proceed with the final compilation.
-Binaries are generated into "section.datafile" and compressed directly to the correct offset into the final image.
+Binaries are generated and compressed directly to the correct offset into the final image.
 
 Finally, for cart images, checksum is computed and put at the right offset.
 

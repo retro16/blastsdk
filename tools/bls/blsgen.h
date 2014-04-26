@@ -114,6 +114,14 @@ typedef enum {
 } format;
 BLSENUM(format, 8)
 
+typedef enum target {
+  target_gen,
+  target_scd,
+  target_vcart,
+  target_max
+} target;
+BLSENUM(target, 8)
+
 // Sources are groups of sections
 // Binaries are groups of sections
 
@@ -130,7 +138,7 @@ typedef struct group {
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
   struct blsll_node_group *uses_binaries; // List of binaries used by this binary
-  struct blsll_node_group *loads; // List of binaries loaded by this group
+  struct blsll_node_group *loads; // List of binaries loaded by this binary
 } group;
 group * group_new();
 void group_free(group *group);
@@ -164,6 +172,7 @@ typedef struct section {
   BLSLL(symbol) *extsym; // External symbols (dependencies)
 
   struct blsll_node_section *uses; // Added by "source.uses", "source.provides" or symbol dependencies
+  struct blsll_node_group *loads; // List of binaries loaded by this section
 
   group *source;
 } section;
@@ -177,14 +186,6 @@ typedef struct element {
 } element;
 static inline void element_free(element *element) { (void)element; printf("Error: tried to free a generic element\n"); exit(1); }
 BLSLL_DECLARE(element, element_free)
-
-typedef enum target {
-  target_gen,
-  target_scd,
-  target_vcart,
-  target_max
-} target;
-BLSENUM(target, 8)
 
 typedef struct output {
   target target;
@@ -209,12 +210,11 @@ group * source_find_sym(const char *name);
 section * section_find(const char *name);
 section * section_find_ext(const char *name, const char *suffix);
 section * section_find_sym(const char *name);
+section * section_find_using(section *section);
 symbol * symbol_find(const char *name);
 group * binary_find(const char *name);
 group * binary_find_sym(const char *name);
-
-group * find_providing(BLSLL(group) * glist, section *section);
-group * find_binary_from_source(group *source);
+group * binary_find_providing(BLSLL(group) * glist, section *section);
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);

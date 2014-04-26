@@ -328,7 +328,7 @@ group * binary_find_sym(const char *name) {
   return grouplist_find_sym(binaries, name);
 }
 
-group * find_providing(BLSLL(group) * glist, section *sec) {
+group * binary_find_providing(BLSLL(group) * glist, section *sec) {
   group *g;
   BLSLL_FOREACH(g, glist) {
     BLSLL(section) *sl = g->provides;
@@ -356,8 +356,13 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
     s = symbol_find(symname);
     if(!s)
     {
-      *symlist = blsll_create_symbol(*symlist);
-      s = (*symlist)->data;
+      if(symlist)
+      {
+        *symlist = blsll_create_symbol(*symlist);
+        s = (*symlist)->data;
+      } else {
+        s = (symbol*)calloc(sizeof(symbol));
+      }
       s->name = strdup(symname);
       s->value.chip = chip_none;
       s->value.addr = -1;
@@ -366,7 +371,9 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
     }
     else
     {
-      *symlist = blsll_insert_symbol(*symlist, s);
+      if(symlist) {
+        *symlist = blsll_insert_symbol(*symlist, s);
+      }
     }
   }
 
@@ -708,17 +715,6 @@ void bls_get_symbols()
 }
 
 void bls_finalize_dep_graph() {
-/*  BLSLL(group) *bol = mainout.bol;
-  group *src;
-
-  BLSLL_FOREACH(src, bol) {
-    group *b = find_binary_from_source(src);
-    BLSLL(section) *uses = src->uses;
-    section *sec;
-    BLSLL_FOREACH(sec, uses) {
-			//TODO
-    }
-  }*/
 }
 
 void bls_map()
