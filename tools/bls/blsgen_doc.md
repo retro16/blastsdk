@@ -71,6 +71,26 @@ Find symbols in sources
 
 A first compilation pass is done on each source, to find symbols provided by the source. This pass also determines binaries loaded by each section.
 
+Compute binary sizes
+--------------------
+
+    For each source in the BOL
+        Generate the symbol table (use random values in the correct ranges for unknown external symbols)
+        Use a predefined ORG in the correct address range (depending on chip/bus)
+        Compile
+        Get the resulting binary size
+        Compress
+        Get the compressed size ; each module should add a small margin if relocation can change compressed size
+
+Determine entry point
+---------------------
+
+Find the entry point section and/or symbol (depending on target).
+
+Known sections prepass
+----------------------
+
+This pass finds all sections provided by each binary based on its 'provides_sources' list.
 
 Create a dependency graph and a build order list (BOL)
 ------------------------------------------------------
@@ -88,40 +108,29 @@ Determine the source used by entry point. Use it as the starting point for the f
             When found, recurse with this source
 
 
-Compute binary sizes
---------------------
 
-    For each source in the BOL
-        Generate the symbol table (use random values in the correct ranges for unknown external symbols)
-        Use a predefined ORG in the correct address range (depending on chip/bus)
-        Compile
-        Get the resulting binary size
-        Compress
-        Get the compressed size ; each module should add a small margin if relocation can change compressed size
-
-Known sections prepass
-----------------------
-
-This pass finds all sections provided by each binary based on its 'provides_sources' list.
 
 Create binary dependencies
 --------------------------
 
 For each section not provided by a binary, find another section depending on this one : the two sections are provided by the same binary.
 For each binary, find 'loads'.
-For each binary, find uses_binaries : all binaries used directly or indirectly (find recursively). Remove 'loads' from 'uses_binaries'.
+For each binary, find uses_binaries : all binaries used directly. Remove 'loads' from 'uses_binaries'.
 
 Now all binaries know all their dependencies.
 
-For each section, find its binary and all 'used_binaries' ; add all their provided sections to the 'uses' list of the section.
+For each section, find its binary and all 'uses_binaries' ; add all their provided sections to the 'uses' list of the section.
 
 Map sections
 ------------
 
 Now all sections have a view of their dependencies when loaded, the final memory map can be computed :
 
-    Sections that do not have a predefined address should be placed at their final position
-        Use the first-match algorithm from blsbuild to do this
+Before, premap sources : values that can be guessed (especially chip/bus) are filled, so each source and section has as much information as possible.
+
+
+Sections that do not have a predefined address should be placed at their final position
+Use the first-match algorithm from blsbuild to do this
 
 After mapping target addresses, physical addresses should be defined.
 

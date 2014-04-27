@@ -219,6 +219,8 @@ group * binary_find_providing(BLSLL(group) * glist, section *section);
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
 
+void *merge_lists(void *target, void *source);
+
 static inline sv neg_int(sv v) {
   if(v < 0) return v;
   return (-v) & 0xFFFFFFFF;

@@ -4,10 +4,25 @@ Binaries
 Binary splash
 -------------
 
- - provides splash.c loadmenu.c
+ - provides splash.c
 
-Binary menu.c
+
+Binary loader.c
+---------------
+
+
+Binary common
 -------------
+
+ - provides common.c
+
+
+Binary level1.c
+---------------
+
+
+Binary level2.c
+---------------
 
 
 Outputs

@@ -85,11 +85,12 @@ void parse_nm(group *s, FILE *in, int setvalues)
         printf("%s = %08X  bus = %s\n", symname, (unsigned int)addr, bus_names[s->bus]);
         break;
       case 'U':
-        symbol_set(&text->extsym, symname, unknown, text);
+        symbol_set(&text->extsym, symname, unknown, NULL);
         printf("%s unknown\n", symname);
       break;
       case 'b':
       case 'B':
+      case 'C':
         symbol_set_bus(&bss->intsym, symname, busaddr, bss);
         printf("%s = %08X\n", symname, (unsigned int)addr);
         break;
@@ -107,8 +108,9 @@ const char *binary_load_function = "BLS_LOAD_BINARY_";
 void binary_loaded(group *s, const char *symname)
 {
   group *binary = binary_find_sym(symname);
+  section *text = section_find_ext(s->name, ".text");
   if(binary) {
-    s->loads = blsll_insert_group(s->loads, binary);
+    text->loads = blsll_insert_group(text->loads, binary);
   } else {
     printf("Could not find binary with symbol name %s\n", symname);
     exit(1);
@@ -131,7 +133,7 @@ void find_binary_load(group *s, FILE *in)
         char symname[1024];
         parse_sym(symname, &find);
         skipblanks(&find);
-        if(*find != ';') {
+        if(find[0] != '(' || find[1] != ')') {
           continue;
         }
         ++find;

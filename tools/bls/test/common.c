@@ -1,0 +1,11 @@
+int common_variable;
+
+void common_level_init()
+{
+  // Loads player sprite
+}
+
+void common_load_map(void *img, int imgtarget, void *map, int maptarget, void *pal)
+{
+  // Loads a level in VRAM
+}

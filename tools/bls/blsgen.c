@@ -361,7 +361,7 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
         *symlist = blsll_create_symbol(*symlist);
         s = (*symlist)->data;
       } else {
-        s = (symbol*)calloc(sizeof(symbol));
+        s = (symbol*)calloc(1, sizeof(symbol));
       }
       s->name = strdup(symname);
       s->value.chip = chip_none;
@@ -377,8 +377,11 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
     }
   }
 
-  if(section != s->section) {
-    printf("Warning : symbol %s multiply defined.\n", symname);
+  if(!s->section) {
+    // The symbol section was undefined
+    s->section = section;
+  } else if(section && section != s->section) {
+    printf("Warning : symbol %s multiply defined (%s and %s at least).\n", symname, section->name, s->section->name);
   }
 
   if(value.chip != chip_none && value.addr != -1) {
@@ -391,6 +394,24 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section) {
   chipaddr ca = bus2chip(value);
   return symbol_set(symlist, symname, ca, section);
+}
+
+void *merge_lists(void *target, void *source) {
+  BLSLL(section) *rl = (BLSLL(section) *)target;
+  BLSLL(section) *sl = (BLSLL(section) *)source;
+  section *t, *s;
+
+  BLSLL_FOREACH(s, sl) {
+    BLSLL(section) *tl = rl;
+    BLSLL_FOREACH(t, tl) {
+      if(t == s) break;
+    }
+    if(!tl) {
+      rl = blsll_insert_section(rl, s);
+    }
+  }
+
+  return rl;
 }
 
 void group_dump(const group *grp, FILE *out) {
@@ -418,6 +439,20 @@ void group_dump(const group *grp, FILE *out) {
     fprintf(out, "\n");
   }
 
+  if(grp->provides_sources) {
+    BLSLL(group) *secl = grp->provides_sources;
+    group *sec;
+
+    fprintf(out, " - provides ");
+    BLSLL_FOREACH(sec, secl) {
+      fprintf(out, "`%s`", sec->name);
+      if(secl->next) {
+        fprintf(out, ", ");
+      }
+    }
+    fprintf(out, " (source)\n");
+  }
+
   if(grp->uses_binaries) {
     BLSLL(group) *secl = grp->uses_binaries;
     group *sec;
@@ -429,7 +464,7 @@ void group_dump(const group *grp, FILE *out) {
         fprintf(out, ", ");
       }
     }
-    fprintf(out, "\n");
+    fprintf(out, " (binary\n");
   }
 
   if(grp->loads) {
@@ -443,7 +478,7 @@ void group_dump(const group *grp, FILE *out) {
         fprintf(out, ", ");
       }
     }
-    fprintf(out, "\n");
+    fprintf(out, " (binary)\n");
   }
 }
 
@@ -493,7 +528,6 @@ void section_dump(const section *sec, FILE *out)
     if(sec->size >= 0) {
       fprintf(out, " - size $%lX\n", (uint64_t)sec->size);
     }
-    fprintf(out, "\n");
 
     if(sec->uses) {
       BLSLL(section) *secl = sec->uses;
@@ -509,6 +543,21 @@ void section_dump(const section *sec, FILE *out)
       fprintf(out, "\n");
     }
 
+    if(sec->loads) {
+      BLSLL(group) *grpl = sec->loads;
+      group *grp;
+
+      fprintf(out, " - loads ");
+      BLSLL_FOREACH(grp, grpl) {
+        fprintf(out, "`%s`", grp->name);
+        if(grpl->next) {
+          fprintf(out, ", ");
+        }
+      }
+      fprintf(out, "\n");
+    }
+
+    fprintf(out, "\n");
 
     if(sec->symbol) {
       if(sec->symbol->name) {
@@ -648,8 +697,12 @@ void gen_bol(group *s)
     syml = sec->extsym;
     BLSLL_FOREACH(sym, syml) {
       // Recurse with the source of the external symbol
-      if(sym->section && sym->section->source) {
-         gen_bol(sym->section->source);
+      if(sym->section) {
+        if(sym->section->source) {
+          gen_bol(sym->section->source);
+        }
+        // Add this section to the section dependencies
+        sec->uses = blsll_insert_unique_section(sec->uses, sym->section);
       }
     }
   }
@@ -743,7 +796,6 @@ void bls_expand_binaries()
   group *grp;
 
   // Replace source dependencies with section dependencies
-
   grpl = binaries;
   BLSLL_FOREACH(grp, grpl) {
     if(grp->provides_sources) {
@@ -763,7 +815,7 @@ void bls_expand_binaries()
   }
  
   // Adds "uses_binaries" declared in sources and add all sections of binaries in all dependencies of the source sections.
-  grpl = sources;
+/*  grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     if(grp->uses_binaries) {
       BLSLL(group) *binl = grp->uses_binaries;
@@ -784,7 +836,32 @@ void bls_expand_binaries()
       blsll_free_group(grp->uses_binaries);
       grp->provides_sources = NULL;
     }
+  }*/
+
+  // Adds "loads" to binaries based on "loads" of its sections
+  grpl = binaries;
+  BLSLL_FOREACH(grp, grpl) {
+    BLSLL(section) *secl = grp->provides;
+    section *sec;
+    BLSLL_FOREACH(sec, secl) {
+      grp->loads = (BLSLL(group) *)merge_lists(grp->loads, sec->loads);
+    }
   }
+
+  // Find uses_binaries for each binary
+  grpl = binaries;
+  BLSLL_FOREACH(grp, grpl) {
+    BLSLL(section) *secl = grp->provides;
+    section *sec;
+    BLSLL_FOREACH(sec, secl) {
+      BLSLL(section) *usl = sec->uses;
+      section *us;
+      BLSLL_FOREACH(us, usl) {
+        grp->uses_binaries = blsll_insert_unique_group(grp->uses_binaries, binary_find_providing(binaries, us));
+      }
+    }
+  }
+
 }
 
 int main(int argc, char **argv) {
