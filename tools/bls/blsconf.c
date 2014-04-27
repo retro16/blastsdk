@@ -96,7 +96,7 @@ group * source_parse(const mdconfnode *n, const char *name) {
 //      section_create_as(s, n);
       break;
     case format_png:
-//      section_create_png(s, n);
+      section_create_png(s, n);
       break;
     case format_max:
       break;
@@ -318,15 +318,16 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   group *g;
   section *s;
   for(n = mdnode; (n = mdconfsearch(n, "provides")); n = n->next) {
-    explicitdeps = 1;
     const char *name = n->value;
-    if((s = section_find(name))) {
+    if((s = section_parse_nosrc(NULL, name))) {
       // Represents a section name
       bin->provides = blsll_insert_section(bin->provides, s);
       continue;
     }
+  }
 
-    // Represents a source
+  for(n = mdnode; (n = mdconfsearch(n, "source")); n = n->next) {
+    explicitdeps = 1;
     g = source_parse(NULL, name);
     if(bin->bus != bus_none && g->bus == bus_none)
     {

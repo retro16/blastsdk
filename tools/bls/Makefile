@@ -8,7 +8,7 @@ clean:
 	rm -f *.o $(TARGETS)
 
 # Per-source rules
-blsgen: blsgen.o blsgen_gcc.o blsconf.o mdconf.o blsaddress.o
+blsgen: blsgen.o blsgen_gcc.o blsgen_png.o blsconf.o mdconf.o blsaddress.o
 blsbuild: blsbuild.o address.o compile.o config.o output.o source.o utils.o img.o
 bdb: bdb.o bdp.o d68k_mod.o symtable.o utils.o binparse.o
 d68k: d68k.o d68k_mod.o symtable.o utils.o
@@ -20,6 +20,7 @@ CFLAGS_img = $(shell libpng-config --cflags)
 CFLAGS_blsbuild = -DINCDIR="\"$(INCDIR)\"" -DINCLUDEDIR="\"$(INCLUDEDIR)\"" -DSRCDIR="\"$(SCDIR)\"" -DBLAST_AS="\"$(BLAST_AS)\"" -DBLAST_CC="\"$(BLAST_CC)\"" -DBLAST_CXX="\"$(BLAST_CXX)\"" -DBLAST_CFLAGS="\"$(BLAST_CFLAGS)\"" -DBLAST_LD="\"$(BLAST_LD)"\" -DBLAST_LDFLAGS="\"$(BLAST_LDFLAGS)\"" -DBLAST_NM="\"$(BLAST_NM)\"" -DBLAST_OBJCOPY="\"$(BLAST_OBJCOPY)\"" -DBLAST_ASMX="\"$(BLAST_ASMX)\""
 CFLAGS_config = $(CFLAGS_blsbuild)
 CFLAGS_compile = $(CFLAGS_blsbuild)
+LDFLAGS_blsgen = -lpng
 LDFLAGS_blsbuild = $(shell libpng-config --ldflags)
 LDFLAGS_bdb = -lreadline
 

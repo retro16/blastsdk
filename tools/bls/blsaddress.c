@@ -7,20 +7,23 @@ bus find_bus(chip chip)
   {
     case chip_none:
     case chip_max:
-    case chip_pram:
     case chip_wram:
-    case chip_zram:
     case chip_sstack:
     case chip_zstack:
       return bus_none;
 
+    case chip_zram:
+      return bus_z80;
+
     case chip_cart:
     case chip_bram:
     case chip_vram:
+    case chip_cram:
     case chip_ram:
     case chip_mstack:
       return bus_main;
 
+    case chip_pram:
     case chip_pcm:
       return bus_sub;
   }
@@ -193,6 +196,7 @@ busaddr chip2bus(chipaddr ca, bus bus)
       }
       break;
     case chip_vram:
+    case chip_cram:
       break;
     // TODO : CD chips
     case chip_bram:
@@ -251,7 +255,7 @@ busaddr translate(busaddr busaddr, bus target)
 {
   return chip2bus(bus2chip(busaddr), target);
 }
-
+/*
 static sv hw_chip_start(chip chip, bus bus, int bank)
 {
   switch(chip)
@@ -286,6 +290,7 @@ static sv hw_chip_start(chip chip, bus bus, int bank)
       return 0;
     case chip_zram:
     case chip_vram:
+    case chip_cram:
       return 0;
     case chip_wram:
       return 0x200000;
@@ -294,7 +299,7 @@ static sv hw_chip_start(chip chip, bus bus, int bank)
   }
   return -1;
 }
-
+*/
 sv chip_start(chip chip)
 {
   if(chip == chip_cart)
@@ -314,12 +319,17 @@ sv chip_size(chip chip)
     case chip_max:
       return -1;
     case chip_cart:
+      if(mainout.target == target_vcart) {
+        return chip_size(chip_wram) - ROMHEADERSIZE;
+      }
       return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
     case chip_zstack:
     case chip_zram:
       return 0x2000;
     case chip_vram:
       return 0x10000;
+    case chip_cram:
+      return 0x80;
     case chip_mstack:
     case chip_ram:
       if(mainout.target != target_gen) {
@@ -334,8 +344,9 @@ sv chip_size(chip chip)
     case chip_pcm:
       return 0x10000;
   }
+  return -1;
 }
-
+/*
 static sv hw_chip_size(chip chip, bus bus, int bank)
 {
   switch(chip)
@@ -356,6 +367,8 @@ static sv hw_chip_size(chip chip, bus bus, int bank)
       return 0x2000;
     case chip_vram:
       return 0x10000;
+    case chip_cram:
+      return 0x80;
     case chip_ram:
       {
         // Avoid allocation over the interrupt vector table for SCD
@@ -383,7 +396,7 @@ static sv hw_chip_size(chip chip, bus bus, int bank)
   }
   return -1;
 }
-
+*/
 chipaddr bankmove(chipaddr addr, bus bus, int newbank)
 {
   busaddr ba = chip2bus(addr, bus);
@@ -428,6 +441,9 @@ void chip_align(chipaddr *chip)
     case chip_vram:
       align = 32;
       break;
+    case chip_cram:
+      align = 32;
+      break;
     case chip_ram:
     case chip_mstack:
       align = 2;
@@ -463,6 +479,8 @@ const char *chip_name(chip chip)
      return "zram";
     case chip_vram:
      return "vram";
+    case chip_cram:
+     return "cram";
     case chip_ram:
      return "ram";
     case chip_pram:

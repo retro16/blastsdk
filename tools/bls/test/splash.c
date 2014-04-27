@@ -3,6 +3,7 @@ void loader_main();
 void display_splash()
 {
   // Display splash.png
+  BLS_LOAD_BINARY_SPLASH_PNG();
 }
 
 void main()

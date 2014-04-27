@@ -201,7 +201,7 @@ void group_free(group *p) {
 }
 
 const char bus_names[][8] = {"none", "main", "sub", "z80"};
-const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "ram", "pram", "wram", "pcm"};
+const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
 const char target_names[][8] = {"gen", "scd", "vcart"};
 
@@ -344,21 +344,6 @@ group * binary_find_providing(BLSLL(group) * glist, section *sec) {
 }
 
 int sections_overlap(section *s1, section *s2) {
-  // Find if sections have binary-level dependencies
-  group *b1 = binary_find_providing(binaries, s1);
-  if(b1) {
-    group *b2 = binary_find_providing(binaries, s2);
-    if(b2) {
-      BLSLL(group) *bl = b2->uses_binaries;
-      BLSLL_FOREACH(b2, bl) {
-        if(b1 == b2) goto sections_overlap_same_binaries;
-      }
-    }
-    // Sections are in binaries without dependencies : they cannot overlap
-    return 0;
-  }
-sections_overlap_same_binaries:
-
   if(s1->symbol->value.chip == chip_none || s1->symbol->value.addr == -1 || s1->size == -1) {
     printf("Error : undefined address or size for section %s\n", s1->name);
     exit(1);
@@ -374,6 +359,25 @@ sections_overlap_same_binaries:
     return 0;
   }
 
+  if(s1->symbol->value.chip != chip_cart) {
+    // Find if sections have binary-level dependencies
+    // cart is ignored because cartridges have fixed content
+    group *b1 = binary_find_providing(binaries, s1);
+    if(b1) {
+      group *b2 = binary_find_providing(binaries, s2);
+      if(b2) {
+        BLSLL(group) *bl = b2->uses_binaries;
+        BLSLL_FOREACH(b2, bl) {
+          if(b1 == b2) goto sections_overlap_same_binaries;
+        }
+      }
+      // Sections are in binaries without dependencies : they cannot overlap
+      return 0;
+    }
+  }
+sections_overlap_same_binaries:
+  while(0);
+
   sv s1addr = s1->symbol->value.addr;
   sv s1end = s1addr + s1->size;
   sv s2addr = s2->symbol->value.addr;
@@ -385,13 +389,6 @@ sections_overlap_same_binaries:
   }
 
   return 1;
-}
-
-int section_overlaps_any(section *sec) {
-  BLSLL(section) *sl;
-  section *s;
-  BLSLL_FOREACH(s, sl) if(sections_overlap(sec, s)) return 1;
-  return 0;
 }
 
 int sections_phys_overlap(section *s1, section *s2) {
@@ -416,13 +413,6 @@ int sections_phys_overlap(section *s1, section *s2) {
   }
 
   return 1;
-}
-
-int section_phys_overlaps_any(section *sec) {
-  BLSLL(section) *sl;
-  section *s;
-  BLSLL_FOREACH(s, sl) if(sections_phys_overlap(sec, s)) return 1;
-  return 0;
 }
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section) {
@@ -572,7 +562,7 @@ void symtable_dump(const BLSLL(symbol) *syml, FILE *out)
       fprintf(out, "Unnamed symbol\n");
       continue;
     }
-    fprintf(out, "%5s ", chip_names[sym->value.chip]);
+    fprintf(out, "    %5s ", chip_names[sym->value.chip]);
     if(sym->value.addr >= 0) {
       fprintf(out, "0x%08X", (uint32_t)sym->value.addr);
     } else {
@@ -600,7 +590,14 @@ void section_dump(const section *sec, FILE *out)
     if(sec->symbol) {
       fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
       if(sec->symbol->value.addr != -1) {
-        fprintf(out, " - addr $%08lX\n", (uint64_t)sec->symbol->value.addr);
+        fprintf(out, " - addr $%08lX", (uint64_t)sec->symbol->value.addr);
+        if(sec->source && sec->source->bus != bus_none) {
+          busaddr ba = chip2bus(sec->symbol->value, sec->source->bus);
+          if(ba.addr != -1) {
+            fprintf(out, " ($%08X bus=%s bank=%d)", (unsigned int)ba.addr, bus_names[sec->source->bus], ba.bank);
+          }
+        }
+        fprintf(out, "\n");
       }
     }
 
@@ -648,12 +645,12 @@ void section_dump(const section *sec, FILE *out)
     }
 
     if(sec->intsym) {
-      fprintf(out, "\nInternal symbol table :\n");
+      fprintf(out, "\nInternal symbol table :\n\n");
       symtable_dump(sec->intsym, out);
     }
 
     if(sec->extsym) {
-      fprintf(out, "\nExternal symbol table :\n");
+      fprintf(out, "\nExternal symbol table :\n\n");
       symtable_dump(sec->extsym, out);
     }
 
@@ -843,6 +840,10 @@ void bls_get_symbols()
     switch(grp->format) {
       case format_gcc:
         source_get_symbols_gcc(grp);
+        break;
+      case format_png:
+        source_get_symbols_png(grp);
+        break;
       default:
         break;
     }
@@ -861,6 +862,11 @@ void bls_map()
       case format_gcc:
         printf("Premapping %s\n", grp->name);
         source_premap_gcc(grp);
+        break;
+      case format_png:
+        printf("Premapping %s\n", grp->name);
+        source_premap_png(grp);
+        break;
       default:
         break;
     }
@@ -896,11 +902,13 @@ void bls_map()
       BLSLL(section) *sl = sections;
       section *s;
       BLSLL_FOREACH(s, sl) {
-        if(s->size == 0 || s->symbol->value.addr == -1) continue;
+        if(s == sec || s->size == 0 || s->symbol->value.addr == -1) continue;
         printf("Overlaps ? %s <-> %s  ", sec->name, s->name);
         if(sections_overlap(sec, s)) {
-          printf("YES\n");
+          printf("YES : %06X => ", (unsigned int)sec->symbol->value.addr);
           sec->symbol->value.addr = s->symbol->value.addr + s->size;
+          chip_align(&sec->symbol->value);
+          printf("%06X\n", (unsigned int)sec->symbol->value.addr);
           goto bls_map_next_section_addr;
         } else {
           printf("NO\n");
@@ -949,11 +957,18 @@ void bls_finalize_binary_dependencies()
   }
 
   // Adds "loads" to binaries based on "loads" of its sections
+  // Unifies data format
   grpl = binaries;
   BLSLL_FOREACH(grp, grpl) {
+    if(grp->format == format_auto) {
+      grp->format = format_raw;
+    }
     BLSLL(section) *secl = grp->provides;
     section *sec;
     BLSLL_FOREACH(sec, secl) {
+      if(sec->format == format_auto) {
+        sec->format = grp->format;
+      }
       grp->uses_binaries = (BLSLL(group) *)merge_lists(grp->uses_binaries, sec->loads);
       grp->loads = (BLSLL(group) *)merge_lists(grp->loads, sec->loads);
     }
@@ -968,7 +983,6 @@ void bls_finalize_binary_dependencies()
       BLSLL(section) *usl = sec->uses;
       section *us;
       BLSLL_FOREACH(us, usl) {
-        printf("%s uses %s : add to %s\n", sec->name, us->name, grp->name);
         grp->uses_binaries = blsll_insert_unique_group(grp->uses_binaries, binary_find_providing(binaries, us));
       }
     }

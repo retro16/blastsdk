@@ -7,4 +7,6 @@ void source_compile_gcc(group *s); // Final compilation step. Produces the binar
 
 //blsgen_png
 void section_create_png(group *source, const mdconfnode *mdconf);
+void source_get_symbols_png(group *s);
+void source_premap_png(group *s);
 

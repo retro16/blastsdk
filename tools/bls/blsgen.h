@@ -81,6 +81,7 @@ typedef enum chip {
   chip_bram, // Optional genesis in-cartridge battery RAM
   chip_zram,
   chip_vram,
+  chip_cram, // Color VRAM
   chip_ram,
   chip_pram,
   chip_wram,
