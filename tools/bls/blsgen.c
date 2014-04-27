@@ -464,7 +464,7 @@ void group_dump(const group *grp, FILE *out) {
         fprintf(out, ", ");
       }
     }
-    fprintf(out, " (binary\n");
+    fprintf(out, " (binary)\n");
   }
 
   if(grp->loads) {
@@ -844,6 +844,7 @@ void bls_expand_binaries()
     BLSLL(section) *secl = grp->provides;
     section *sec;
     BLSLL_FOREACH(sec, secl) {
+      grp->uses_binaries = (BLSLL(group) *)merge_lists(grp->uses_binaries, sec->loads);
       grp->loads = (BLSLL(group) *)merge_lists(grp->loads, sec->loads);
     }
   }
@@ -857,11 +858,21 @@ void bls_expand_binaries()
       BLSLL(section) *usl = sec->uses;
       section *us;
       BLSLL_FOREACH(us, usl) {
+        printf("%s uses %s : add to %s\n", sec->name, us->name, grp->name);
         grp->uses_binaries = blsll_insert_unique_group(grp->uses_binaries, binary_find_providing(binaries, us));
       }
     }
   }
 
+  // Add reverse dependencies to uses_binaries
+  grpl = binaries;
+  BLSLL_FOREACH(grp, grpl) {
+    BLSLL(group) *ol = grp->uses_binaries;
+    group *o;
+    BLSLL_FOREACH(o, ol) {
+      o->uses_binaries = blsll_insert_unique_group(o->uses_binaries, grp);
+    }
+  }
 }
 
 int main(int argc, char **argv) {
@@ -869,8 +880,8 @@ int main(int argc, char **argv) {
 
   bls_get_symbols();
   bls_find_entry();
-  bls_expand_binaries();
   bls_gen_bol();
+  bls_expand_binaries();
   bls_map();
 
   blsconf_dump(stdout);
