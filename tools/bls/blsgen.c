@@ -343,6 +343,88 @@ group * binary_find_providing(BLSLL(group) * glist, section *sec) {
   return NULL;
 }
 
+int sections_overlap(section *s1, section *s2) {
+  // Find if sections have binary-level dependencies
+  group *b1 = binary_find_providing(binaries, s1);
+  if(b1) {
+    group *b2 = binary_find_providing(binaries, s2);
+    if(b2) {
+      BLSLL(group) *bl = b2->uses_binaries;
+      BLSLL_FOREACH(b2, bl) {
+        if(b1 == b2) goto sections_overlap_same_binaries;
+      }
+    }
+    // Sections are in binaries without dependencies : they cannot overlap
+    return 0;
+  }
+sections_overlap_same_binaries:
+
+  if(s1->symbol->value.chip == chip_none || s1->symbol->value.addr == -1 || s1->size == -1) {
+    printf("Error : undefined address or size for section %s\n", s1->name);
+    exit(1);
+  }
+
+  if(s2->symbol->value.chip == chip_none || s2->symbol->value.addr == -1 || s2->size == -1) {
+    printf("Error : undefined address or size for section %s\n", s2->name);
+    exit(1);
+  }
+
+  if(s1->symbol->value.chip != s2->symbol->value.chip) {
+    // Different chips (or no chip)
+    return 0;
+  }
+
+  sv s1addr = s1->symbol->value.addr;
+  sv s1end = s1addr + s1->size;
+  sv s2addr = s2->symbol->value.addr;
+  sv s2end = s2addr + s2->size;
+
+  if(s1addr >= s2end || s2addr >= s1end)
+  {
+    return 0;
+  }
+
+  return 1;
+}
+
+int section_overlaps_any(section *sec) {
+  BLSLL(section) *sl;
+  section *s;
+  BLSLL_FOREACH(s, sl) if(sections_overlap(sec, s)) return 1;
+  return 0;
+}
+
+int sections_phys_overlap(section *s1, section *s2) {
+  if(s1->physaddr == -1 || s1->physsize == -1) {
+    printf("Error : undefined pĥysical location for section %s\n", s1->name);
+    exit(1);
+  }
+
+  if(s2->physaddr == -1 || s2->physsize == -1) {
+    printf("Error : undefined pĥysical location for section %s\n", s2->name);
+    exit(1);
+  }
+
+  sv s1addr = s1->physaddr;
+  sv s1end = s1addr + s1->physsize;
+  sv s2addr = s2->physaddr;
+  sv s2end = s2addr + s2->physsize;
+
+  if(s1addr >= s2end || s2addr >= s1end)
+  {
+    return 0;
+  }
+
+  return 1;
+}
+
+int section_phys_overlaps_any(section *sec) {
+  BLSLL(section) *sl;
+  section *s;
+  BLSLL_FOREACH(s, sl) if(sections_phys_overlap(sec, s)) return 1;
+  return 0;
+}
+
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section) {
   BLSLL(symbol) *sl = *symlist;
   symbol *s;
@@ -767,16 +849,12 @@ void bls_get_symbols()
   }
 }
 
-void bls_finalize_dep_graph() {
-}
-
 void bls_map()
 {
   BLSLL(group) *grpl;
   group *grp;
 
   // Premap all sources
-
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     switch(grp->format) {
@@ -788,9 +866,65 @@ void bls_map()
     }
   }
 
+  // Do logical section mapping
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    if(sec->size < 0) {
+      printf("Error : section %s has an unknown size\n", sec->name);
+      exit(1);
+    } else if(!sec->size) {
+      // Sections with null size don't need mapping
+      continue;
+    }
+    if(sec->symbol->value.chip == chip_none) {
+      printf("Error : could not determine chip of section %s\n", sec->name);
+      exit(1);
+    }
+    if(sec->symbol->value.addr != -1) {
+      // Section address already known
+      continue;
+    }
+
+    // Find a place for this section
+    sv chipstart = chip_start(sec->symbol->value.chip);
+    sv chipend = chipstart + chip_size(sec->symbol->value.chip);
+    sec->symbol->value.addr = chipstart;
+    printf("Section %s : size=%04X chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->size, (unsigned int)chipstart, (unsigned int)chipend);
+    while(sec->symbol->value.addr + sec->size <= chipend)
+    {
+      BLSLL(section) *sl = sections;
+      section *s;
+      BLSLL_FOREACH(s, sl) {
+        if(s->size == 0 || s->symbol->value.addr == -1) continue;
+        printf("Overlaps ? %s <-> %s  ", sec->name, s->name);
+        if(sections_overlap(sec, s)) {
+          printf("YES\n");
+          sec->symbol->value.addr = s->symbol->value.addr + s->size;
+          goto bls_map_next_section_addr;
+        } else {
+          printf("NO\n");
+        }
+      }
+      // Found
+      goto bls_map_next_section;
+bls_map_next_section_addr:
+      continue;
+    }
+
+    if(sec->symbol->value.addr + sec->size >= chipend) {
+      printf("Error : could not map section %s : not enough memory in chip %s\n", sec->name, chip_names[sec->symbol->value.chip]);
+      exit(1);
+    }
+bls_map_next_section:
+    continue;
+  }
+
+  // Do physical mapping
+
 }
 
-void bls_expand_binaries()
+void bls_finalize_binary_dependencies()
 {
   BLSLL(group) *grpl;
   group *grp;
@@ -813,30 +947,6 @@ void bls_expand_binaries()
       grp->provides_sources = NULL;
     }
   }
- 
-  // Adds "uses_binaries" declared in sources and add all sections of binaries in all dependencies of the source sections.
-/*  grpl = sources;
-  BLSLL_FOREACH(grp, grpl) {
-    if(grp->uses_binaries) {
-      BLSLL(group) *binl = grp->uses_binaries;
-      group *bin;
-      BLSLL_FOREACH(bin, binl) {
-        BLSLL(section) *sl = bin->provides;
-        section *s;
-
-        BLSLL(section) *grpsl = grp->provides;
-        section *grps;
-
-        BLSLL_FOREACH(grps, grpsl) {
-          BLSLL_FOREACH(s, sl) {
-            grps->uses = blsll_insert_section(grps->uses, s);
-          }
-        }
-      }
-      blsll_free_group(grp->uses_binaries);
-      grp->provides_sources = NULL;
-    }
-  }*/
 
   // Adds "loads" to binaries based on "loads" of its sections
   grpl = binaries;
@@ -881,7 +991,7 @@ int main(int argc, char **argv) {
   bls_get_symbols();
   bls_find_entry();
   bls_gen_bol();
-  bls_expand_binaries();
+  bls_finalize_binary_dependencies();
   bls_map();
 
   blsconf_dump(stdout);

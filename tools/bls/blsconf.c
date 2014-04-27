@@ -337,7 +337,6 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   }
 
   for(n = mdnode; (n = mdconfsearch(n, "uses")); n = n->next) {
-    explicitdeps = 1;
     const char *name = n->value;
     if((g = binary_parse(NULL, name))) {
       // Represents a source

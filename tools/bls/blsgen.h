@@ -196,8 +196,9 @@ typedef struct output {
   section *ip;
   section *sp;
 
-  BLSLL(group) *binaries; // Binaries to put in the image
   BLSLL(group) *bol; // Build order list
+  BLSLL(group) *sol; // Section order lost
+  BLSLL(group) *binaries; // Binaries to put in the image (in order)
 } output;
 output * output_new();
 void output_free(output *output);
@@ -215,6 +216,9 @@ symbol * symbol_find(const char *name);
 group * binary_find(const char *name);
 group * binary_find_sym(const char *name);
 group * binary_find_providing(BLSLL(group) * glist, section *section);
+
+int sections_overlap(section *s1, section *s2);
+int sections_phys_overlap(section *s1, section *s2);
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);

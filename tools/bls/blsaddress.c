@@ -295,15 +295,45 @@ static sv hw_chip_start(chip chip, bus bus, int bank)
   return -1;
 }
 
-sv chip_start(chip chip, bus bus, int bank)
+sv chip_start(chip chip)
 {
-  sv start = hw_chip_start(chip, bus, bank);
-  if(chip == chip_cart && bank < 1)
+  if(chip == chip_cart)
   {
-    start += ROMHEADERSIZE;
+    return ROMHEADERSIZE;
   }
 
-  return start;
+  return 0;
+}
+
+sv chip_size(chip chip)
+{
+  switch(chip) {
+    case chip_bram:
+      // TODO
+    case chip_none:
+    case chip_max:
+      return -1;
+    case chip_cart:
+      return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
+    case chip_zstack:
+    case chip_zram:
+      return 0x2000;
+    case chip_vram:
+      return 0x10000;
+    case chip_mstack:
+    case chip_ram:
+      if(mainout.target != target_gen) {
+        return 0xFD00; // Avoid allocating over exception vectors
+      }
+      return 0x10000;
+    case chip_sstack:
+    case chip_pram:
+      return 0x40000;
+    case chip_wram:
+      return 0x20000;
+    case chip_pcm:
+      return 0x10000;
+  }
 }
 
 static sv hw_chip_size(chip chip, bus bus, int bank)
@@ -363,18 +393,6 @@ chipaddr bankmove(chipaddr addr, bus bus, int newbank)
   }
   ba.bank = newbank;
   return bus2chip(ba);
-}
-
-sv chip_size(chip chip, bus bus, int bank)
-{
-  sv size = hw_chip_size(chip, bus, bank);
-
-  if(chip == chip_cart && bank < 1)
-  {
-    size -= ROMHEADERSIZE;
-  }
-
-  return size;
 }
 
 sv align_value(sv value, sv step)

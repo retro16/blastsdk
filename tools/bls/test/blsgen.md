@@ -24,6 +24,7 @@ Binary level1.c
 Binary level2.c
 ---------------
 
+ - uses splash
 
 Outputs
 =======

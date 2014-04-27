@@ -7,3 +7,5 @@ busaddr translate(busaddr busaddr, bus target);
 chipaddr bankmove(chipaddr addr, bus bus, int newbank);
 void chip_align(chipaddr *chip);
 const char *chip_name(chip chip);
+sv chip_start(chip chip);
+sv chip_size(chip chip);
