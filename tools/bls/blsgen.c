@@ -584,7 +584,7 @@ void section_dump(const section *sec, FILE *out)
       fprintf(out, " - physsize $%08lX\n", (uint64_t)sec->physsize);
     }
     if(sec->physalign) {
-      fprintf(out, " - physalign %d\n", sec->physalign);
+      fprintf(out, " - physalign $%X\n", (unsigned int)sec->physalign);
     }
 
     if(sec->symbol) {
@@ -602,7 +602,7 @@ void section_dump(const section *sec, FILE *out)
     }
 
     if(sec->align) {
-      fprintf(out, " - align %d\n", sec->align);
+      fprintf(out, " - align $%X\n", (unsigned int)sec->align);
     }
     if(sec->size >= 0) {
       fprintf(out, " - size $%lX\n", (uint64_t)sec->size);

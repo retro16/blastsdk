@@ -1,4 +1,5 @@
 #include "blsgen.h"
+#include "blsgen_ext.h"
 #include "blsconf.h"
 
 #include <unistd.h>
@@ -63,7 +64,7 @@ void section_create_png(group *source, const mdconfnode *mdconf)
   // Generate the .map section
   source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".map")));
   s->source = source;
-  s->align = 0x800;
+  s->align = 0x2000;
   
   if(source->bus == bus_none && mainout.target != target_scd)
   {
@@ -94,7 +95,7 @@ void source_get_size_png(group *s)
   png_uint_32 height = png_get_image_height(png_ptr, info_ptr);
   if(width % 8 || height % 8)
   {
-    printf("File %s size is not a multiple of 8.\n", s->name);
+    printf("File %s size is not a multiple of 8 pixels.\n", s->name);
     exit(1);
   }
 
@@ -107,7 +108,7 @@ void source_get_size_png(group *s)
 
   img->size = width * height / 2;
   pal->size = 16 * 2; // 16 colors palette
-  map->size = img->size / 16;
+  map->size = compute_map_size(width, height);
 }
 
 void source_get_symbols_png(group *s)
