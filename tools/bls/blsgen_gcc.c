@@ -1,5 +1,6 @@
 #include "blsgen.h"
 #include "blsconf.h"
+#include "blsaddress.h"
 
 #include <unistd.h>
 
@@ -144,9 +145,84 @@ void find_binary_load(group *s, FILE *in)
   }
 }
 
-void gen_load_defines(group *b, const char *outfile)
+const char * gen_load_defines()
 {
-  
+  static char filename[1024];
+  snprintf(filename, 1024, "blsload_defines.h");
+  FILE *out = fopen(filename, "w");
+
+  if(!out) {
+    printf("Error : cannot open %s for writing.\n", filename);
+    exit(1);
+  }
+
+  BLSLL(group) *srcl;
+  group *src;
+  BLSLL(section) *secl;
+  section *sec;
+  BLSLL(group) *binl;
+  group *bin;
+
+  binl = binaries;
+  BLSLL_FOREACH(bin, binl) {
+    char binname[1024];
+    getsymname(binname, bin->name);
+    fprintf(out, "#define %s%s() ", binary_load_function, binname);
+    if(mainout.target == target_scd) {
+      // Begin SCD transfer
+      // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
+//      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
+    } else {
+      secl = bin->provides;
+      BLSLL_FOREACH(sec, secl) {
+        // Load each section
+        busaddr ba = chip2bus(sec->symbol->value, bus_main);
+        if(sec->format == format_empty) continue;
+        if(sec->format == format_zero) {
+          if(sec->symbol->value.chip == chip_ram) {
+            fprintf(out, "blsfastfill_word(0x%08X, 0x%08X, 0);", (unsigned int)ba.addr, (unsigned int)sec->size);
+          } else if(sec->symbol->value.chip == chip_vram) {
+            fprintf(out, "blsvdp_clear(0x%04X, 0x%04X, 0);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+          } else {
+            printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
+          }
+          continue;
+        }
+        if(sec->format != format_raw) { printf("Warning : %s format unsupported\n", format_names[sec->format]); continue; }
+        switch(sec->symbol->value.chip) {
+          case chip_none:
+          case chip_mstack:
+          case chip_sstack:
+          case chip_zstack:
+          case chip_cart:
+          case chip_bram:
+          case chip_pram:
+          case chip_wram:
+          case chip_pcm:
+          case chip_max:
+            break;
+
+          case chip_zram:
+            // TODO
+            break;
+
+          case chip_vram:
+            fprintf(out, "blsvdp_dma(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->physaddr, (unsigned int)sec->size);
+            break;
+          case chip_cram:
+            fprintf(out, "blsvdp_set_cram(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->physaddr, (unsigned int)sec->size);
+            break;
+          case chip_ram:
+            fprintf(out, "blsfastcopy_word(0x%08X, 0x%08X, 0x%08X);", (unsigned int)ba.addr, (unsigned int)sec->physaddr, (unsigned int)((sec->size + 1) / 2));
+            break;
+        }
+      }
+    }
+    fprintf(out, "\n");
+  }
+
+  fclose(out);
+  return filename;
 }
 
 void source_get_size_gcc(group *s);
@@ -255,39 +331,31 @@ void source_get_symbol_values_gcc(group *s)
   sprintf(object, "%s.o", s->name);
   sprintf(elf, "%s.elf", s->name);
 
-  // Read binary loading from the source
-  snprintf(cmdline, 1024, "%s -E -fdirectives-only %s", precompiler, s->name);
-  printf("Find binary loadings in %s :\n%s\n", s->name, cmdline);
-  f = popen(cmdline, "r");
-  if(!f)
-  {
-    printf("Could not execute cpp on source %s\n", s->name);
-    exit(1);
-  }
-  find_binary_load(s, f);
-  pclose(f);
+  const char *defs = gen_load_defines();
 
-  const char *defs = gen_load_defines(s);
-
-  snprintf(cmdline, 1024, "%s %s %s -mcpu=68000 -c %s -o %s", compiler, defs, cflags, s->name, object);
-  printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
+  snprintf(cmdline, 1024, "%s -include %s %s -mcpu=68000 -c %s -o %s", compiler, defs, cflags, s->name, object);
+  printf("Compile %s with load defines :\n%s\n", s->name, cmdline);
   system(cmdline);
 
+  section *text = section_find_ext(s->name, ".text");
+  section *data = section_find_ext(s->name, ".data");
+  section *bss = section_find_ext(s->name, ".bss");
+
   // Link to get internal symbols
-  snprintf(cmdline, 1024, "%s %s -Ttext=0x40000 -r %s -o %s", ld, ldflags, object, elf);
-  printf("Get symbols from %s :\n%s\n", s->name, cmdline);
+  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X -r %s -o %s", ld, ldflags, (unsigned int)text->symbol->value.addr, (unsigned int)data->symbol->value.addr, (unsigned int)bss->symbol->value.addr, object, elf);
+  printf("Get internal symbol valuess from %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
   // Generate and parse symbols from elf binary
   snprintf(cmdline, 1024, "%s %s", nm, elf);
-  printf("Extract sybols from %s :\n%s\n", s->name, cmdline);
+  printf("Extract symbol values from %s :\n%s\n", s->name, cmdline);
   f = popen(cmdline, "r");
   if(!f)
   {
     printf("Could not execute nm on source %s\n", s->name);
     exit(1);
   }
-  parse_nm(s, f, 0);
+  parse_nm(s, f, 1);
   pclose(f);
 }
 

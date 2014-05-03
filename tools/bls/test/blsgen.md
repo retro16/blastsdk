@@ -1,3 +1,11 @@
+Sections
+========
+
+Section level1.c.text
+---------------------
+
+ - chip ram
+
 Binaries
 ========
 
