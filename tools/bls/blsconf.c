@@ -45,7 +45,7 @@ format format_guess(const char *name) {
   // Try to deduce format from file/section name
   const char *c = strchr(name, '.');
   if(c) {
-    int i;
+    int i = 0;
     while(extfmt[i].fmt != format_max) {
       if(strcasecmp(c, extfmt[i].ext) == 0) return extfmt[i].fmt;
       ++i;

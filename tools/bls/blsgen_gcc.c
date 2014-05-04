@@ -43,6 +43,42 @@ const char *nm = "m68k-elf-nm";
 
 const char *readelf = "m68k-elf-readelf";
 
+static void gen_rodata_merge_linker_script()
+{
+  FILE *script = fopen("_bls_ldscript", "w");
+
+  fprintf(script,
+    "SECTIONS\n"
+    "{\n"
+    " .text :\n"
+    " {\n"
+    "  *(.text)\n"
+    "  *(.rodata*)\n"
+    " }\n"
+    "}\n"
+  );
+
+  fclose(script);
+}
+
+static void merge_rodata(const char *elf)
+{
+  char tmpelf[1024] = "_blsload_tmp_";
+  strcat(tmpelf, elf);
+
+  gen_rodata_merge_linker_script();
+
+  char line[1024];
+  snprintf(line, 1024, "%s -r -T _bls_ldscript -o %s %s", ld, tmpelf, elf);
+  printf("Merging rodata : %s\n", line);
+  system(line);
+
+
+  unlink("_bls_ldscript");
+  unlink(elf);
+  rename(tmpelf, elf);
+}
+
 void parse_nm(group *s, FILE *in, int setvalues)
 {
   chipaddr unknown = {chip_none, -1};
@@ -156,8 +192,6 @@ const char * gen_load_defines()
     exit(1);
   }
 
-  BLSLL(group) *srcl;
-  group *src;
   BLSLL(section) *secl;
   section *sec;
   BLSLL(group) *binl;
@@ -167,7 +201,7 @@ const char * gen_load_defines()
   BLSLL_FOREACH(bin, binl) {
     char binname[1024];
     getsymname(binname, bin->name);
-    fprintf(out, "#define %s%s() ", binary_load_function, binname);
+    fprintf(out, "#define %s%s() do { ", binary_load_function, binname);
     if(mainout.target == target_scd) {
       // Begin SCD transfer
       // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
@@ -218,7 +252,7 @@ const char * gen_load_defines()
         }
       }
     }
-    fprintf(out, "\n");
+    fprintf(out, " } while(0)\n");
   }
 
   fclose(out);
@@ -235,6 +269,8 @@ void source_get_symbols_gcc(group *s)
 
   sprintf(object, "%s.o", s->name);
   sprintf(elf, "%s.elf", s->name);
+  
+  const char *defs = gen_load_defines();
 
   // Read binary loading from the source
   snprintf(cmdline, 1024, "%s -E -fdirectives-only %s", precompiler, s->name);
@@ -248,7 +284,7 @@ void source_get_symbols_gcc(group *s)
   find_binary_load(s, f);
   pclose(f);
 
-  snprintf(cmdline, 1024, "%s %s -mcpu=68000 -c %s -o %s", compiler, cflags, s->name, object);
+  snprintf(cmdline, 1024, "%s %s -include %s -mcpu=68000 -c %s -o %s", compiler, cflags, defs, s->name, object);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -256,6 +292,8 @@ void source_get_symbols_gcc(group *s)
   snprintf(cmdline, 1024, "%s %s -Ttext=0x40000 -r %s -o %s", ld, ldflags, object, elf);
   printf("Get symbols from %s :\n%s\n", s->name, cmdline);
   system(cmdline);
+
+  merge_rodata(elf);
 
   // Generate and parse symbols from elf binary
   snprintf(cmdline, 1024, "%s %s", nm, elf);
@@ -308,8 +346,8 @@ void source_get_size_gcc(group *s)
 
     if(line[2] == '[') {
       strcpy(sectionname, line + 7);
-    } else if(strlen(line) > 32 && line[31] == ' ') {
-      sv size = parse_hex(line + 32);
+    } else if(strlen(line) > 39 && line[38] == ' ') {
+      sv size = parse_hex(line + 39);
       section *sec = section_find_ext(s->name, sectionname);
       if(!sec) {
         continue;
