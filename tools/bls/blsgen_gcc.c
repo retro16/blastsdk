@@ -397,6 +397,45 @@ void source_get_symbol_values_gcc(group *s)
   pclose(f);
 }
 
+static void extract_section(const char *elf, const char *sec)
+{
+	char cmdline[1024];
+  snprintf(cmdline, 1024, "%s -O binary -j %s %s %s%s", objdump, sec, elf, elf, sec);
+  printf("Extract section %s data from %s :\n%s\n", sec, elf, cmdline);
+  system(cmdline);
+}
+
+void source_compile_gcc(group *s)
+{
+  char cmdline[1024];
+  char object[1024];
+  char elf[1024];
+  FILE *f;
+
+  sprintf(object, "%s.o", s->name);
+  sprintf(elf, "%s.elf", s->name);
+
+  const char *defs = gen_load_defines();
+
+  snprintf(cmdline, 1024, "%s -include %s %s -mcpu=68000 -c %s -o %s", compiler, defs, cflags, s->name, object);
+  printf("Final compilation of %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  section *text = section_find_ext(s->name, ".text");
+  section *data = section_find_ext(s->name, ".data");
+  section *bss = section_find_ext(s->name, ".bss");
+
+  // Link at final address
+  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X %s -o %s", ld, ldflags, (unsigned int)text->symbol->value.addr, (unsigned int)data->symbol->value.addr, (unsigned int)bss->symbol->value.addr, object, elf);
+  printf("Get internal symbol valuess from %s :\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  // Extract sections from final ELF
+	extract_section(elf, ".text");
+	extract_section(elf, ".data");
+	extract_section(elf, ".bss");
+}
+
 void source_premap_gcc(group *s)
 {
   section *text = section_find_ext(s->name, ".text");

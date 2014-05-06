@@ -867,6 +867,23 @@ void bls_get_symbol_values()
   }
 }
 
+void bls_compile()
+{
+  BLSLL(group) *grpl;
+  group *grp;
+
+  grpl = sources;
+  BLSLL_FOREACH(grp, grpl) {
+    switch(grp->format) {
+      case format_gcc:
+        source_compile_gcc(grp);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 void bls_map()
 {
   BLSLL(group) *grpl;
@@ -1025,6 +1042,7 @@ int main(int argc, char **argv) {
   bls_finalize_binary_dependencies();
   bls_map();
   bls_get_symbol_values();
+	bls_compile();
 
   blsconf_dump(stdout);
 }
