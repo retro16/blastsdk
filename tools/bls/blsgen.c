@@ -1033,6 +1033,25 @@ void bls_finalize_binary_dependencies()
   }
 }
 
+const char path_prefixes[][64] = {
+  BLSPREFIX "/share/blast/src",
+
+};
+
+const char * find_file(const char *f)
+{
+  char name[4096];
+  FILE *fp = fopen(f, "r");
+  if(fp) {
+    fclose(fp);
+    return f;
+  }
+
+	
+
+  return name;
+}
+
 int main(int argc, char **argv) {
   blsconf_load(argc > 1 ? argv[1] : "blsgen.md");
 

@@ -34,7 +34,7 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
 
 const char *compiler = "m68k-elf-gcc";
 const char *precompiler = "m68k-elf-cpp";
-const char *cflags = "-Os -pipe";
+const char *cflags = "-Os -pipe -fomit-frame-pointer -fno-builtin-memset -fno-builtin-memcpy";
 
 const char *ld = "m68k-elf-ld";
 const char *ldflags = "";
@@ -42,6 +42,7 @@ const char *ldflags = "";
 const char *nm = "m68k-elf-nm";
 
 const char *readelf = "m68k-elf-readelf";
+const char *objcopy = "m68k-elf-objcopy";
 
 static void gen_rodata_merge_linker_script()
 {
@@ -59,6 +60,40 @@ static void gen_rodata_merge_linker_script()
   );
 
   fclose(script);
+}
+
+static void gen_symtable_section(FILE *out, const section *s, bus bus)
+{
+	const BLSLL(symbol) *syml = s->extsym;
+  const symbol *sym;
+  BLSLL_FOREACH(sym, syml) {
+		if(!sym->name) {
+			printf("Warning : unnamed symbol needed by %s\n", s->name);
+			continue;
+		}
+    if(sym->value.addr < 0) {
+      printf("Warning : Undefined symbol needed by %s : %s\n", s->name, sym->name);
+      continue;
+    }
+		busaddr ba = chip2bus(sym->value, bus);
+    fprintf(out, "%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
+    printf("%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
+  }
+}
+
+static void gen_symtable(const group *s)
+{
+	section *text = section_find_ext(s->name, ".text");
+	section *data = section_find_ext(s->name, ".data");
+	section *bss = section_find_ext(s->name, ".bss");
+
+	FILE *f = fopen("_blsgen_symtable.sym", "w");
+
+	gen_symtable_section(f, text, s->bus);
+	gen_symtable_section(f, data, s->bus);
+	gen_symtable_section(f, bss, s->bus);
+
+	fclose(f);
 }
 
 static void merge_rodata(const char *elf)
@@ -400,7 +435,7 @@ void source_get_symbol_values_gcc(group *s)
 static void extract_section(const char *elf, const char *sec)
 {
 	char cmdline[1024];
-  snprintf(cmdline, 1024, "%s -O binary -j %s %s %s%s", objdump, sec, elf, elf, sec);
+  snprintf(cmdline, 1024, "%s -O binary -j %s %s %s%s", objcopy, sec, elf, elf, sec);
   printf("Extract section %s data from %s :\n%s\n", sec, elf, cmdline);
   system(cmdline);
 }
@@ -425,8 +460,10 @@ void source_compile_gcc(group *s)
   section *data = section_find_ext(s->name, ".data");
   section *bss = section_find_ext(s->name, ".bss");
 
+	gen_symtable(s);
+
   // Link at final address
-  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X %s -o %s", ld, ldflags, (unsigned int)text->symbol->value.addr, (unsigned int)data->symbol->value.addr, (unsigned int)bss->symbol->value.addr, object, elf);
+  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X -R _blsgen_symtable.sym %s -o %s", ld, ldflags, (unsigned int)text->symbol->value.addr, (unsigned int)data->symbol->value.addr, (unsigned int)bss->symbol->value.addr, object, elf);
   printf("Get internal symbol valuess from %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 

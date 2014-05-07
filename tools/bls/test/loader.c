@@ -1,4 +1,4 @@
-void common_level_init();
+extern void common_level_init();
 
 void load_level(int l)
 {
@@ -18,6 +18,6 @@ void load_level(int l)
 void loader_main()
 {
   BLS_LOAD_BINARY_COMMON_C();
-  common_init();
+  common_level_init();
   load_level(1);
 }

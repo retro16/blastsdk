@@ -209,13 +209,11 @@ cp tools/makelib.sgdk sgdk
 make -C sgdk -f makelib.sgdk
 
 
-echo "Installing bls library"
-make -C src install
-
 echo "Installing bls sources"
 installsrc inc /share/blastsdk
 installsrc asm /share/blastsdk
 installsrc include /share/blastsdk
+installsrc src /share/blastsdk
 
 
 echo ""

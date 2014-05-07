@@ -44,6 +44,10 @@ const char *mydata="Hello world"
 ;
 
 const char *otherdata="Second string                               Shorter";
+
+int *cv = &common_variable;
+int x = 3;
+
 void common_load_map(void *img, int imgtarget, void *map, int maptarget, void *pal);
 void level1_init()
 {

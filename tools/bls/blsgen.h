@@ -20,6 +20,10 @@
 #define MAINSTACK 0xFFF800 // Default stack pointer
 #endif
 
+#ifndef BLSPREFIX
+#error BLSPREFIX not defined
+#endif
+
 extern BLSLL(group) *sources;
 extern BLSLL(section) *sections;
 extern BLSLL(group) *binaries;
@@ -243,5 +247,7 @@ sv parse_hex_skip(const char **cp);
 sv parse_hex(const char *cp);
 void parse_sym(char *s, const char **cp);
 size_t getsymname(char *output, const char *path);
+
+const char * find_file(const char *f);
 
 #endif

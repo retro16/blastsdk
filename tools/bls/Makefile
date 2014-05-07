@@ -15,7 +15,9 @@ d68k: d68k.o d68k_mod.o symtable.o utils.o
 scdupload: scdupload.o bdp.o utils.o
 d68ktest:
 
+
 # Per-source flags
+CFLAGS_blsgen = -DBLSPREFIX="\"$(BLSPREFIX)\""
 CFLAGS_img = $(shell libpng-config --cflags)
 CFLAGS_blsbuild = -DINCDIR="\"$(INCDIR)\"" -DINCLUDEDIR="\"$(INCLUDEDIR)\"" -DSRCDIR="\"$(SCDIR)\"" -DBLAST_AS="\"$(BLAST_AS)\"" -DBLAST_CC="\"$(BLAST_CC)\"" -DBLAST_CXX="\"$(BLAST_CXX)\"" -DBLAST_CFLAGS="\"$(BLAST_CFLAGS)\"" -DBLAST_LD="\"$(BLAST_LD)"\" -DBLAST_LDFLAGS="\"$(BLAST_LDFLAGS)\"" -DBLAST_NM="\"$(BLAST_NM)\"" -DBLAST_OBJCOPY="\"$(BLAST_OBJCOPY)\"" -DBLAST_ASMX="\"$(BLAST_ASMX)\""
 CFLAGS_config = $(CFLAGS_blsbuild)
@@ -29,9 +31,11 @@ CFLAGS ?= -std=gnu99 -O0 -g3 -pedantic -Wall -Wextra
 CC = gcc
 LD = gcc
 
-INCDIR ?= $(CURDIR)/../inc/
-INCLUDEDIR ?= $(CURDIR)/../include/
-SRCDIR ?= $(CURDIR)/../src/
+BLSPREFIX ?= $(dir $(dir $(shell which $(BLAST_CC) ) ) )
+INCDIR ?= $(BLSPREFIX)/share/blast/inc
+ASMDIR ?= $(BLSPREFIX)/share/blast/asm
+INCLUDEDIR ?= $(BLSPREFIX)/share/blast/include
+SRCDIR ?= $(BLSPREFIX)/share/blast/src
 BLAST_AS ?= m68k-elf-as
 BLAST_CC ?= m68k-elf-gcc
 BLAST_CXX ?= m68k-elf-g++
@@ -41,6 +45,7 @@ BLAST_LDFLAGS ?=
 BLAST_OBJCOPY ?= m68k-elf-objcopy
 BLAST_NM ?= m68k-elf-nm
 BLAST_ASMX ?= asmx
+
 
 install: $(TARGETS)
 	for f in $(INSTALL_TARGETS); do cp "$$f" "$(INSTALL_DIR)"; done
