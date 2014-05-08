@@ -1026,10 +1026,10 @@ void bls_finalize_binary_dependencies()
 
 char path_prefixes[][4096] = {
   ".", // Here comes the blsgen.md directory
-  BLSPREFIX "/share/blast/asm",
-  BLSPREFIX "/share/blast/inc",
-  BLSPREFIX "/share/blast/src",
-  BLSPREFIX "/share/blast/include"
+  BLSPREFIX "/share/blastsdk/asm",
+  BLSPREFIX "/share/blastsdk/inc",
+  BLSPREFIX "/share/blastsdk/src",
+  BLSPREFIX "/share/blastsdk/include"
 };
 
 size_t getbasename(char *output, const char *name)
@@ -1077,7 +1077,7 @@ int findfile(char *name, const char *f)
     }
   }
 
-  printf("Warning : %s not found", f);
+  printf("Warning : %s not found\n", f);
   return 0;
 }
 

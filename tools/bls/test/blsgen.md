@@ -27,6 +27,9 @@ Binary level1.c
 Binary level2.c
 ---------------
 
+Binary blsload.c
+----------------
+
 Output mygame.img
 =================
 

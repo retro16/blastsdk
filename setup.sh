@@ -198,6 +198,7 @@ exit 1
 fi
 fi
 
+if ! [ "$FORCE" ]; then
 echo "Installing sgdk library"
 requirecmd svn
 if [ -e "sgdk" ]; then
@@ -207,7 +208,7 @@ else
 fi
 cp tools/makelib.sgdk sgdk
 make -C sgdk -f makelib.sgdk
-
+fi
 
 echo "Installing bls sources"
 installsrc inc /share/blastsdk

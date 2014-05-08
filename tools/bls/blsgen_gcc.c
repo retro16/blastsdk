@@ -244,7 +244,12 @@ const char *gen_load_defines()
         if(sec->format == format_empty) continue;
         if(sec->format == format_zero) {
           if(sec->symbol->value.chip == chip_ram) {
-            fprintf(out, "blsfastfill_word(0x%08X, 0x%08X, 0);", (unsigned int)ba.addr, (unsigned int)sec->size);
+            if(sec->size > 1) {
+              fprintf(out, "blsfastfill_word(0x%08X, 0x%08X, 0);", (unsigned int)ba.addr, (unsigned int)sec->size / 2);
+            }
+            if(sec->size & 1) {
+              fprintf(out, "*((char*)0x%08X) = 0", (unsigned int)(ba.addr + sec->size - 1));
+            }
           } else if(sec->symbol->value.chip == chip_vram) {
             fprintf(out, "blsvdp_clear(0x%04X, 0x%04X, 0);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           } else {
