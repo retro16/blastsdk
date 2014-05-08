@@ -3,9 +3,7 @@
 # Alter these variables to suit your need
 BINUTILS_VERSION="2.24"
 GCC_VERSION="4.8.2"
-#BINUTILS_URL="http://www.mirrorservice.org/sites/sources.redhat.com/pub/binutils/snapshots/binutils-$BINUTILS_VERSION.tar.bz2"
 BINUTILS_URL="http://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.bz2"
-#GCC_URL="ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.bz2"
 GCC_URL="ftp://ftp.lip6.fr/pub/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.bz2"
 
 
@@ -17,7 +15,9 @@ Blast ! SDK - SEGA 16 bit development tools.
 This script will setup the Blast SDK for your system.
 EOF
 
-if [ "$UID" -eq 0 ]; then
+if [ "$(uname -o)" = "Cygwin" ]; then
+DEFAULTPREFIX="/cygdrive/c/blastsdk"
+elif [ "$UID" -eq 0 ]; then
 DEFAULTPREFIX="/opt/blastsdk"
 else
 DEFAULTPREFIX="$HOME/opt/blastsdk"
@@ -221,5 +221,5 @@ echo "Installation finished."
 
 PATH="$OLDPATH"
 if ! which blsbuild &>/dev/null; then
-  echo "Please add $BLSPREFIX/bin to your PATH."
+  echo "Please add $BLSPREFIX/bin to your PATH (edit $HOME/.profile)."
 fi

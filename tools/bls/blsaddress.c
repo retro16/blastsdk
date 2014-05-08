@@ -306,6 +306,11 @@ sv chip_start(chip chip)
   {
     return ROMHEADERSIZE;
   }
+  else if(chip == chip_vram)
+  {
+    // Skip null tile
+    return 32;
+  }
 
   return 0;
 }

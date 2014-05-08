@@ -63,7 +63,25 @@ To build blast, the following packages are needed :
 * Building bdbridge
  * Arduino 1.x
 
+### Cygwin dependencies ###
 
+To build under Cygwin, you will need to install the following packages :
+
+ - Devel/bison
+ - Devel/byacc
+ - Devel/gcc-core
+ - Devel/gcc-g++
+ - Devel/git
+ - Devel/make
+ - Devel/pkg-config
+ - Devel/subversion
+ - Graphics/libpng-devel
+ - Libs/libgmp-devel
+ - Libs/libmpc-devel
+ - Libs/libmpfr-devel
+ - Libs/libreadline-devel
+ - Web/wget
+ 
 Quick start
 -----------
 

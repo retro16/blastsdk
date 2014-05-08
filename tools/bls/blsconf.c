@@ -223,7 +223,7 @@ section * section_parse(const mdconfnode *md, const char *srcname, const char *n
       ((char *)srcname)[c - name] = '\0';
     }
 
-    s->source = source_parse(md, srcname);
+    s->source = source_parse(NULL, srcname);
     s->datafile = symname(name);
   } else if(!md) {
     return s;

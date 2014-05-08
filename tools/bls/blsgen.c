@@ -867,6 +867,9 @@ void bls_compile()
     case format_gcc:
       source_compile_gcc(grp);
       break;
+    case format_png:
+      source_compile_png(grp);
+      break;
     default:
       break;
     }
