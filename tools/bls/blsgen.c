@@ -952,9 +952,6 @@ bls_map_next_section_addr:
 bls_map_next_section:
     continue;
   }
-
-  // Do physical mapping
-
 }
 
 void bls_finalize_binary_dependencies()

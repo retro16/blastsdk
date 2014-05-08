@@ -143,7 +143,9 @@ typedef struct group {
   int optimize; // Optimization level (used for compilation or compression level)
   bus bus;
   bankconfig banks; // Status of banks when using the source
-
+  sv physaddr; // Used only in scd binaries
+  sv physsize; // Used only in scd binaries
+  
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
   struct blsll_node_group *uses_binaries; // List of binaries used by this binary
