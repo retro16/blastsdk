@@ -9,27 +9,23 @@ void open_png(const char *filename, FILE **f, png_structp *png_ptr, png_infop *i
 {
   png_byte magic[8];
   *f = fopen(filename, "rb");
-  if(!*f)
-  {
+  if(!*f) {
     printf("Error: Cannot open PNG source %s.\n", filename);
     exit(1);
   }
   fread(magic, 1, sizeof(magic), *f);
-  if(!png_check_sig(magic, sizeof(magic)))
-  {
+  if(!png_check_sig(magic, sizeof(magic))) {
     printf("Error: %s is not a valid PNG file.\n", filename);
     exit(1);
   }
 
   *png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-  if(!*png_ptr)
-  {
+  if(!*png_ptr) {
     printf("Error: cannot init libpng.\n");
     exit(2);
   }
   *info_ptr = png_create_info_struct(*png_ptr);
-  if(!*png_ptr)
-  {
+  if(!*png_ptr) {
     printf("Error: cannot init libpng info.\n");
     exit(2);
   }
@@ -65,9 +61,8 @@ void section_create_png(group *source, const mdconfnode *mdconf)
   source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".map")));
   s->source = source;
   s->align = 0x2000;
-  
-  if(source->bus == bus_none && mainout.target != target_scd)
-  {
+
+  if(source->bus == bus_none && mainout.target != target_scd) {
     // For genesis, default to main bus
     source->bus = bus_main;
   }
@@ -82,10 +77,11 @@ void source_get_size_png(group *s)
   FILE *f;
   png_structp png_ptr;
   png_infop info_ptr;
+  char srcname[4096];
+  findfile(srcname, s->name);
 
-  open_png(s->name, &f, &png_ptr, &info_ptr);
-  if(png_get_color_type(png_ptr, info_ptr) != PNG_COLOR_TYPE_PALETTE)
-  {
+  open_png(srcname, &f, &png_ptr, &info_ptr);
+  if(png_get_color_type(png_ptr, info_ptr) != PNG_COLOR_TYPE_PALETTE) {
     printf("Invalid PNG format : %d.\n", png_get_color_type(png_ptr, info_ptr));
     exit(1);
   }
@@ -93,8 +89,7 @@ void source_get_size_png(group *s)
   // Read image size
   png_uint_32 width = png_get_image_width(png_ptr, info_ptr);
   png_uint_32 height = png_get_image_height(png_ptr, info_ptr);
-  if(width % 8 || height % 8)
-  {
+  if(width % 8 || height % 8) {
     printf("File %s size is not a multiple of 8 pixels.\n", s->name);
     exit(1);
   }
@@ -123,51 +118,48 @@ void source_premap_png(group *s)
   section *pal = section_find_ext(s->name, ".pal");
   section *map = section_find_ext(s->name, ".map");
 
-  if(img->symbol->value.chip == chip_none)
-  {
+  if(img->symbol->value.chip == chip_none) {
     switch(s->bus) {
-      case bus_none:
-      case bus_max:
-        break;
-      case bus_z80:
-      case bus_main:
-        img->symbol->value.chip = chip_vram;
-        break;
-      case bus_sub:
-        img->symbol->value.chip = chip_wram;
-        break;
+    case bus_none:
+    case bus_max:
+      break;
+    case bus_z80:
+    case bus_main:
+      img->symbol->value.chip = chip_vram;
+      break;
+    case bus_sub:
+      img->symbol->value.chip = chip_wram;
+      break;
     }
   }
 
-  if(pal->symbol->value.chip == chip_none)
-  {
+  if(pal->symbol->value.chip == chip_none) {
     switch(s->bus) {
-      case bus_none:
-      case bus_max:
-        break;
-      case bus_z80:
-      case bus_main:
-        pal->symbol->value.chip = chip_cram;
-        break;
-      case bus_sub:
-        pal->symbol->value.chip = chip_wram;
-        break;
+    case bus_none:
+    case bus_max:
+      break;
+    case bus_z80:
+    case bus_main:
+      pal->symbol->value.chip = chip_cram;
+      break;
+    case bus_sub:
+      pal->symbol->value.chip = chip_wram;
+      break;
     }
   }
 
-  if(map->symbol->value.chip == chip_none)
-  {
+  if(map->symbol->value.chip == chip_none) {
     switch(s->bus) {
-      case bus_none:
-      case bus_max:
-        break;
-      case bus_z80:
-      case bus_main:
-        map->symbol->value.chip = chip_vram;
-        break;
-      case bus_sub:
-        map->symbol->value.chip = chip_wram;
-        break;
+    case bus_none:
+    case bus_max:
+      break;
+    case bus_z80:
+    case bus_main:
+      map->symbol->value.chip = chip_vram;
+      break;
+    case bus_sub:
+      map->symbol->value.chip = chip_wram;
+      break;
     }
   }
 }

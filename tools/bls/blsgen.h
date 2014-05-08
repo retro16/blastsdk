@@ -24,6 +24,10 @@
 #error BLSPREFIX not defined
 #endif
 
+#ifndef BUILDDIR
+#define BUILDDIR "blsgen_build"
+#endif
+
 extern BLSLL(group) *sources;
 extern BLSLL(section) *sections;
 extern BLSLL(group) *binaries;
@@ -248,6 +252,7 @@ sv parse_hex(const char *cp);
 void parse_sym(char *s, const char **cp);
 size_t getsymname(char *output, const char *path);
 
-const char * find_file(const char *f);
+int findfile(char *out, const char *f);
+void tmpdir(char *out, const char *f); // Returns the file name in the temporary directory
 
 #endif

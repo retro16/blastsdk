@@ -28,7 +28,7 @@ Binary level2.c
 ---------------
 
 Output mygame.img
------------------
+=================
 
 An output defines the image on the physical medium.
 
@@ -37,5 +37,5 @@ An output defines the image on the physical medium.
  - copyright 2014 GPL
  - author Retro 16
  - binaries splash.c
- 
+
  - entry splash.c

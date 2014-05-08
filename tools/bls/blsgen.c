@@ -3,13 +3,14 @@
 #include "blsconf.h"
 #include "blsaddress.h"
 #include "blsgen_ext.h"
+#include <sys/stat.h>
+#include <libgen.h>
 
 output mainout;
 
 void skipblanks(const char **l)
 {
-  while(**l && **l <= ' ')
-  {
+  while(**l && **l <= ' ') {
     ++*l;
   }
 }
@@ -19,25 +20,17 @@ sv parse_hex_skip(const char **cp)
   skipblanks(cp);
   sv val = 0;
   int len = 8;
-  while(**cp && len--)
-  {
-    if(**cp >= 'A' && **cp <= 'F')
-    {
+  while(**cp && len--) {
+    if(**cp >= 'A' && **cp <= 'F') {
       val <<= 4;
       val |= **cp + 10 - 'A';
-    }
-    else if(**cp >= 'a' && **cp <= 'f')
-    {
+    } else if(**cp >= 'a' && **cp <= 'f') {
       val <<= 4;
       val |= **cp + 10 - 'a';
-    }
-    else if(**cp >= '0' && **cp <= '9')
-    {
+    } else if(**cp >= '0' && **cp <= '9') {
       val <<= 4;
       val |= **cp - '0';
-    }
-    else
-    {
+    } else {
       break;
     }
     ++(*cp);
@@ -45,53 +38,43 @@ sv parse_hex_skip(const char **cp)
   return val;
 }
 
-sv parse_hex(const char *cp) {
+sv parse_hex(const char *cp)
+{
   return parse_hex_skip(&cp);
 }
 
-sv parse_int_skip(const char **cp) {
+sv parse_int_skip(const char **cp)
+{
   skipblanks(cp);
   sv val = 0;
   int neg = 0;
-  if(**cp == '-')
-  {
+  if(**cp == '-') {
     ++(*cp);
     neg = 1;
-  } else if(**cp == '~')
-  {
+  } else if(**cp == '~') {
     ++(*cp);
     neg = 2;
   }
-  if(**cp == '$')
-  {
+  if(**cp == '$') {
     ++(*cp);
     val = parse_hex_skip(cp);
-  }
-  else if(**cp == '0' && (cp[0][1] == 'x' || cp[0][1] == 'X'))
-  {
-    (*cp) += 2; 
+  } else if(**cp == '0' && (cp[0][1] == 'x' || cp[0][1] == 'X')) {
+    (*cp) += 2;
     val = parse_hex_skip(cp);
-  }
-  else while(**cp)
-  {
-    if(**cp >= '0' && **cp <= '9')
-    {
-      val *= 10;
-      val += **cp - '0';
-    }
-    else if(**cp == '*')
-    {
+  } else while(**cp) {
+      if(**cp >= '0' && **cp <= '9') {
+        val *= 10;
+        val += **cp - '0';
+      } else if(**cp == '*') {
+        ++(*cp);
+        sv second = parse_int_skip(cp);
+        val *= second;
+        break;
+      } else {
+        break;
+      }
       ++(*cp);
-      sv second = parse_int_skip(cp);
-      val *= second;
-      break;
     }
-    else
-    {
-      break;
-    }
-    ++(*cp);
-  }
   if(neg == 1) {
     val = neg_int(val);
   } else if(neg == 2) {
@@ -100,15 +83,15 @@ sv parse_int_skip(const char **cp) {
   return val;
 }
 
-sv parse_int(const char *cp) {
+sv parse_int(const char *cp)
+{
   return parse_int_skip(&cp);
 }
 
 void parse_sym(char *s, const char **cp)
 {
   const char *c = *cp;
-  while((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_' || *c == '.')
-  {
+  while((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_' || *c == '.') {
     *s = *c;
     ++s;
     ++c;
@@ -124,59 +107,45 @@ size_t getsymname(char *output, const char *path)
 
   // Parse first character
 
-  if(!path || !*path)
-  {
+  if(!path || !*path) {
     printf("Error : Empty path\n");
     exit(1);
   }
-  if(*path >= '0' && *path <= '9')
-  {
+  if(*path >= '0' && *path <= '9') {
     printf("Warning : symbols cannot start with numbers, prepending underscore to [%s]\n", path);
     *op = '_';
     ++op;
     sep = 0;
   }
 
-  if(*path >= 'a' && *path <= 'z')
-  {
+  if(*path >= 'a' && *path <= 'z') {
     *op = *path - 'a' + 'A';
     ++op;
     ++path;
     sep = 0;
-  }
-  else if(*path >= 'A' && *path <= 'Z')
-  {
+  } else if(*path >= 'A' && *path <= 'Z') {
     *op = *path;
     ++op;
     ++path;
     sep = 0;
-  }
-  else
-  {
+  } else {
     *op = '_';
     ++op;
     ++path;
     sep = 1;
   }
 
-  while(*path)
-  {
-    if((*path >= '0' && *path <= '9') || (*path >= 'A' && *path <= 'Z') || *path == '_')
-    {
+  while(*path) {
+    if((*path >= '0' && *path <= '9') || (*path >= 'A' && *path <= 'Z') || *path == '_') {
       *op = *path;
       ++op;
       sep = 0;
-    }
-    else if(*path >= 'a' && *path <= 'z')
-    {
+    } else if(*path >= 'a' && *path <= 'z') {
       *op = *path - 'a' + 'A';
       ++op;
       sep = 0;
-    }
-    else
-    {
-      if(!sep)
-      {
+    } else {
+      if(!sep) {
         *op = '_';
         ++op;
       }
@@ -189,13 +158,15 @@ size_t getsymname(char *output, const char *path)
   return op - output;
 }
 
-group * group_new() {
+group *group_new()
+{
   group *g = (group *)calloc(1, sizeof(group));
   g->optimize = -1;
   return g;
 }
 
-void group_free(group *p) {
+void group_free(group *p)
+{
   if(p->name) free(p->name);
   free(p);
 }
@@ -205,7 +176,8 @@ const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bra
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
 const char target_names[][8] = {"gen", "scd", "vcart"};
 
-section * section_new() {
+section *section_new()
+{
   section *sec = (section *)calloc(1, sizeof(section));
   sec->physaddr = -1;
   sec->physsize = -1;
@@ -213,37 +185,43 @@ section * section_new() {
   return sec;
 }
 
-void section_free(section *p) {
+void section_free(section *p)
+{
   if(p->name) free(p->name);
   if(p->datafile) free(p->datafile);
   free(p);
 }
 
-symbol * symbol_new() {
+symbol *symbol_new()
+{
   symbol *sym = (symbol *)calloc(1, sizeof(symbol));
   sym->value.addr = -1;
   return sym;
 }
 
-void symbol_free(symbol *p) {
+void symbol_free(symbol *p)
+{
   if(p->name) free(p->name);
   free(p);
 }
 
 const char target_name[][8] = {"gen", "scd", "vcart"};
 
-output * output_new() {
+output *output_new()
+{
   return (output *)calloc(1, sizeof(output));
 }
 
-void output_free(output *p) {
+void output_free(output *p)
+{
   if(p->name) free(p->name);
   if(p->region) free(p->region);
   if(p->file) free(p->file);
   free(p);
 }
 
-group * source_find(const char *name) {
+group *source_find(const char *name)
+{
   BLSLL(group) *n = sources;
   BLSLL_FINDSTR(n, name, name);
   if(n)
@@ -251,7 +229,8 @@ group * source_find(const char *name) {
   return NULL;
 }
 
-group * grouplist_find_sym(BLSLL(group) * groups, const char *name) {
+group *grouplist_find_sym(BLSLL(group) * groups, const char *name)
+{
   char symname[4096];
   getsymname(symname, name);
 
@@ -268,7 +247,8 @@ group * grouplist_find_sym(BLSLL(group) * groups, const char *name) {
   return NULL;
 }
 
-section * sectionlist_find_sym(BLSLL(section) * sections, const char *name) {
+section *sectionlist_find_sym(BLSLL(section) * sections, const char *name)
+{
   char symname[4096];
   getsymname(symname, name);
 
@@ -285,11 +265,13 @@ section * sectionlist_find_sym(BLSLL(section) * sections, const char *name) {
   return NULL;
 }
 
-group * source_find_sym(const char *name) {
+group *source_find_sym(const char *name)
+{
   return grouplist_find_sym(sources, name);
 }
 
-section * section_find(const char *name) {
+section *section_find(const char *name)
+{
   BLSLL(section) *n = sections;
   BLSLL_FINDSTR(n, name, name);
   if(n)
@@ -297,18 +279,21 @@ section * section_find(const char *name) {
   return NULL;
 }
 
-section * section_find_sym(const char *name) {
+section *section_find_sym(const char *name)
+{
   return sectionlist_find_sym(sections, name);
 }
 
-section * section_find_ext(const char *name, const char *suffix) {
+section *section_find_ext(const char *name, const char *suffix)
+{
   char *n = alloca(strlen(name) + strlen(suffix) + 1);
   strcpy(n, name);
   strcat(n, suffix);
   return section_find(n);
 }
 
-symbol * symbol_find(const char *name) {
+symbol *symbol_find(const char *name)
+{
   BLSLL(symbol) *n = symbols;
   BLSLL_FINDSTR(n, name, name);
   if(n)
@@ -316,7 +301,8 @@ symbol * symbol_find(const char *name) {
   return NULL;
 }
 
-group * binary_find(const char *name) {
+group *binary_find(const char *name)
+{
   BLSLL(group) *n = binaries;
   BLSLL_FINDSTR(n, name, name);
   if(n)
@@ -324,15 +310,17 @@ group * binary_find(const char *name) {
   return NULL;
 }
 
-group * binary_find_sym(const char *name) {
+group *binary_find_sym(const char *name)
+{
   return grouplist_find_sym(binaries, name);
 }
 
-group * binary_find_providing(BLSLL(group) * glist, section *sec) {
+group *binary_find_providing(BLSLL(group) * glist, section *sec)
+{
   group *g;
   BLSLL_FOREACH(g, glist) {
     BLSLL(section) *sl = g->provides;
-		section *s;
+    section *s;
     BLSLL_FOREACH(s, sl) {
       if(sec == s) {
         return g;
@@ -343,7 +331,8 @@ group * binary_find_providing(BLSLL(group) * glist, section *sec) {
   return NULL;
 }
 
-int sections_overlap(section *s1, section *s2) {
+int sections_overlap(section *s1, section *s2)
+{
   if(s1->symbol->value.chip == chip_none || s1->symbol->value.addr == -1 || s1->size == -1) {
     printf("Error : undefined address or size for section %s\n", s1->name);
     exit(1);
@@ -383,15 +372,15 @@ sections_overlap_same_binaries:
   sv s2addr = s2->symbol->value.addr;
   sv s2end = s2addr + s2->size;
 
-  if(s1addr >= s2end || s2addr >= s1end)
-  {
+  if(s1addr >= s2end || s2addr >= s1end) {
     return 0;
   }
 
   return 1;
 }
 
-int sections_phys_overlap(section *s1, section *s2) {
+int sections_phys_overlap(section *s1, section *s2)
+{
   if(s1->physaddr == -1 || s1->physsize == -1) {
     printf("Error : undefined pĥysical location for section %s\n", s1->name);
     exit(1);
@@ -407,15 +396,15 @@ int sections_phys_overlap(section *s1, section *s2) {
   sv s2addr = s2->physaddr;
   sv s2end = s2addr + s2->physsize;
 
-  if(s1addr >= s2end || s2addr >= s1end)
-  {
+  if(s1addr >= s2end || s2addr >= s1end) {
     return 0;
   }
 
   return 1;
 }
 
-symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section) {
+symbol *symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section)
+{
   BLSLL(symbol) *sl = *symlist;
   symbol *s;
   BLSLL_FOREACH(s, sl) {
@@ -426,23 +415,19 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
   if(!sl) {
     // Symbol not found
     s = symbol_find(symname);
-    if(!s)
-    {
-      if(symlist)
-      {
+    if(!s) {
+      if(symlist) {
         *symlist = blsll_create_symbol(*symlist);
         s = (*symlist)->data;
       } else {
-        s = (symbol*)calloc(1, sizeof(symbol));
+        s = (symbol *)calloc(1, sizeof(symbol));
       }
       s->name = strdup(symname);
       s->value.chip = chip_none;
       s->value.addr = -1;
       s->section = section;
       symbols = blsll_insert_symbol(symbols, s);
-    }
-    else
-    {
+    } else {
       if(symlist) {
         *symlist = blsll_insert_symbol(*symlist, s);
       }
@@ -463,12 +448,14 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
   return s;
 }
 
-symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section) {
+symbol *symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section)
+{
   chipaddr ca = bus2chip(value);
   return symbol_set(symlist, symname, ca, section);
 }
 
-void *merge_lists(void *target, void *source) {
+void *merge_lists(void *target, void *source)
+{
   BLSLL(section) *rl = (BLSLL(section) *)target;
   BLSLL(section) *sl = (BLSLL(section) *)source;
   section *t, *s;
@@ -486,7 +473,8 @@ void *merge_lists(void *target, void *source) {
   return rl;
 }
 
-void group_dump(const group *grp, FILE *out) {
+void group_dump(const group *grp, FILE *out)
+{
   BLSLL(section) *secl;
   section *sec;
 
@@ -574,89 +562,90 @@ void symtable_dump(const BLSLL(symbol) *syml, FILE *out)
 
 void section_dump(const section *sec, FILE *out)
 {
-    fprintf(out, " - datafile `%s`\n", sec->datafile);
-    fprintf(out, " - format %s\n", format_names[sec->format]);
+  fprintf(out, " - datafile `%s`\n", sec->datafile);
+  fprintf(out, " - format %s\n", format_names[sec->format]);
 
-    if(sec->physaddr != -1) {
-      fprintf(out, " - physaddr $%08lX\n", (uint64_t)sec->physaddr);
-    }
-    if(sec->physsize != -1) {
-      fprintf(out, " - physsize $%08lX\n", (uint64_t)sec->physsize);
-    }
-    if(sec->physalign) {
-      fprintf(out, " - physalign $%X\n", (unsigned int)sec->physalign);
-    }
+  if(sec->physaddr != -1) {
+    fprintf(out, " - physaddr $%08lX\n", (uint64_t)sec->physaddr);
+  }
+  if(sec->physsize != -1) {
+    fprintf(out, " - physsize $%08lX\n", (uint64_t)sec->physsize);
+  }
+  if(sec->physalign) {
+    fprintf(out, " - physalign $%X\n", (unsigned int)sec->physalign);
+  }
 
-    if(sec->symbol) {
-      fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
-      if(sec->symbol->value.addr != -1) {
-        fprintf(out, " - addr $%08lX", (uint64_t)sec->symbol->value.addr);
-        if(sec->source && sec->source->bus != bus_none) {
-          busaddr ba = chip2bus(sec->symbol->value, sec->source->bus);
-          if(ba.addr != -1) {
-            fprintf(out, " ($%08X bus=%s bank=%d)", (unsigned int)ba.addr, bus_names[sec->source->bus], ba.bank);
-          }
-        }
-        fprintf(out, "\n");
-      }
-    }
-
-    if(sec->align) {
-      fprintf(out, " - align $%X\n", (unsigned int)sec->align);
-    }
-    if(sec->size >= 0) {
-      fprintf(out, " - size $%lX\n", (uint64_t)sec->size);
-    }
-
-    if(sec->uses) {
-      BLSLL(section) *secl = sec->uses;
-      section *s;
-
-      fprintf(out, " - uses ");
-      BLSLL_FOREACH(s, secl) {
-        fprintf(out, "`%s`", s->name);
-        if(secl->next) {
-          fprintf(out, ", ");
+  if(sec->symbol) {
+    fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
+    if(sec->symbol->value.addr != -1) {
+      fprintf(out, " - addr $%08lX", (uint64_t)sec->symbol->value.addr);
+      if(sec->source && sec->source->bus != bus_none) {
+        busaddr ba = chip2bus(sec->symbol->value, sec->source->bus);
+        if(ba.addr != -1) {
+          fprintf(out, " ($%08X bus=%s bank=%d)", (unsigned int)ba.addr, bus_names[sec->source->bus], ba.bank);
         }
       }
       fprintf(out, "\n");
     }
+  }
 
-    if(sec->loads) {
-      BLSLL(group) *grpl = sec->loads;
-      group *grp;
+  if(sec->align) {
+    fprintf(out, " - align $%X\n", (unsigned int)sec->align);
+  }
+  if(sec->size >= 0) {
+    fprintf(out, " - size $%lX\n", (uint64_t)sec->size);
+  }
 
-      fprintf(out, " - loads ");
-      BLSLL_FOREACH(grp, grpl) {
-        fprintf(out, "`%s`", grp->name);
-        if(grpl->next) {
-          fprintf(out, ", ");
-        }
+  if(sec->uses) {
+    BLSLL(section) *secl = sec->uses;
+    section *s;
+
+    fprintf(out, " - uses ");
+    BLSLL_FOREACH(s, secl) {
+      fprintf(out, "`%s`", s->name);
+      if(secl->next) {
+        fprintf(out, ", ");
       }
-      fprintf(out, "\n");
     }
-
     fprintf(out, "\n");
+  }
 
-    if(sec->symbol) {
-      if(sec->symbol->name) {
-        fprintf(out, "\nSymbol name `%s`\n\n", sec->symbol->name);
+  if(sec->loads) {
+    BLSLL(group) *grpl = sec->loads;
+    group *grp;
+
+    fprintf(out, " - loads ");
+    BLSLL_FOREACH(grp, grpl) {
+      fprintf(out, "`%s`", grp->name);
+      if(grpl->next) {
+        fprintf(out, ", ");
       }
     }
+    fprintf(out, "\n");
+  }
 
-    if(sec->intsym) {
-      fprintf(out, "\nInternal symbol table :\n\n");
-      symtable_dump(sec->intsym, out);
-    }
+  fprintf(out, "\n");
 
-    if(sec->extsym) {
-      fprintf(out, "\nExternal symbol table :\n\n");
-      symtable_dump(sec->extsym, out);
+  if(sec->symbol) {
+    if(sec->symbol->name) {
+      fprintf(out, "\nSymbol name `%s`\n\n", sec->symbol->name);
     }
+  }
+
+  if(sec->intsym) {
+    fprintf(out, "\nInternal symbol table :\n\n");
+    symtable_dump(sec->intsym, out);
+  }
+
+  if(sec->extsym) {
+    fprintf(out, "\nExternal symbol table :\n\n");
+    symtable_dump(sec->extsym, out);
+  }
 
 }
 
-void output_dump(FILE *out) {
+void output_dump(FILE *out)
+{
   fprintf(out, " - target %s\n", target_names[mainout.target]);
   if(mainout.region) {
     fprintf(out, " - region %s\n", mainout.region);
@@ -702,7 +691,8 @@ void output_dump(FILE *out) {
   }
 }
 
-void blsconf_dump(FILE *out) {
+void blsconf_dump(FILE *out)
+{
   // Dumps the whole configuration to a FILE
 
   fprintf(out, "blsgen configuration dump\n");
@@ -799,34 +789,33 @@ void bls_gen_bol()
 
 void bls_find_entry()
 {
-  switch(mainout.target)
-  {
-    default:
-      mainout.entry = symbol_find("MAIN");
-      if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
-      if(!mainout.entry) mainout.entry = symbol_find("main");
-      if(!mainout.entry) {
-        printf("Could not find MAIN entry point.\n");
-        exit(1);
-      }
-      break;
+  switch(mainout.target) {
+  default:
+    mainout.entry = symbol_find("MAIN");
+    if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
+    if(!mainout.entry) mainout.entry = symbol_find("main");
+    if(!mainout.entry) {
+      printf("Could not find MAIN entry point.\n");
+      exit(1);
+    }
+    break;
 
-    case target_scd:
-      mainout.ip = section_find("IP_ASM");
-      if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
-      if(!mainout.ip) mainout.ip = section_find("ip_main");
-      if(!mainout.ip) {
-        printf("Could not find IP entry point.\n");
-        exit(1);
-      }
-      mainout.sp = section_find("SP_ASM");
-      if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
-      if(!mainout.sp) mainout.sp = section_find("sp_main");
-      if(!mainout.sp) {
-        printf("Could not find SP entry point.\n");
-        exit(1);
-      }
-      break;
+  case target_scd:
+    mainout.ip = section_find("IP_ASM");
+    if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
+    if(!mainout.ip) mainout.ip = section_find("ip_main");
+    if(!mainout.ip) {
+      printf("Could not find IP entry point.\n");
+      exit(1);
+    }
+    mainout.sp = section_find("SP_ASM");
+    if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
+    if(!mainout.sp) mainout.sp = section_find("sp_main");
+    if(!mainout.sp) {
+      printf("Could not find SP entry point.\n");
+      exit(1);
+    }
+    break;
   }
 }
 
@@ -838,14 +827,14 @@ void bls_get_symbols()
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     switch(grp->format) {
-      case format_gcc:
-        source_get_symbols_gcc(grp);
-        break;
-      case format_png:
-        source_get_symbols_png(grp);
-        break;
-      default:
-        break;
+    case format_gcc:
+      source_get_symbols_gcc(grp);
+      break;
+    case format_png:
+      source_get_symbols_png(grp);
+      break;
+    default:
+      break;
     }
   }
 }
@@ -858,11 +847,11 @@ void bls_get_symbol_values()
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     switch(grp->format) {
-      case format_gcc:
-        source_get_symbol_values_gcc(grp);
-        break;
-      default:
-        break;
+    case format_gcc:
+      source_get_symbol_values_gcc(grp);
+      break;
+    default:
+      break;
     }
   }
 }
@@ -875,11 +864,11 @@ void bls_compile()
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     switch(grp->format) {
-      case format_gcc:
-        source_compile_gcc(grp);
-        break;
-      default:
-        break;
+    case format_gcc:
+      source_compile_gcc(grp);
+      break;
+    default:
+      break;
     }
   }
 }
@@ -893,16 +882,16 @@ void bls_map()
   grpl = sources;
   BLSLL_FOREACH(grp, grpl) {
     switch(grp->format) {
-      case format_gcc:
-        printf("Premapping %s\n", grp->name);
-        source_premap_gcc(grp);
-        break;
-      case format_png:
-        printf("Premapping %s\n", grp->name);
-        source_premap_png(grp);
-        break;
-      default:
-        break;
+    case format_gcc:
+      printf("Premapping %s\n", grp->name);
+      source_premap_gcc(grp);
+      break;
+    case format_png:
+      printf("Premapping %s\n", grp->name);
+      source_premap_png(grp);
+      break;
+    default:
+      break;
     }
   }
 
@@ -931,8 +920,7 @@ void bls_map()
     sv chipend = chipstart + chip_size(sec->symbol->value.chip);
     sec->symbol->value.addr = chipstart;
     printf("Section %s : size=%04X chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->size, (unsigned int)chipstart, (unsigned int)chipend);
-    while(sec->symbol->value.addr + sec->size <= chipend)
-    {
+    while(sec->symbol->value.addr + sec->size <= chipend) {
       BLSLL(section) *sl = sections;
       section *s;
       BLSLL_FOREACH(s, sl) {
@@ -1033,27 +1021,78 @@ void bls_finalize_binary_dependencies()
   }
 }
 
-const char path_prefixes[][64] = {
+char path_prefixes[][4096] = {
+  ".", // Here comes the blsgen.md directory
+  BLSPREFIX "/share/blast/asm",
+  BLSPREFIX "/share/blast/inc",
   BLSPREFIX "/share/blast/src",
-
+  BLSPREFIX "/share/blast/include"
 };
 
-const char * find_file(const char *f)
+size_t getbasename(char *output, const char *name)
 {
-  char name[4096];
-  FILE *fp = fopen(f, "r");
-  if(fp) {
-    fclose(fp);
-    return f;
+  int len = 63;
+  char *op = output;
+
+  while(*name) {
+    if(*name == '.') {
+      len = 0;
+    } else if(*name == '/' || *name == '\\') {
+      op = output;
+      len = 63;
+    } else {
+      if(len) {
+        *op = *name;
+        ++op;
+        --len;
+      }
+    }
+    ++name;
   }
 
-	
+  *op = '\0';
 
-  return name;
+  return op - output;
 }
 
-int main(int argc, char **argv) {
-  blsconf_load(argc > 1 ? argv[1] : "blsgen.md");
+int findfile(char *name, const char *f)
+{
+  strcpy(name, f);
+  FILE *fp = fopen(name, "r");
+  if(fp) {
+    fclose(fp);
+    return 1;
+  }
+
+  unsigned int i;
+  for(i = 0; i < sizeof(path_prefixes) / sizeof(*path_prefixes) && path_prefixes[i]; ++i) {
+    sprintf(name, "%s/%s", path_prefixes[i], f);
+    FILE *fp = fopen(name, "r");
+    if(fp) {
+      fclose(fp);
+      return 2;
+    }
+  }
+
+  printf("Warning : %s not found", f);
+  return 0;
+}
+
+void tmpdir(char *out, const char *f)
+{
+  sprintf(out, BUILDDIR "/%s", f);
+}
+
+int main(int argc, char **argv)
+{
+  mkdir(BUILDDIR, 0777);
+  if(argc > 1) {
+    strncpy(path_prefixes[0], argv[1], sizeof(path_prefixes[0]));
+    dirname(path_prefixes[0]);
+    blsconf_load(argv[1]);
+  } else {
+    blsconf_load("blsgen.md");
+  }
 
   bls_get_symbols();
   bls_find_entry();
@@ -1061,7 +1100,9 @@ int main(int argc, char **argv) {
   bls_finalize_binary_dependencies();
   bls_map();
   bls_get_symbol_values();
-	bls_compile();
+  bls_compile();
 
-  blsconf_dump(stdout);
+  FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
+  blsconf_dump(f);
+  fclose(f);
 }
