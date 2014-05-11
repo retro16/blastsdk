@@ -16,7 +16,7 @@ Looking at the console socket :
     \ 1 2 3 4 5 /
      \ 6 7 8 9 /
        -------
-    
+
     Bit Pin Ard Name Pad0  Pad1  Serial Monitor
      0  1   4   D0   Up    Up    -      D0
      1  2   5   D1   Down  Down  -      D1
@@ -44,9 +44,9 @@ Example transmitting 0xA3 to the genesis :
     D0 ---________________/                   ------ output
           ____________________________________
     D1 ---                                    ------ output
-                         
+
     D2 ---____________________________________------ output
-          ________________     
+          ________________
     D3 ---                \___________________------ output
           ____                      __________
     TH ---    \____________________/          ------ output
@@ -54,17 +54,17 @@ Example transmitting 0xA3 to the genesis :
     TL ---       \___________________/        ------ input
           _                               ____
     TR --- \_____________________________/    ------ output
-    
+
 
 Example receiving 0xE0 from the genesis :
 
-          _____                               
+          _____
     D0 ---     \______________________________------ input
-          ____________________                
+          ____________________
     D1 ---                    \_______________------ input
-          ____________________                
+          ____________________
     D2 ---                    \_______________------ input
-          ____________________                
+          ____________________
     D3 ---                    \_______________------ input
           ________                  __________
     TH ---        \________________/          ------ input
@@ -86,7 +86,7 @@ High level protocol
 The high level protocol uses only bytes (it never transmits an odd number of
 nybbles). All 16/32 bits values are big endian (native 68k ordering).
 
-Packets cannot grow over 40 bytes including data (that is the maximum buffer
+Packets cannot grow over 36 bytes including data (that is the maximum buffer
 you will ever need).
 
 Monitor mode can be triggered externally by sending any command. Clock pin low
@@ -98,7 +98,7 @@ Byte level protocol
 -------------------
 
     First byte : header
-    B7..B5 : command 
+    B7..B5 : command
       000 = handshake (ping genesis)
       001 = exit monitor mode
       010 = byte read
@@ -107,13 +107,16 @@ Byte level protocol
       101 = long write
       110 = word read
       111 = word write
-    B4..B0 : data size in bytes (0 means 32, size ignored if B7..B5 = 00)
+    B4..B0 : data size in *bytes* (0 means 32, no data if B7..B6 = 00)
     3 next bytes : address
 
 Followed by data for write commands :
 
     size*bytes : data
 
+Note : the data size field always indicates the size in *bytes*, even if you
+send words or longs. Sending an odd number of bytes during word transfers leads
+to undefined behaviour.
 
 Command-level protocol
 ----------------------
@@ -149,17 +152,34 @@ The genesis will send write commands to upload read results.
 
 The genesis will never issue read commands.
 
+### Examples ###
 
-Accessing genesis state from the debugger
------------------------------------------
+Set word at 0xFF0020 to 0xCAFE and word at 0xFF0022 to 0xBABE
 
-The monitor reserves a small amount of RAM for its operation. This is mapped in
-bda_ram.inc. Symbols are defined to access normal mode registers
-(bda_d0..bda_a7 + bda_pc + bda_sr). Their values are restored in the CPU when
-leaving monitor mode.
+    E4 FF 00 20 CA FE BA BE
 
-Since these symbols may be automatically mapped by blsbuild, debugging tools
-should not hardcode these symbols. The memory layout of registers will be kept
-the same, so one base address is enough. The symbols bda_cpu_state and
-bdp_cpu_state_end define the zone you may access for this purpose.
+Exit monitor mode
 
+    20 00 00 00
+
+Read long word at 0x000200 (first line is sent to the genesis, second line is
+received from the genesis)
+
+    84 00 02 00
+    A4 00 02 00 53 45 47 41
+
+
+Accessing genesis CPU state from the monitor
+--------------------------------------------
+
+On the genesis, the last 74 bytes of RAM contain CPU registers, updated when
+entering and leaving the monitor. Since these registers are read/write, you can
+read and alter CPU registers directly in monitor mode by accessing the correct
+addresses.
+
+Mapping is the following :
+
+FFFFB6 : D0..D7
+FFFFD6 : A0..A7
+FFFFF6 : PC
+FFFFFE : SR

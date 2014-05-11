@@ -312,6 +312,11 @@ sv chip_start(chip chip)
     // Skip null tile
     return 32;
   }
+  else if(chip == chip_pram)
+  {
+    // Skip CD BIOS
+    return 0x6000;
+  }
 
   return 0;
 }
@@ -341,10 +346,10 @@ sv chip_size(chip chip)
       if(mainout.target != target_gen) {
         return 0xFD00; // Avoid allocating over exception vectors
       }
-      return 0x10000;
+      return 0xFFB6; // Avoid allocating over monitor CPU state
     case chip_sstack:
     case chip_pram:
-      return 0x40000;
+      return 0x40000 - 0x6000;
     case chip_wram:
       return 0x20000;
     case chip_pcm:

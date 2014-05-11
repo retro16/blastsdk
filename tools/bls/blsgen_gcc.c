@@ -196,7 +196,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
       symbol *sym;
       if((sym = symbol_find(symname)))
       {
-        blsll_append_symbol(s->extsym, sym);
+        s->extsym = blsll_insert_symbol(s->extsym, sym);
         printf("%s extern\n", symname);
       }
       else
@@ -212,7 +212,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
     if(strncmp(line + 17, sname, strlen(sname)) != 0) continue;
 
     symbol_set_bus(&s->intsym, symname, busaddr, s);
-    blsll_append_symbol(s->extsym, symbol_find(symname));
+    s->extsym = blsll_insert_symbol(s->extsym, symbol_find(symname));
     printf("%s = %08X\n", symname, (unsigned int)addr);
   }
 }
