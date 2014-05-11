@@ -30,6 +30,9 @@ Binary level2.c
 Binary blsload.c
 ----------------
 
+Binary vdp.c
+----------------
+
 Output mygame.img
 =================
 

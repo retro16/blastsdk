@@ -3,6 +3,7 @@
 #include "blsconf.h"
 #include "blsaddress.h"
 #include "blsgen_ext.h"
+#include "blspack.h"
 #include <sys/stat.h>
 #include <libgen.h>
 
@@ -351,10 +352,13 @@ int sections_overlap(section *s1, section *s2)
   if(s1->symbol->value.chip != chip_cart) {
     // Find if sections have binary-level dependencies
     // cart is ignored because cartridges have fixed content
+    // TODO : support sections stored in multiple binaries
     group *b1 = binary_find_providing(binaries, s1);
     if(b1) {
       group *b2 = binary_find_providing(binaries, s2);
       if(b2) {
+        if(b1 == b2) goto sections_overlap_same_binaries;
+
         BLSLL(group) *bl = b2->uses_binaries;
         BLSLL_FOREACH(b2, bl) {
           if(b1 == b2) goto sections_overlap_same_binaries;
@@ -373,6 +377,7 @@ sections_overlap_same_binaries:
   sv s2end = s2addr + s2->size;
 
   if(s1addr >= s2end || s2addr >= s1end) {
+    printf("NO: s1=%06X-%06X s2=%06X-%06X\n", (uint32_t)s1addr, (uint32_t)s1end, (uint32_t)s2addr, (uint32_t)s2end);
     return 0;
   }
 
@@ -382,12 +387,12 @@ sections_overlap_same_binaries:
 int sections_phys_overlap(section *s1, section *s2)
 {
   if(s1->physaddr == -1 || s1->physsize == -1) {
-    printf("Error : undefined pĥysical location for section %s\n", s1->name);
+    printf("Error : undefined physical location for section %s\n", s1->name);
     exit(1);
   }
 
   if(s2->physaddr == -1 || s2->physsize == -1) {
-    printf("Error : undefined pĥysical location for section %s\n", s2->name);
+    printf("Error : undefined physical location for section %s\n", s2->name);
     exit(1);
   }
 
@@ -552,9 +557,10 @@ void symtable_dump(const BLSLL(symbol) *syml, FILE *out)
     }
     fprintf(out, "    %5s ", chip_names[sym->value.chip]);
     if(sym->value.addr >= 0) {
-      fprintf(out, "0x%08X", (uint32_t)sym->value.addr);
+      busaddr ba = chip2bus(sym->value, bus_main);
+      fprintf(out, "0x%08X 0x%06X", (uint32_t)sym->value.addr, 0xFFFFFFU & (uint32_t)ba.addr);
     } else {
-      fprintf(out, "??????????");
+      fprintf(out, "?????????? ????????");
     }
     fprintf(out, " %s\n", sym->name);
   }
@@ -734,8 +740,14 @@ void blsconf_dump(FILE *out)
 
   // Dump output
   fprintf(out, "\n----------------------------------------\n");
-  fprintf(out, "\nOutput\n=======\n\n");
+  fprintf(out, "\nOutput\n======\n\n");
   output_dump(out);
+  fprintf(out, "\n");
+
+  // Dump symbol values
+  fprintf(out, "\n----------------------------------------\n");
+  fprintf(out, "\nSymbols\n=======\n\n");
+  symtable_dump(symbols, out);
   fprintf(out, "\n");
 }
 
@@ -928,15 +940,13 @@ void bls_map()
       section *s;
       BLSLL_FOREACH(s, sl) {
         if(s == sec || s->size == 0 || s->symbol->value.addr == -1) continue;
-        printf("Overlaps ? %s <-> %s  ", sec->name, s->name);
+        printf("Overlaps ? %s(%06X-%06X) <-> %s(%06X-%06X)  ", sec->name, (uint32_t)sec->symbol->value.addr, (uint32_t)(sec->symbol->value.addr + sec->size - 1), s->name, (uint32_t)s->symbol->value.addr, (uint32_t)(s->symbol->value.addr + s->size - 1));
         if(sections_overlap(sec, s)) {
           printf("YES : %06X => ", (unsigned int)sec->symbol->value.addr);
           sec->symbol->value.addr = s->symbol->value.addr + s->size;
           chip_align(&sec->symbol->value);
           printf("%06X\n", (unsigned int)sec->symbol->value.addr);
           goto bls_map_next_section_addr;
-        } else {
-          printf("NO\n");
         }
       }
       // Found
@@ -1021,6 +1031,46 @@ void bls_finalize_binary_dependencies()
   }
 }
 
+void bls_pack_binaries()
+{
+  if(mainout.target == target_scd) {
+    // Packs each binary into separate files and compress them
+    BLSLL(group) *binl = mainout.bol;
+    group *bin;
+    BLSLL_FOREACH(bin, binl) {
+      sections_cat(bin);
+      switch(bin->format) {
+        default:
+        case format_raw:
+        {
+
+          break;
+        }
+      }
+    }
+  } else {
+    // Packs each section into separate files and compress them
+    BLSLL(section) *secl = sections;
+    section *sec;
+    BLSLL_FOREACH(sec, secl) {
+      printf("Packing section %s\n", sec->name);
+      switch(sec->format) {
+        default:
+        case format_raw:
+        {
+          size_t fs = pack_raw(sec->name);
+          sec->physsize = fs;
+        }
+        case format_zero:
+        {
+          sec->physsize = 0;
+          break;
+        }
+      }
+    }
+  }
+}
+
 char path_prefixes[][4096] = {
   ".", // Here comes the blsgen.md directory
   BLSPREFIX "/share/blastsdk/asm",
@@ -1028,6 +1078,18 @@ char path_prefixes[][4096] = {
   BLSPREFIX "/share/blastsdk/src",
   BLSPREFIX "/share/blastsdk/include"
 };
+
+char include_prefixes[4096];
+
+void gen_include_prefixes()
+{
+  unsigned int i;
+  *include_prefixes = 0;
+  for(i = 0; i < sizeof(path_prefixes)/sizeof(*path_prefixes); ++i) {
+    strcat(include_prefixes, " -I ");
+    strcat(include_prefixes, path_prefixes[i]);
+  }
+}
 
 size_t getbasename(char *output, const char *name)
 {
@@ -1089,8 +1151,10 @@ int main(int argc, char **argv)
   if(argc > 1) {
     strncpy(path_prefixes[0], argv[1], sizeof(path_prefixes[0]));
     dirname(path_prefixes[0]);
+    gen_include_prefixes();
     blsconf_load(argv[1]);
   } else {
+    gen_include_prefixes();
     blsconf_load("blsgen.md");
   }
 
@@ -1100,9 +1164,14 @@ int main(int argc, char **argv)
   bls_finalize_binary_dependencies();
   bls_map();
   bls_get_symbol_values();
-  bls_compile();
+  bls_compile(); // Compile with most values to get a good approximation of file sizes
+//  bls_pack_binaries(); // Pack once to find physical size
+//  bls_physmap(); // Map physical medium
+//  bls_compile(); // Recompile with physical medium addresses
+//  bls_pack_binaries(); // Final packing pass
+//  bls_build_image(); // Build final image
 
   FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
-  blsconf_dump(f);
+  blsconf_dump(f); // Dump full configuration for reference and debugging
   fclose(f);
 }

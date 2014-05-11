@@ -145,7 +145,7 @@ typedef struct group {
   bankconfig banks; // Status of banks when using the source
   sv physaddr; // Used only in scd binaries
   sv physsize; // Used only in scd binaries
-  
+
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
   struct blsll_node_group *uses_binaries; // List of binaries used by this binary
@@ -245,6 +245,9 @@ static inline sv not_int(sv v) {
   if(v < 0) return v;
   return (~v) & 0xFFFFFFFF;
 }
+
+extern char path_prefixes[][4096];
+extern char include_prefixes[4096];
 
 void skipblanks(const char **cp);
 sv parse_int_skip(const char **cp);

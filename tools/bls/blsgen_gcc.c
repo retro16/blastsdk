@@ -33,7 +33,7 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
 
 const char *compiler = "m68k-elf-gcc";
 const char *precompiler = "m68k-elf-cpp";
-const char *cflags = "-Os -pipe -fomit-frame-pointer -fno-builtin-memset -fno-builtin-memcpy";
+const char *cflags = " -Dextern='extern __attribute__((weak))' -fno-common -Os -pipe -fomit-frame-pointer -fno-builtin-memset -fno-builtin-memcpy";
 
 const char *ld = "m68k-elf-ld";
 const char *ldflags = "";
@@ -42,24 +42,8 @@ const char *nm = "m68k-elf-nm";
 
 const char *readelf = "m68k-elf-readelf";
 const char *objcopy = "m68k-elf-objcopy";
+const char *objdump = "m68k-elf-objdump";
 
-static void gen_rodata_merge_linker_script()
-{
-  FILE *script = fopen(BUILDDIR "/_bls_ldscript", "w");
-
-  fprintf(script,
-          "SECTIONS\n"
-          "{\n"
-          " .text :\n"
-          " {\n"
-          "  *(.text)\n"
-          "  *(.rodata*)\n"
-          " }\n"
-          "}\n"
-         );
-
-  fclose(script);
-}
 
 static void gen_symtable_section(FILE *out, const section *s, bus bus)
 {
@@ -86,7 +70,11 @@ static void gen_symtable(const group *s)
   section *data = section_find_ext(s->name, ".data");
   section *bss = section_find_ext(s->name, ".bss");
 
-  FILE *f = fopen(BUILDDIR"/_blsgen_symtable.sym", "w");
+  char symfile[4096];
+  snprintf(symfile, 4096, BUILDDIR"/%s.sym", s->name);
+  FILE *f = fopen(symfile, "w");
+
+  fprintf(f, "BLAST_DUMMY_LINE_XXXXXXXXXX_ = 0x00000000;\n");
 
   gen_symtable_section(f, text, s->bus);
   gen_symtable_section(f, data, s->bus);
@@ -95,80 +83,137 @@ static void gen_symtable(const group *s)
   fclose(f);
 }
 
-static void merge_rodata(const char *srcname)
+static section * extract_section_elf(const group *src, const char *name, unsigned int address)
 {
-  char tmpelf[4096];
-  snprintf(tmpelf, 4096, BUILDDIR"/_blsload_tmp_%s.elf", srcname);
-  char elf[4096];
-  snprintf(elf, 4096, BUILDDIR"/%s.elf", srcname);
+  char linkerscript[4096];
+  char cmdline[4096];
 
-  gen_rodata_merge_linker_script();
+  section *s = section_find_ext(src->name, name);
 
-  char line[4096];
-  snprintf(line, 4096, "%s -r -T "BUILDDIR"/_bls_ldscript -o %s %s", ld, tmpelf, elf);
-  printf("Merging rodata : %s\n", line);
-  system(line);
+  snprintf(linkerscript, 4096, BUILDDIR"/%s.ldscript", s->name);
+  FILE *script = fopen(linkerscript, "w");
 
-  unlink(BUILDDIR"/_bls_ldscript");
-  unlink(elf);
-  rename(tmpelf, elf);
+  switch(name[1])
+  {
+  case 't':
+    fprintf(script,
+          "SECTIONS\n"
+          "{\n"
+          " .text 0x%08X :\n"
+          " {\n"
+          "  *(.text*)\n"
+          "  *(.rodata*)\n"
+          " }\n"
+          " .other :\n"
+          " {\n"
+          "  *(.data)\n"
+          "  *(.bss)\n"
+          "  *(COMMON)\n"
+          " }\n"
+          "}\n"
+         , address);
+    break;
+  case 'd':
+    fprintf(script,
+          "SECTIONS\n"
+          "{\n"
+          " .data 0x%08X :\n"
+          " {\n"
+          "  *(.data)\n"
+          " }\n"
+          " .other :\n"
+          " {\n"
+          "  *(.text*)\n"
+          "  *(.rodata*)\n"
+          "  *(.bss)\n"
+          "  *(COMMON)\n"
+          " }\n"
+          "}\n"
+         , address);
+    break;
+  case 'b':
+    fprintf(script,
+          "SECTIONS\n"
+          "{\n"
+          " .bss 0x%08X :\n"
+          " {\n"
+          "  *(.bss)\n"
+          "  *(COMMON)\n"
+          " }\n"
+          " .other :\n"
+          " {\n"
+          "  *(.text*)\n"
+          "  *(.rodata*)\n"
+          "  *(.data)\n"
+          " }\n"
+          "}\n"
+         , address);
+    break;
+  default:
+    break;
+  }
+  fclose(script);
+
+  snprintf(cmdline, 4096, "%s -r -T %s -o "BUILDDIR"/%s.elf "BUILDDIR"/%s.o", ld, linkerscript, s->name, src->name);
+  printf("Extracting section %s\n%s\n", s->name, cmdline);
+  system(cmdline);
+
+  return s;
 }
 
-void parse_nm(group *s, FILE *in, int setvalues)
+void parse_symtable_dump(section *s, FILE *in, int setvalues)
 {
+  const char *sname = strrchr(s->name, '.');
   chipaddr unknown = {chip_none, -1};
   while(!feof(in)) {
     char line[1024];
     fgets(line, 1024, in);
 
-    printf("  %s", line);
-
-    if(strlen(line) < 12) {
+    if(strlen(line) < 34) {
       continue;
     }
 
-    const char *c = line;
-    sv addr = parse_hex_skip(&c);
+    // line : 00000ad4 g     O .data  00000004 myd
 
-    skipblanks(&c); // Skip space
-    char type = *(c++);
-    skipblanks(&c);
+    sv addr = parse_hex(line);
     char symname[1024];
+    const char *c;
+    for(c = &line[17]; *c && *c != ' ' && *c != '\t'; ++c);
+    parse_hex_skip(&c);
+    skipblanks(&c);
     parse_sym(symname, &c);
 
-    section *text = section_find_ext(s->name, ".text");
-    section *data = section_find_ext(s->name, ".data");
-    section *bss = section_find_ext(s->name, ".bss");
-
-    busaddr busaddr = {s->bus, addr, s->banks.bank[s->bus]};
+    busaddr busaddr = {s->source->bus, addr, s->source->banks.bank[s->source->bus]};
     if(!setvalues) {
       busaddr.bus = bus_none;
       busaddr.addr = -1;
       busaddr.bank = -1;
     }
 
-    switch(type) {
-    case 'T':
-      // Pointer in text section : associate to bus
-      symbol_set_bus(&text->intsym, symname, busaddr, text);
-      printf("%s = %08X  bus = %s\n", symname, (unsigned int)addr, bus_names[s->bus]);
-      break;
-    case 'U':
-      symbol_set(&text->extsym, symname, unknown, NULL);
-      printf("%s unknown\n", symname);
-      break;
-    case 'b':
-    case 'B':
-    case 'C':
-      symbol_set_bus(&bss->intsym, symname, busaddr, bss);
-      printf("%s = %08X\n", symname, (unsigned int)addr);
-      break;
-    case 'd':
-    case 'D':
-      symbol_set_bus(&data->intsym, symname, busaddr, data);
-      printf("%s = %08X\n", symname, (unsigned int)addr);
-      break;
+    if(sname[0] == '.' && sname[1] == 't' && strncmp(line + 17, "*UND*", 5) == 0)
+    {
+      // Undefined (extern) symbol, referenced in text section
+      symbol *sym;
+      if((sym = symbol_find(symname)))
+      {
+        blsll_append_symbol(s->extsym, sym);
+        printf("%s extern\n", symname);
+      }
+      else
+      {
+        symbol_set(&s->extsym, symname, unknown, NULL);
+        printf("%s unknown\n", symname);
+      }
+      continue;
     }
+
+    if(line[9] == 'l' || line[9] == ' ') continue;
+
+    if(strncmp(line + 17, sname, strlen(sname)) != 0) continue;
+
+    symbol_set_bus(&s->intsym, symname, busaddr, s);
+    blsll_append_symbol(s->extsym, symbol_find(symname));
+    printf("%s = %08X\n", symname, (unsigned int)addr);
   }
 }
 
@@ -211,6 +256,14 @@ void find_binary_load(group *s, FILE *in)
   }
 }
 
+static void extract_section(const char *target, const char *elf, const char *sec)
+{
+  char cmdline[4096];
+  snprintf(cmdline, 4096, "%s -O binary -j %s %s "BUILDDIR"/%s", objcopy, sec, elf, target);
+  printf("Extract section %s data from %s :\n%s\n", sec, elf, cmdline);
+  system(cmdline);
+}
+
 const char *gen_load_defines()
 {
   static char filename[4096];
@@ -248,7 +301,7 @@ const char *gen_load_defines()
               fprintf(out, "blsfastfill_word(0x%08X, 0x%08X, 0);", (unsigned int)ba.addr, (unsigned int)sec->size / 2);
             }
             if(sec->size & 1) {
-              fprintf(out, "*((char*)0x%08X) = 0", (unsigned int)(ba.addr + sec->size - 1));
+              fprintf(out, "*((char*)0x%08X) = 0;", (unsigned int)(ba.addr + sec->size - 1));
             }
           } else if(sec->symbol->value.chip == chip_vram) {
             fprintf(out, "blsvdp_clear(0x%04X, 0x%04X, 0);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
@@ -297,7 +350,49 @@ const char *gen_load_defines()
   return filename;
 }
 
-void source_get_size_gcc(group *s);
+static void section_get_size_gcc(section *s)
+{
+  // Generate and parse section sizes from elf binary
+  char cmdline[4096];
+  snprintf(cmdline, 4096, "%s -h "BUILDDIR"/%s.elf", objdump, s->name);
+  printf("Extract section sizes from %s :\n%s\n", s->name, cmdline);
+  FILE *in = popen(cmdline, "r");
+  if(!in) {
+    printf("Could not execute objdump on section %s\n", s->name);
+    exit(1);
+  }
+
+  const char *sname = strrchr(s->name, '.');
+
+  while(!feof(in)) {
+    char line[1024];
+    fgets(line, 1024, in);
+
+    if(strncmp(line + 4, sname, strlen(sname)) == 0)
+    {
+      s->size = parse_hex(line + 4 + strlen(sname));
+      break;
+    }
+  }
+
+  pclose(in);
+}
+
+static void parse_symbols(section *s, int setvalues)
+{
+  char cmdline[4096];
+  snprintf(cmdline, 4096, "%s -t "BUILDDIR"/%s.elf", objdump, s->name);
+  printf("Extract symbol%ss from %s :\n%s\n", setvalues ? " value" : "", s->name, cmdline);
+  FILE *f = popen(cmdline, "r");
+  if(!f) {
+    printf("Could not execute objdump on source %s\n", s->name);
+    exit(1);
+  }
+  parse_symtable_dump(s, f, setvalues);
+  pclose(f);
+  section_get_size_gcc(s);
+}
+
 void source_get_symbols_gcc(group *s)
 {
   char cmdline[4096];
@@ -316,7 +411,7 @@ void source_get_symbols_gcc(group *s)
   const char *defs = gen_load_defines();
 
   // Read binary loading from the source
-  snprintf(cmdline, 4096, "%s -E -fdirectives-only %s", precompiler, srcname);
+  snprintf(cmdline, 4096, "%s %s -E -fdirectives-only %s", precompiler, include_prefixes, srcname);
   printf("Find binary loadings in %s :\n%s\n", s->name, cmdline);
   f = popen(cmdline, "r");
   if(!f) {
@@ -326,75 +421,19 @@ void source_get_symbols_gcc(group *s)
   find_binary_load(s, f);
   pclose(f);
 
-  snprintf(cmdline, 4096, "%s %s -include %s -mcpu=68000 -c %s -o %s", compiler, cflags, defs, srcname, object);
+  snprintf(cmdline, 4096, "%s %s %s -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, defs, srcname, object);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
   // Link to get internal symbols
-  snprintf(cmdline, 4096, "%s %s -Ttext=0x40000 -r %s -o %s", ld, ldflags, object, elf);
+  snprintf(cmdline, 4096, "%s %s -r %s -o %s", ld, ldflags, object, elf);
   printf("Get symbols from %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
-  merge_rodata(s->name);
-
   // Generate and parse symbols from elf binary
-  snprintf(cmdline, 4096, "%s %s", nm, elf);
-  printf("Extract sybols from %s :\n%s\n", s->name, cmdline);
-  f = popen(cmdline, "r");
-  if(!f) {
-    printf("Could not execute nm on source %s\n", s->name);
-    exit(1);
-  }
-  parse_nm(s, f, 0);
-  pclose(f);
-
-  source_get_size_gcc(s);
-}
-
-void source_get_size_gcc(group *s)
-{
-  char cmdline[4096];
-  char elf[4096];
-
-  snprintf(elf, 4096, BUILDDIR"/%s.elf", s->name);
-
-  // Generate and parse section sizes from elf binary
-  snprintf(cmdline, 4096, "%s -t %s", readelf, elf);
-  printf("Extract section sizes from %s :\n%s\n", s->name, cmdline);
-  FILE *in = popen(cmdline, "r");
-  if(!in) {
-    printf("Could not execute readelf on source %s\n", s->name);
-    exit(1);
-  }
-
-  char sectionname[256] = "";
-
-  while(!feof(in)) {
-    char line[1024];
-    fgets(line, 1024, in);
-    if(*line) {
-      line[strlen(line) - 1] = '\0';
-    }
-
-    printf("  %s\n", line);
-
-    if(strlen(line) < 8) {
-      continue;
-    }
-
-    if(line[2] == '[') {
-      strcpy(sectionname, line + 7);
-    } else if(strlen(line) > 39 && line[38] == ' ') {
-      sv size = parse_hex(line + 39);
-      section *sec = section_find_ext(s->name, sectionname);
-      if(!sec) {
-        continue;
-      }
-      sec->size = size;
-    }
-  }
-
-  pclose(in);
+  parse_symbols(extract_section_elf(s, ".text", 0x40000), 0);
+  parse_symbols(extract_section_elf(s, ".data", 0x440000), 0);
+  parse_symbols(extract_section_elf(s, ".bss", 0x840000), 0);
 }
 
 void source_get_symbol_values_gcc(group *s)
@@ -403,7 +442,6 @@ void source_get_symbol_values_gcc(group *s)
   char object[4096];
   char elf[4096];
   char srcname[4096];
-  FILE *f;
 
   sprintf(object, BUILDDIR"/%s.o", s->name);
   sprintf(elf, BUILDDIR"/%s.elf", s->name);
@@ -414,7 +452,7 @@ void source_get_symbol_values_gcc(group *s)
 
   const char *defs = gen_load_defines();
 
-  snprintf(cmdline, 1024, "%s -include %s %s -mcpu=68000 -c %s -o %s", compiler, defs, cflags, srcname, object);
+  snprintf(cmdline, 1024, "%s %s -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, defs, cflags, srcname, object);
   printf("Compile %s with load defines :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -423,28 +461,16 @@ void source_get_symbol_values_gcc(group *s)
   section *bss = section_find_ext(s->name, ".bss");
 
   // Link to get internal symbols
-  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X -r %s -o %s", ld, ldflags, (unsigned int)text->symbol->value.addr, (unsigned int)data->symbol->value.addr, (unsigned int)bss->symbol->value.addr, object, elf);
+  busaddr textba = chip2bus(text->symbol->value, s->bus);
+  busaddr databa = chip2bus(data->symbol->value, s->bus);
+  busaddr bssba = chip2bus(bss->symbol->value, s->bus);
+  snprintf(cmdline, 1024, "%s %s -r %s -o %s", ld, ldflags, object, elf);
   printf("Get internal symbol values from %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
-  // Generate and parse symbols from elf binary
-  snprintf(cmdline, 1024, "%s %s", nm, elf);
-  printf("Extract symbol values from %s :\n%s\n", s->name, cmdline);
-  f = popen(cmdline, "r");
-  if(!f) {
-    printf("Could not execute nm on source %s\n", s->name);
-    exit(1);
-  }
-  parse_nm(s, f, 1);
-  pclose(f);
-}
-
-static void extract_section(const char *elf, const char *sec)
-{
-  char cmdline[4096];
-  snprintf(cmdline, 4096, "%s -O binary -j %s %s %s%s", objcopy, sec, elf, elf, sec);
-  printf("Extract section %s data from %s :\n%s\n", sec, elf, cmdline);
-  system(cmdline);
+  parse_symbols(extract_section_elf(s, ".text", (unsigned int)textba.addr), 1);
+  parse_symbols(extract_section_elf(s, ".data", (unsigned int)databa.addr), 1);
+  parse_symbols(extract_section_elf(s, ".bss", (unsigned int)bssba.addr), 1);
 }
 
 void source_compile_gcc(group *s)
@@ -463,7 +489,7 @@ void source_compile_gcc(group *s)
 
   const char *defs = gen_load_defines();
 
-  snprintf(cmdline, 4096, "%s -include %s %s -mcpu=68000 -c %s -o %s", compiler, defs, cflags, srcname, object);
+  snprintf(cmdline, 4096, "%s %s -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, defs, cflags, srcname, object);
   printf("Final compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -474,14 +500,17 @@ void source_compile_gcc(group *s)
   gen_symtable(s);
 
   // Link at final address
-  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X -R _blsgen_symtable.sym %s -o %s", ld, ldflags, (unsigned int)text->symbol->value.addr, (unsigned int)data->symbol->value.addr, (unsigned int)bss->symbol->value.addr, object, elf);
-  printf("Get internal symbol valuess from %s :\n%s\n", s->name, cmdline);
+  busaddr textba = chip2bus(text->symbol->value, s->bus);
+  busaddr databa = chip2bus(data->symbol->value, s->bus);
+  busaddr bssba = chip2bus(bss->symbol->value, s->bus);
+  snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X -R "BUILDDIR"/%s.sym %s -o %s", ld, ldflags, (unsigned int)textba.addr, (unsigned int)databa.addr, (unsigned int)bssba.addr, s->name, object, elf);
+  printf("Link at final address %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
   // Extract sections from final ELF
-  extract_section(elf, ".text");
-  extract_section(elf, ".data");
-  extract_section(elf, ".bss");
+  extract_section(text->name, elf, ".text");
+  extract_section(data->name, elf, ".data");
+  extract_section(bss->name, elf, ".bss");
 }
 
 void source_premap_gcc(group *s)

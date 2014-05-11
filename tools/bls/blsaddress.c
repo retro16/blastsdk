@@ -43,7 +43,7 @@ chipaddr bus2chip(busaddr ba)
       return ca;
 
     case bus_main:
-      if(ba.addr >= 0 && ((mainout.target != target_scd && ba.addr < 0x400000) || ba.addr < 0x020000))
+      if(mainout.target == target_gen && ba.addr >= 0 && ba.addr < 0x400000)
       {
         ca.chip = chip_cart;
         ca.addr = ba.addr;
@@ -65,6 +65,7 @@ chipaddr bus2chip(busaddr ba)
       {
           if(mainout.target == target_vcart)
           {
+            printf("cart\n");
               ca.chip = chip_cart;
           }
           else

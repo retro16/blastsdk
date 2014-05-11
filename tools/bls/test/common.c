@@ -1,4 +1,5 @@
 int common_variable;
+short common_array[800];
 
 void common_level_init()
 {
