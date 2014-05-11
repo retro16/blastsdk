@@ -4,6 +4,7 @@
 #include "blsaddress.h"
 #include "blsgen_ext.h"
 #include "blspack.h"
+#include "blswrite.h"
 #include <sys/stat.h>
 #include <libgen.h>
 
@@ -300,6 +301,28 @@ symbol *symbol_find(const char *name)
   if(n)
     return n->data;
   return NULL;
+}
+
+sv symbol_get_addr(const char *name)
+{
+  symbol *sym = symbol_find(name);
+  if(!sym) return -1;
+  return sym->value.addr;
+}
+
+chip symbol_get_chip(const char *name)
+{
+  symbol *sym = symbol_find(name);
+  if(!sym) return chip_none;
+  return sym->value.chip;
+}
+
+sv symbol_get_bus(const char *name, bus bus)
+{
+  symbol *sym = symbol_find(name);
+  if(!sym) return -1;
+  busaddr ba = chip2bus(sym->value, bus);
+  return ba.addr;
 }
 
 group *binary_find(const char *name)
@@ -964,6 +987,68 @@ bls_map_next_section:
   }
 }
 
+void bls_physmap_cart()
+{
+  sv chipstart = ROMHEADERSIZE;
+  sv chipend = MAXCARTSIZE - ROMHEADERSIZE;
+
+  // Do logical section mapping
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    if(sec->physsize == -1) {
+      printf("Error : %s has unknown size", sec->name);
+      exit(1);
+    }
+    if(sec->physsize == 0) {
+      // Sections with null size don't need mapping
+      continue;
+    }
+    if(sec->symbol->value.chip == chip_cart) {
+      // Section on cartridge are already mapped
+      sec->physaddr = sec->symbol->value.addr;
+      continue;
+    }
+    if(sec->physaddr != -1) {
+      // Section address already known
+      continue;
+    }
+
+    // Find a place for this section
+    sec->physaddr = chipstart;
+    printf("Section %s : size=%04X chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->physsize, (unsigned int)chipstart, (unsigned int)chipend);
+    while(sec->physaddr + sec->physsize <= chipend) {
+      BLSLL(section) *sl = sections;
+      section *s;
+      BLSLL_FOREACH(s, sl) {
+        if(s == sec || s->physsize == 0 || s->physaddr == -1) continue;
+        printf("Overlaps ? %s(%06X-%06X) <-> %s(%06X-%06X)  ", sec->name, (uint32_t)sec->symbol->value.addr, (uint32_t)(sec->symbol->value.addr + sec->size - 1), s->name, (uint32_t)s->symbol->value.addr, (uint32_t)(s->symbol->value.addr + s->size - 1));
+        if(sections_phys_overlap(sec, s)) {
+          printf("YES : %06X => ", (unsigned int)sec->physaddr);
+          sec->physaddr = align_value(s->physaddr + s->physsize, 2);
+          printf("%06X\n", (unsigned int)sec->physaddr);
+          goto bls_map_next_section_addr;
+        }
+      }
+      // Found
+      goto bls_map_next_section;
+bls_map_next_section_addr:
+      continue;
+    }
+
+    if(sec->physaddr + sec->physsize >= chipend) {
+      printf("Error : could not map section %s : not enough memory in cart\n", sec->name);
+      exit(1);
+    }
+bls_map_next_section:
+    continue;
+  }
+}
+
+void bls_physmap_cd()
+{
+}
+
 void bls_finalize_binary_dependencies()
 {
   BLSLL(group) *grpl;
@@ -1033,43 +1118,146 @@ void bls_finalize_binary_dependencies()
 
 void bls_pack_binaries()
 {
-  if(mainout.target == target_scd) {
-    // Packs each binary into separate files and compress them
-    BLSLL(group) *binl = mainout.bol;
-    group *bin;
-    BLSLL_FOREACH(bin, binl) {
-      sections_cat(bin);
-      switch(bin->format) {
-        default:
-        case format_raw:
-        {
+  // Packs each binary into separate files and compress them
+  BLSLL(group) *binl = mainout.bol;
+  group *bin;
+  BLSLL_FOREACH(bin, binl) {
+    sections_cat(bin);
+    switch(bin->format) {
+      default:
+      case format_raw:
+      {
 
-          break;
-        }
-      }
-    }
-  } else {
-    // Packs each section into separate files and compress them
-    BLSLL(section) *secl = sections;
-    section *sec;
-    BLSLL_FOREACH(sec, secl) {
-      printf("Packing section %s\n", sec->name);
-      switch(sec->format) {
-        default:
-        case format_raw:
-        {
-          size_t fs = pack_raw(sec->name);
-          sec->physsize = fs;
-        }
-        case format_zero:
-        {
-          sec->physsize = 0;
-          break;
-        }
+        break;
       }
     }
   }
 }
+
+void bls_pack_sections()
+{
+  // Packs each section into separate files and compress them
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    if(!sec->size || !sec->physsize) {
+      // Ignore empty sections
+      sec->size = 0;
+      sec->physsize = 0;
+      continue;
+    }
+    printf("Packing section %s\n", sec->name);
+    switch(sec->format) {
+      default:
+      case format_raw:
+      {
+        size_t fs = pack_raw(sec->name);
+        printf("Size of %s : %04X\n", sec->name, (unsigned int)fs);
+        sec->physsize = fs;
+        break;
+      }
+      case format_empty:
+      case format_zero:
+      {
+        sec->size = 0;
+        sec->physsize = 0;
+        break;
+      }
+    }
+  }
+}
+
+void bls_build_cart_image()
+{
+  printf("Writing image to %s\n", mainout.file);
+  FILE *f = fopen(mainout.file, "w");
+
+  // Write data
+
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    if(sec->physaddr == -1 || sec->physsize == 0) continue;
+
+    char inname[4096];
+    snprintf(inname, 4096, BUILDDIR"/%s.phy", sec->name);
+    FILE *i = fopen(inname, "r");
+    if(!i) {
+      printf("Error : cannot find physical image %s for section %s\n", inname, sec->name);
+      exit(1);
+    }
+
+    fseek(f, sec->physaddr, SEEK_SET);
+    filecat(i, f);
+
+    fclose(i);
+  }
+
+  // Write default stackpointer
+  fseek(f, 0x000000, SEEK_SET);
+  chipaddr ca = {chip_ram, chip_start(chip_ram) + chip_size(chip_ram)};
+  fputaddr(ca, bus_main, f);
+
+  // Write entry point
+  fputaddr(mainout.entry->value, bus_main, f);
+
+  // Write interrupt vectors
+  sv addr;
+#define INTVECT(name) if((addr = symbol_get_bus("G_HWINT_"#name, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("G_INT_"#name, bus_main)) != -1) fputlong(addr, f); else fputaddr(mainout.entry->value, bus_main, f);
+#define INTVECT2(name,name2) if((addr = symbol_get_bus("G_HWINT_"#name, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("G_INT_"#name, bus_main)) != -1) fputlong(addr, f); else \
+                             if((addr = symbol_get_bus("G_HWINT_"#name2, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("G_INT_"#name2, bus_main)) != -1) fputlong(addr, f); else fputaddr(mainout.entry->value, bus_main, f);
+
+  INTVECT(BUSERR) // 0x08
+  INTVECT(ADDRERR) // 0x0C
+  INTVECT(ILL) // 0x10
+  INTVECT(ZDIV) // 0x14
+  INTVECT(CHK) // 0x18
+  INTVECT(TRAPV) // 0x1C
+  INTVECT(PRIV) // 0x20
+  INTVECT(TRACE) // 0x24
+  INTVECT(LINEA) // 0x28
+  INTVECT(LINEF) // 0x2C
+  unsigned int i;
+  for(i = 0; i < 12; ++i) fputaddr(mainout.entry->value, bus_main, f); // 0x30 .. 0x060
+  INTVECT(SPURIOUS) // 0x60
+  INTVECT(LEVEL1) // 0x64
+  INTVECT2(LEVEL2,PAD) // 0x68
+  INTVECT(LEVEL3) // 0x6C
+  INTVECT2(LEVEL4,HBLANK) // 0x70
+  INTVECT(LEVEL5) // 0x74
+  INTVECT2(LEVEL6,VBLANK) // 0x78
+  INTVECT(LEVEL7) // 0x7C
+  INTVECT(TRAP00) // 0x80
+  INTVECT(TRAP01)
+  INTVECT(TRAP02)
+  INTVECT(TRAP03)
+  INTVECT(TRAP04)
+  INTVECT(TRAP05)
+  INTVECT(TRAP06)
+  INTVECT(TRAP07) // 0x9C
+  INTVECT(TRAP08) // 0xA0
+  INTVECT(TRAP09)
+  INTVECT(TRAP10)
+  INTVECT(TRAP11)
+  INTVECT(TRAP12)
+  INTVECT(TRAP13)
+  INTVECT(TRAP14)
+  INTVECT(TRAP15) // 0xBC
+  for(i = 0; i < 16; ++i) fputaddr(mainout.entry->value, bus_main, f);
+#undef INTVECT
+#undef INTVECT2
+
+  // Write SEGA header
+  fseek(f, 0x000100, SEEK_SET);
+  fprintf(f, "SEGA");
+  // TODO
+
+  // Compute checksum
+  // TODO
+
+  fclose(f);
+}
+
 
 char path_prefixes[][4096] = {
   ".", // Here comes the blsgen.md directory
@@ -1158,6 +1346,7 @@ int main(int argc, char **argv)
     blsconf_load("blsgen.md");
   }
 
+
   bls_get_symbols();
   bls_find_entry();
   bls_gen_bol();
@@ -1165,11 +1354,15 @@ int main(int argc, char **argv)
   bls_map();
   bls_get_symbol_values();
   bls_compile(); // Compile with most values to get a good approximation of file sizes
-//  bls_pack_binaries(); // Pack once to find physical size
-//  bls_physmap(); // Map physical medium
-//  bls_compile(); // Recompile with physical medium addresses
-//  bls_pack_binaries(); // Final packing pass
-//  bls_build_image(); // Build final image
+  if(mainout.target != target_scd) {
+    bls_pack_sections(); // Final packing pass
+    bls_physmap_cart(); // Map physical cartridge image
+    bls_build_cart_image(); // Build the final cart image
+  }
+  else {
+    bls_pack_binaries(); // Final packing pass
+    bls_physmap_cd(); // Map physical CD
+  }
 
   FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
   blsconf_dump(f); // Dump full configuration for reference and debugging

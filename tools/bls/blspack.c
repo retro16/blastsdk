@@ -19,7 +19,7 @@ static void pack_open(const char *filename, FILE **i, FILE **o)
   }
 }
 
-static size_t filecat(FILE *i, FILE *o)
+size_t filecat(FILE *i, FILE *o)
 {
   // Copy a file and returns its size
   size_t filesize = 0;
@@ -47,50 +47,10 @@ size_t pack_raw(const char *filename)
   return filesize;
 }
 
-size_t pack_lzbyte(const char *filename)
-{
-  FILE *i, *o;
-  pack_open(filename, &i, &o);
-
-  // TODO
-  size_t filesize = 0;
-  while(!feof(i)) {
-    char buf[65536];
-    size_t r = fread(buf, 1, sizeof(buf), i);
-    filesize += r;
-    fwrite(buf, 1, r, o);
-  }
-
-  fclose(i);
-  fclose(o);
-
-  return filesize;
-}
-
-size_t pack_lzword(const char *filename)
-{
-  FILE *i, *o;
-  pack_open(filename, &i, &o);
-
-  // TODO
-  size_t filesize = 0;
-  while(!feof(i)) {
-    char buf[65536];
-    size_t r = fread(buf, 1, sizeof(buf), i);
-    filesize += r;
-    fwrite(buf, 1, r, o);
-  }
-
-  fclose(i);
-  fclose(o);
-
-  return filesize;
-}
-
 const char * sections_cat(group *bin)
 {
   static char binname[4096];
-  snprintf(binname, 4096, BUILDDIR"/%s.bin");
+  snprintf(binname, 4096, BUILDDIR"/%s.bin", bin->name);
   FILE *i, *o;
   o = fopen(binname, "wb");
 

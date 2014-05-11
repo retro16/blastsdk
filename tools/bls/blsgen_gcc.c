@@ -256,11 +256,12 @@ void find_binary_load(group *s, FILE *in)
   }
 }
 
-static void extract_section(const char *target, const char *elf, const char *sec)
+static void extract_section(section *s)
 {
+  const char *sname = strrchr(s->name, '.');
   char cmdline[4096];
-  snprintf(cmdline, 4096, "%s -O binary -j %s %s "BUILDDIR"/%s", objcopy, sec, elf, target);
-  printf("Extract section %s data from %s :\n%s\n", sec, elf, cmdline);
+  snprintf(cmdline, 4096, "%s -O binary -j %s "BUILDDIR"/%s.elf "BUILDDIR"/%s", objcopy, sname, s->name, s->name);
+  printf("Extract section %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 }
 
@@ -371,6 +372,10 @@ static void section_get_size_gcc(section *s)
     if(strncmp(line + 4, sname, strlen(sname)) == 0)
     {
       s->size = parse_hex(line + 4 + strlen(sname));
+      if(sname[1] == 'd' && s->size == 1) {
+        s->size = 0; // Workaround
+        s->physsize = 0;
+      }
       break;
     }
   }
@@ -508,9 +513,9 @@ void source_compile_gcc(group *s)
   system(cmdline);
 
   // Extract sections from final ELF
-  extract_section(text->name, elf, ".text");
-  extract_section(data->name, elf, ".data");
-  extract_section(bss->name, elf, ".bss");
+  extract_section(text);
+  extract_section(data);
+  extract_section(bss);
 }
 
 void source_premap_gcc(group *s)

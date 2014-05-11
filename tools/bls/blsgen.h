@@ -224,6 +224,8 @@ section * section_find_ext(const char *name, const char *suffix);
 section * section_find_sym(const char *name);
 section * section_find_using(section *section);
 symbol * symbol_find(const char *name);
+sv symbol_get_addr(const char *name);
+chip symbol_get_chip(const char *name);
 group * binary_find(const char *name);
 group * binary_find_sym(const char *name);
 group * binary_find_providing(BLSLL(group) * glist, section *section);

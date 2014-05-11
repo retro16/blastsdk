@@ -11,3 +11,4 @@ sv chip_start(chip chip);
 sv chip_size(chip chip);
 sv tilemap_addr4(sv addr, sv width);
 sv tilemap_addr8(sv addr, sv width);
+sv align_value(sv value, sv step);
