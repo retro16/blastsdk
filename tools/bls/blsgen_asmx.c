@@ -6,44 +6,19 @@
 
 /* blsgen functions to generate binaries from gcc sources */
 
-void section_create_gcc(group *source, const mdconfnode *mdconf)
+void section_create_asmx(group *source, const mdconfnode *mdconf)
 {
   (void)mdconf;
   section *s;
 
-  // Generate the .text section
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".text")));
+  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, "")));
   s->source = source;
-
-  // Generate the .data section
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".data")));
-  s->source = source;
-
-  // Generate the .bss section
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".bss")));
-  s->source = source;
-  s->physsize = 0; // Do not store BSS on physical medium
-  s->format = format_zero;
 
   if(source->bus == bus_none && mainout.target != target_scd) {
     // For genesis, default to main bus
     source->bus = bus_main;
   }
 }
-
-const char *compiler = "m68k-elf-gcc";
-const char *precompiler = "m68k-elf-cpp";
-const char *cflags = " -Dextern='extern __attribute__((weak))' -fno-common -Os -pipe -fomit-frame-pointer -fno-builtin-memset -fno-builtin-memcpy";
-
-const char *ld = "m68k-elf-ld";
-const char *ldflags = "";
-
-const char *nm = "m68k-elf-nm";
-
-const char *readelf = "m68k-elf-readelf";
-const char *objcopy = "m68k-elf-objcopy";
-const char *objdump = "m68k-elf-objdump";
-
 
 static void gen_symtable_section(FILE *out, const section *s, bus bus)
 {
@@ -59,106 +34,21 @@ static void gen_symtable_section(FILE *out, const section *s, bus bus)
       continue;
     }
     busaddr ba = chip2bus(sym->value, bus);
-    fprintf(out, "%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
-    printf("%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
+    fprintf(out, "%s\tEQU\t$%08X;\n", sym->name, (uint32_t)ba.addr);
   }
 }
 
 static void gen_symtable(const group *s)
 {
-  section *text = section_find_ext(s->name, ".text");
-  section *data = section_find_ext(s->name, ".data");
-  section *bss = section_find_ext(s->name, ".bss");
+  section *sec = section_find(s->name);
 
   char symfile[4096];
   snprintf(symfile, 4096, BUILDDIR"/%s.sym", s->name);
   FILE *f = fopen(symfile, "w");
 
-  fprintf(f, "BLAST_DUMMY_LINE_XXXXXXXXXX_ = 0x00000000;\n");
-
-  gen_symtable_section(f, text, s->bus);
-  gen_symtable_section(f, data, s->bus);
-  gen_symtable_section(f, bss, s->bus);
+  gen_symtable_section(f, sec, s->bus);
 
   fclose(f);
-}
-
-static section * extract_section_elf(const group *src, const char *name, unsigned int address)
-{
-  char linkerscript[4096];
-  char cmdline[4096];
-
-  section *s = section_find_ext(src->name, name);
-
-  snprintf(linkerscript, 4096, BUILDDIR"/%s.ldscript", s->name);
-  FILE *script = fopen(linkerscript, "w");
-
-  switch(name[1])
-  {
-  case 't':
-    fprintf(script,
-          "SECTIONS\n"
-          "{\n"
-          " .text 0x%08X :\n"
-          " {\n"
-          "  *(.text*)\n"
-          "  *(.rodata*)\n"
-          " }\n"
-          " .other :\n"
-          " {\n"
-          "  *(.data)\n"
-          "  *(.bss)\n"
-          "  *(COMMON)\n"
-          " }\n"
-          "}\n"
-         , address);
-    break;
-  case 'd':
-    fprintf(script,
-          "SECTIONS\n"
-          "{\n"
-          " .data 0x%08X :\n"
-          " {\n"
-          "  *(.data)\n"
-          " }\n"
-          " .other :\n"
-          " {\n"
-          "  *(.text*)\n"
-          "  *(.rodata*)\n"
-          "  *(.bss)\n"
-          "  *(COMMON)\n"
-          " }\n"
-          "}\n"
-         , address);
-    break;
-  case 'b':
-    fprintf(script,
-          "SECTIONS\n"
-          "{\n"
-          " .bss 0x%08X :\n"
-          " {\n"
-          "  *(.bss)\n"
-          "  *(COMMON)\n"
-          " }\n"
-          " .other :\n"
-          " {\n"
-          "  *(.text*)\n"
-          "  *(.rodata*)\n"
-          "  *(.data)\n"
-          " }\n"
-          "}\n"
-         , address);
-    break;
-  default:
-    break;
-  }
-  fclose(script);
-
-  snprintf(cmdline, 4096, "%s -r -T %s -o "BUILDDIR"/%s.elf "BUILDDIR"/%s.o", ld, linkerscript, s->name, src->name);
-  printf("Extracting section %s\n%s\n", s->name, cmdline);
-  system(cmdline);
-
-  return s;
 }
 
 void parse_symtable_dump(section *s, FILE *in, int setvalues)
@@ -222,9 +112,9 @@ const char *binary_load_function = "BLS_LOAD_BINARY_";
 void binary_loaded(group *s, const char *symname)
 {
   group *binary = binary_find_sym(symname);
-  section *text = section_find_ext(s->name, ".text");
+  section *sec = section_find(s->name);
   if(binary) {
-    text->loads = blsll_insert_group(text->loads, binary);
+    text->loads = blsll_insert_group(sec->loads, binary);
   } else {
     printf("Could not find binary with symbol name %s\n", symname);
     exit(1);
@@ -351,7 +241,7 @@ const char *gen_load_defines()
   return filename;
 }
 
-static void section_get_size_gcc(section *s)
+static void section_get_size_asmx(section *s)
 {
   // Generate and parse section sizes from elf binary
   char cmdline[4096];
@@ -395,10 +285,10 @@ static void parse_symbols(section *s, int setvalues)
   }
   parse_symtable_dump(s, f, setvalues);
   pclose(f);
-  section_get_size_gcc(s);
+  section_get_size_asmx(s);
 }
 
-void source_get_symbols_gcc(group *s)
+void source_get_symbols_asmx(group *s)
 {
   char cmdline[4096];
   char object[4096];
@@ -441,7 +331,7 @@ void source_get_symbols_gcc(group *s)
   parse_symbols(extract_section_elf(s, ".bss", 0x840000), 0);
 }
 
-void source_get_symbol_values_gcc(group *s)
+void source_get_symbol_values_asmx(group *s)
 {
   char cmdline[4096];
   char object[4096];
@@ -478,7 +368,7 @@ void source_get_symbol_values_gcc(group *s)
   parse_symbols(extract_section_elf(s, ".bss", (unsigned int)bssba.addr), 1);
 }
 
-void source_compile_gcc(group *s)
+void source_compile_asmx(group *s)
 {
   char cmdline[4096];
   char object[4096];
@@ -518,7 +408,7 @@ void source_compile_gcc(group *s)
   extract_section(bss);
 }
 
-void source_premap_gcc(group *s)
+void source_premap_asmx(group *s)
 {
   section *text = section_find_ext(s->name, ".text");
   section *data = section_find_ext(s->name, ".data");

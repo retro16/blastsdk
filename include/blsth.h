@@ -47,14 +47,14 @@ void main() {
 sp : the stack pointer used for the thread.
      This pointer should be passed to all calls.
 */
-void blsth_init(void *sp);
+extern void blsth_init(void *sp);
 
 /* Run waiting background tasks
 
 The thread will run until all pending function calls are done or until the thread calls blsth_yield().
 */
 __attribute__ ((noinline))
-void blsth_run(void *sp);
+extern void blsth_run(void *sp);
 
 /* Push a new call on thread stack */
 #define blsth_call(sp, fct, ...) \
@@ -65,10 +65,13 @@ void blsth_run(void *sp);
 
 /* Called from a thread : release thread and give CPU back to main */
 __attribute__ ((noinline))
-void blsth_yield();
+extern void blsth_yield();
 
 /* Used by blsth_call macro : DO NOT USE DIRECTLY */
 __attribute__ ((noinline))
-void blsth_pushcall(void *sp, void *fctptr, ...);
+extern void blsth_pushcall(void *sp, void *fctptr, ...);
+
+/* Used by blsth_call macro : DO NOT USE DIRECTLY */
+extern volatile void *blsth_sp;
 
 #endif

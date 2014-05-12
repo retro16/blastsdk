@@ -1,13 +1,3 @@
-struct blsth_frame {
-  // Registers
-  void *d2; void *d3; void *d4; void *d5; void *d6; void *d7;
-  void *a2; void *a3; void *a4; void *frameptr; void *fp; void *retaddr;
-};
-
-struct th {
-  char *stack;
-};
-
 void blsfastfill_word(char *d, unsigned short count, unsigned short pattern)
 {
   asm(
@@ -21,7 +11,8 @@ void blsfastfill_word(char *d, unsigned short count, unsigned short pattern)
   );
 }
 
-void blsfastcopy_word(char *d, const char *c, unsigned int s) {
+void blsfastcopy_word(char *d, const char *c, unsigned int s)
+{
   asm(
 "\n\t subq #1, %2"
 "\n1:"

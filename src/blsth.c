@@ -13,10 +13,10 @@ struct th {
 
 // Global variables
 volatile void *blsth_sp;
-struct th *blsth_curthread;
-void *mainstack;
+static struct th *blsth_curthread;
+static void *mainstack;
 
-void memcpy(char *d, const char *c, unsigned int s) {
+static void memcpy(char *d, const char *c, unsigned int s) {
 
   if(!((unsigned long)d & 1) && !((unsigned long)c & 1) && !(s & 1) && s < 0x20000)
   {
@@ -103,7 +103,7 @@ void blsth_init(void *thread) {
   t->stack = (char *)thread;
 }
 
-
+/*
 char threadstack[4096];
 void *thread = &(threadstack[4096]);
 
@@ -134,4 +134,4 @@ int main() {
 
   return 0;
 }
-
+*/

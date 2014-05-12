@@ -1357,6 +1357,7 @@ int main(int argc, char **argv)
   if(mainout.target != target_scd) {
     bls_pack_sections(); // Final packing pass
     bls_physmap_cart(); // Map physical cartridge image
+		bls_compile(); // Recompile with physical addresses
     bls_build_cart_image(); // Build the final cart image
   }
   else {

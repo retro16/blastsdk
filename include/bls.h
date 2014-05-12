@@ -3,9 +3,9 @@
 
 
 /* blsvdp.asm */
-extern void blsvdp_dma(void *dest, void *src, unsigned int len);
-extern void blsvdp_dma_cram(void *dest, void *src, unsigned int len);
-extern void blsvdp_prepare_init(short *prepared);
-extern void blsvdp_prepare_dma(void *dest, void *src, unsigned int len, short *prepared);
-extern void blsvdp_exec(short *prepared);
+extern void BLSVDP_DMA(void *dest, void *src, unsigned int len);
+extern void BLSVDP_DMA_CRAM(void *dest, void *src, unsigned int len);
+extern void BLSVDP_PREPARE_INIT(short *prepared);
+extern void BLSVDP_PREPARE_DMA(void *dest, void *src, unsigned int len, short *prepared);
+extern void BLSVDP_EXEC(short *prepared);
 
