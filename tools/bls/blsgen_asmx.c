@@ -107,6 +107,142 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
   }
 }
 
+void parse_lst(section *s, FILE *f, int setvalues)
+{
+  while(!feof(f))
+  {
+    char line[4096];
+    fgets(line, 4096, f);
+
+    int l = strlen(line);
+
+    if(l > 10 && s->symbol->value.addr == -1 && line[0] >= '0')
+    {
+      const char *c = line;
+      sv address = parse_hex(&c, 6);
+      skipblanks(&c);
+      if(strncasecmp("ORG", c, 3) == 0 && c[3] <= ' ')
+      {
+        // first ORG declaration : map to address
+        busaddr_t ba;
+        ba.bus = s->bus;
+        ba.addr = address;
+        ba.bank = -1;
+        chipaddr ca = bus2chip(ba);
+        if(s->symbol->value.chip != chip_none && ca.chip != s->symbol->value.chip)
+        {
+          printf("Error: ORG of source %s is not on the correct chip.\n", s->name);
+          exit(1);
+        }
+        s->symbol->value = ca;
+      }
+    }
+
+    if(line[0] >= '0' && line[0] <= '9' && l >= 20 && strcmp(&line[5], " Total Error(s)\n") == 0)
+    {
+      break;
+    }
+  }
+
+  // After error count : catch symbols and ending address
+  while(!feof(f))
+  {
+    char line[4096];
+    char sym[256];
+    fgets(line, 4096, f);
+    int l = strlen(line);
+    if(l < 8)
+    {
+      continue;
+    }
+    if(strcmp(&line[8], " ending address\n") == 0)
+    {
+      // Parse ending address to find out estimated size
+      // Only appears in one-pass compilation phase
+      const char *p = line;
+      sv binend = parse_hex(&p);
+      s->binsize = binend - chip2bus(s->symbol->value).addr;
+      continue;
+    }
+
+    const char *c = line;
+    while(*c)
+    {
+      // Skip blanks
+      skipblanks(&c);
+      // Parse symbol name
+      parse_sym(sym, &c);
+      // Skip blanks to find value
+      skipblanks(&c);
+      if(*c < '0' || *c > 'F')
+      {
+        break;
+      }
+      sv_t symval = parse_hex(&c, 8);
+      if(*c == '\n' || !*c)
+      {
+				busaddr_t busaddr = {s->source->bus, symval, s->source->banks.bank[s->source->bus]};
+        if(!setvalues)
+        {
+					busaddr.bus = bus_none;
+					busaddr.addr = -1;
+					busaddr.bank = -1;
+				}
+				symbol_set_bus(&s->intsym, symname, busaddr, s);
+        continue;
+      }
+      if(*c != ' ')
+      {
+        printf("Expected space instead of [%02X] in file %s\n[%s]\n", *c, file, c);
+        exit(1);
+      }
+      ++c;
+      switch(*c)
+      {
+        case ' ':
+        case '\n':
+        case '\r':
+        case 'E':
+        case 'S':
+				{
+          // Internal pointer
+					symbol *ts;
+					if((ts = symbol_find(sym)) && ts->section != s)
+					{
+					  break; // Do not touch external symbols
+					}
+					busaddr_t busaddr = {s->source->bus, symval, s->source->banks.bank[s->source->bus]};
+					if(!setvalues)
+					{
+						busaddr.bus = bus_none;
+						busaddr.addr = -1;
+						busaddr.bank = -1;
+					}
+					symbol_set_bus(&s->intsym, sym, busaddr, s);
+          break;
+				}
+        case 'U':
+				{
+					symbol *ts;
+					if((ts = symbol_find(sym)))
+					{
+						s->extsym = blsll_insert_symbol(s->extsym, sym);
+						printf("%s extern\n", sym);
+					}
+					else
+					{
+						symbol_set(&s->extsym, sym, unknown, NULL);
+						printf("%s unknown\n", sym);
+					}
+          break;
+				}
+        default:
+          break;
+      }
+      ++c;
+    }
+  }
+}
 const char *binary_load_function = "BLS_LOAD_BINARY_";
 
 void binary_loaded(group *s, const char *symname)
