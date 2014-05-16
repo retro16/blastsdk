@@ -9,6 +9,9 @@ Section level1.c.text
 Binaries
 ========
 
+Binary a.asm
+------------
+
 Binary splash.c
 ---------------
 

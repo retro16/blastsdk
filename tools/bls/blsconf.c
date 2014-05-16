@@ -85,7 +85,7 @@ group * source_parse(const mdconfnode *n, const char *name) {
 //      section_create_raw(s, n);
       break;
     case format_asmx:
-//      section_create_asmx(s, n);
+      section_create_asmx(s, n);
       break;
     case format_sdcc:
 //      section_create_sdcc(s, n);

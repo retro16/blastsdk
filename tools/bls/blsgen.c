@@ -868,6 +868,8 @@ void bls_get_symbols()
     case format_png:
       source_get_symbols_png(grp);
       break;
+    case format_asmx:
+      source_get_symbols_asmx(grp);
     default:
       break;
     }
@@ -884,6 +886,9 @@ void bls_get_symbol_values()
     switch(grp->format) {
     case format_gcc:
       source_get_symbol_values_gcc(grp);
+      break;
+    case format_asmx:
+      source_get_symbol_values_asmx(grp);
       break;
     default:
       break;
@@ -904,6 +909,9 @@ void bls_compile()
       break;
     case format_png:
       source_compile_png(grp);
+      break;
+    case format_asmx:
+      source_compile_asmx(grp);
       break;
     default:
       break;
@@ -927,6 +935,10 @@ void bls_map()
     case format_png:
       printf("Premapping %s\n", grp->name);
       source_premap_png(grp);
+      break;
+    case format_asmx:
+      printf("Premapping %s\n", grp->name);
+      source_premap_asmx(grp);
       break;
     default:
       break;

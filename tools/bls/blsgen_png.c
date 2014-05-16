@@ -299,7 +299,7 @@ printf("Output map (%08X) to %s\n", (unsigned int)map->size, outfilename);
     printf("Error: cannot open output for %s.\n", map->name);
     exit(1);
   }
-  printf("%d\n", fwrite(mapdata, 1, map->size, outfile));
+  printf("%lu\n", fwrite(mapdata, 1, map->size, outfile));
   fclose(outfile);
   
   free(mapdata);

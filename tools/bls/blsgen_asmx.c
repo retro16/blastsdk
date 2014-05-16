@@ -20,7 +20,7 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
   }
 }
 
-static void gen_symtable_section(FILE *out, const section *s, bus bus)
+static void gen_symtable_section_asmx(FILE *out, const section *s, bus bus)
 {
   const BLSLL(symbol) *syml = s->extsym;
   const symbol *sym;
@@ -38,7 +38,7 @@ static void gen_symtable_section(FILE *out, const section *s, bus bus)
   }
 }
 
-static void gen_symtable(const group *s)
+static void gen_symtable_asmx(const group *s)
 {
   section *sec = section_find_ext(s->name, ".bin");
 
@@ -46,13 +46,15 @@ static void gen_symtable(const group *s)
   snprintf(symfile, 4096, BUILDDIR"/%s.sym", s->name);
   FILE *f = fopen(symfile, "w");
 
-  gen_symtable_section(f, sec, s->bus);
+  gen_symtable_section_asmx(f, sec, s->bus);
 
   fclose(f);
 }
 
-static void parse_lst(section *s, FILE *f, int setvalues)
+static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 {
+	section *sec = section_find_ext(src->name, ".bin");
+
   while(!feof(f))
   {
     char line[4096];
@@ -60,41 +62,38 @@ static void parse_lst(section *s, FILE *f, int setvalues)
 
     int l = strlen(line);
 
-    if(l > 10 && s->symbol->value.addr == -1 && line[0] >= '0')
+    if(l > 10 && sec->symbol->value.addr == -1 && line[0] >= '0')
     {
       const char *c = line;
-      sv address = parse_hex(&c, 6);
+      sv address = parse_hex_skip(&c);
       skipblanks(&c);
       if(strncasecmp("ORG", c, 3) == 0 && c[3] <= ' ')
       {
         // first ORG declaration : map to address
-        busaddr_t ba;
-        ba.bus = s->bus;
+        busaddr ba;
+        ba.bus = src->bus;
         ba.addr = address;
         ba.bank = -1;
         chipaddr ca = bus2chip(ba);
-        if(s->symbol->value.chip != chip_none && ca.chip != s->symbol->value.chip)
+        if(sec->symbol->value.chip != chip_none && ca.chip != sec->symbol->value.chip)
         {
-          printf("Error: ORG of source %s is not on the correct chip.\n", s->name);
+          printf("Error: ORG of source %s is not on the correct chip.\n", src->name);
           exit(1);
         }
-        s->symbol->value = ca;
+        sec->symbol->value = ca;
       }
     }
 
 		char *sub;
-		if(l > 10 && (sub = strstr("Illegal opcode 'BLS_LOAD_BINARY_")))
+		if(l > 10 && (sub = strstr(line, "BLS_LOAD_BINARY_")))
 		{
-			sub += 33;
-			char end = sub;
-			while(*end && *end != '\'') ++end;
-			char binname = (char*)alloca(end - sub + 1);
-			memcpy(binname, sub, end - sub);
-			binname[end - sub] = '\0';
+			sub += 16;
+			char binname[4096];
+			parse_sym(binname, &sub);
 
 			group *binary = binary_find_sym(binname);
 			if(binary) {
-				s->loads = blsll_insert_unique_group(s->loads, binary);
+				sec->loads = blsll_insert_unique_group(sec->loads, binary);
 			} else {
 				printf("Could not find binary with symbol name %s\n", binname);
 				exit(1);
@@ -122,9 +121,8 @@ static void parse_lst(section *s, FILE *f, int setvalues)
     {
       // Parse ending address to find out estimated size
       // Only appears in one-pass compilation phase
-      const char *p = line;
-      sv binend = parse_hex(&p);
-      s->binsize = binend - chip2bus(s->symbol->value).addr;
+      sv binend = parse_hex(line);
+      sec->size = binend - chip2bus(sec->symbol->value, src->bus).addr;
       continue;
     }
 
@@ -141,22 +139,22 @@ static void parse_lst(section *s, FILE *f, int setvalues)
       {
         break;
       }
-      sv_t symval = parse_hex(&c, 8);
+      sv symval = parse_hex_skip(&c);
       if(*c == '\n' || !*c)
       {
-				busaddr_t busaddr = {s->source->bus, symval, s->source->banks.bank[s->source->bus]};
+				busaddr busaddr = {src->bus, symval, src->banks.bank[src->bus]};
         if(!setvalues)
         {
 					busaddr.bus = bus_none;
 					busaddr.addr = -1;
 					busaddr.bank = -1;
 				}
-				symbol_set_bus(&s->intsym, symname, busaddr, s);
+				symbol_set_bus(&sec->intsym, sym, busaddr, sec);
         continue;
       }
       if(*c != ' ')
       {
-        printf("Expected space instead of [%02X] in file %s\n[%s]\n", *c, file, c);
+        printf("Expected space instead of [%02X] in source listing of %s\n[%s]\n", *c, src->name, c);
         exit(1);
       }
       ++c;
@@ -170,18 +168,18 @@ static void parse_lst(section *s, FILE *f, int setvalues)
 				{
           // Internal pointer
 					symbol *ts;
-					if((ts = symbol_find(sym)) && ts->section != s)
+					if((ts = symbol_find(sym)) && ts->section != sec)
 					{
 					  break; // Do not touch external symbols
 					}
-					busaddr_t busaddr = {s->source->bus, symval, s->source->banks.bank[s->source->bus]};
+					busaddr busaddr = {src->bus, symval, src->banks.bank[src->bus]};
 					if(!setvalues)
 					{
 						busaddr.bus = bus_none;
 						busaddr.addr = -1;
 						busaddr.bank = -1;
 					}
-					symbol_set_bus(&s->intsym, sym, busaddr, s);
+					symbol_set_bus(&sec->intsym, sym, busaddr, sec);
           break;
 				}
         case 'U':
@@ -189,12 +187,13 @@ static void parse_lst(section *s, FILE *f, int setvalues)
 					symbol *ts;
 					if((ts = symbol_find(sym)))
 					{
-						s->extsym = blsll_insert_symbol(s->extsym, sym);
+						sec->extsym = blsll_insert_symbol(sec->extsym, ts);
 						printf("%s extern\n", sym);
 					}
 					else
 					{
-						symbol_set(&s->extsym, sym, unknown, NULL);
+						chipaddr unknown = {chip_none, -1};
+						symbol_set(&sec->extsym, sym, unknown, NULL);
 						printf("%s unknown\n", sym);
 					}
           break;
@@ -207,16 +206,16 @@ static void parse_lst(section *s, FILE *f, int setvalues)
   }
 }
 
-void parse_symbols(section *s, int setvalues)
+void parse_symbols_asmx(group *src, int setvalues)
 {
 	char filename[4096];
-	snprintf(filename, 4096, BUILDDIR"/%s.lst", s->name);
+	snprintf(filename, 4096, BUILDDIR"/%s.lst", src->name);
 	FILE *f = fopen(filename, "r");
-	parse_lst(s, f, setvalues);
+	parse_lst_asmx(src, f, setvalues);
 	fclose(f);
 }
 
-const char *gen_load_defines()
+const char *gen_load_defines_asmx()
 {
   static char filename[4096];
   snprintf(filename, 4096, BUILDDIR"/_blsload_defines.asm");
@@ -236,7 +235,7 @@ const char *gen_load_defines()
   BLSLL_FOREACH(bin, binl) {
     char binname[1024];
     getsymname(binname, bin->name);
-    fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO", binname);
+    fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO\n", binname);
     if(mainout.target == target_scd) {
       // Begin SCD transfer
       // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
@@ -260,7 +259,7 @@ const char *gen_load_defines()
               fprintf(out, "\t\tCLR.B\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
             }
           } else if(sec->symbol->value.chip == chip_vram) {
-            fprintf(out, "\t\tBLSVDP_CLEAR\t0x%04X, 0x%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+            fprintf(out, "\t\tBLSVDP_CLEAR\t$%04X, $%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           } else {
             printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
           }
@@ -288,13 +287,13 @@ const char *gen_load_defines()
           break;
 
         case chip_vram:
-          fprintf(out, "VDPDMASEND\t#%08X, #%04X, #%04X, VRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+          fprintf(out, "VDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           break;
         case chip_cram:
-          fprintf(out, "VDPDMASEND\t#%08X, #%04X, #%04X, CRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+          fprintf(out, "VDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           break;
         case chip_ram:
-          fprintf(out, "BLSFASTCOPY_WORD\t#%08X, #%08X, #%08X\n", (unsigned int)ba.addr, (unsigned int)sec->physaddr, (unsigned int)((sec->size + 1) / 2));
+          fprintf(out, "BLSFASTCOPY_WORD\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)sec->physaddr, (unsigned int)((sec->size + 1) / 2));
           break;
         }
       }
@@ -309,31 +308,42 @@ const char *gen_load_defines()
 void source_get_symbols_asmx(group *s)
 {
   char srcname[4096];
-  FILE *f;
+  char cmdline[4096];
 
-  const char *defs = gen_load_defines();
+  const char *defs = gen_load_defines_asmx();
+
+  if(!findfile(srcname, s->name)) {
+    printf("Error: %s not found\n", s->name);
+    exit(1);
+  }
 
   snprintf(cmdline, 4096, "asmx -C 68000 -w -e -1 %s -i %s -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", include_prefixes, defs, s->name, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
   // Generate and parse symbols from listing
-  parse_symbols(s, 0);
+  parse_symbols_asmx(s, 0);
 }
 
 void source_compile_asmx(group *s)
 {
   char srcname[4096];
-  FILE *f;
+  char cmdline[4096];
 
-  const char *defs = gen_load_defines();
+  const char *defs = gen_load_defines_asmx();
+	gen_symtable_asmx(s);
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -w -e -1 %s -i %s -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", include_prefixes, defs, s->name, s->name, srcname);
+  if(!findfile(srcname, s->name)) {
+    printf("Error: %s not found\n", s->name);
+    exit(1);
+  }
+
+  snprintf(cmdline, 4096, "asmx -C 68000 -w -e -1 %s -i %s -i "BUILDDIR"/%s.inc -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", include_prefixes, defs, s->name, s->name, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
   // Generate and parse symbols from listing
-  parse_symbols(s, 1);
+  parse_symbols_asmx(s, 1);
 }
 
 void source_get_symbol_values_asmx(group *s)
