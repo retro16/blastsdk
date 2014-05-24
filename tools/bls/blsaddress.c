@@ -153,6 +153,13 @@ busaddr chip2bus(chipaddr ca, bus bus)
           break;
         }
         ca.addr += 0x200000;
+      } else if(mainout.target == target_ram)
+      {
+        if(ca.addr >= 0x00FD00)
+        {
+          break;
+        }
+        ca.addr += 0xFF0200;
       }
       switch(bus)
       {
@@ -228,6 +235,7 @@ busaddr chip2bus(chipaddr ca, bus bus)
             case target_max:
               break;
             case target_gen:
+            case target_ram:
               break;
             case target_scd:
             case target_vcart:
@@ -317,6 +325,10 @@ sv chip_start(chip chip)
     // Skip CD BIOS
     return 0x6000;
   }
+  else if(mainout.target == target_ram && chip == chip_ram)
+  {
+    return ROMHEADERSIZE;
+  }
 
   return 0;
 }
@@ -332,6 +344,8 @@ sv chip_size(chip chip)
     case chip_cart:
       if(mainout.target == target_vcart) {
         return chip_size(chip_wram) - ROMHEADERSIZE;
+      } else if(mainout.target == target_ram) {
+        return chip_size(chip_ram);
       }
       return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
     case chip_zstack:
@@ -343,6 +357,9 @@ sv chip_size(chip chip)
       return 0x80;
     case chip_mstack:
     case chip_ram:
+      if(mainout.target == target_ram) {
+        return 0xFD00 - ROMHEADERSIZE;
+      }
       if(mainout.target != target_gen) {
         return 0xFD00; // Avoid allocating over exception vectors
       }
@@ -549,4 +566,17 @@ sv tilemap_addr8(sv addr, sv width)
 
   //     tiles on top      tiles on left   line offset in tile
   return (tyi * 32 * tw) + txi * 32      + tyo * 4             + txo / 2;
+}
+
+busaddr phys2bus(sv physaddr, bus target)
+{
+  busaddr ba = {bus_none, -1, -1};
+  if(mainout.target != target_scd)
+  {
+    ba.bus = target;
+    chipaddr ca = {chip_cart, physaddr};
+    ba = chip2bus(ca, target);
+  }
+
+  return ba;
 }

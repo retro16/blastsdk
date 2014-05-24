@@ -176,7 +176,7 @@ void group_free(group *p)
 const char bus_names[][8] = {"none", "main", "sub", "z80"};
 const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
-const char target_names[][8] = {"gen", "scd", "vcart"};
+const char target_names[][8] = {"gen", "scd", "vcart", "ram"};
 
 section *section_new()
 {
@@ -690,7 +690,8 @@ void output_dump(FILE *out)
       fprintf(out, " - sp `%s`\n", mainout.sp->name);
     }
   } else if(mainout.entry) {
-    fprintf(out, " - entry `%s`\n", mainout.entry->name);
+    busaddr ba = chip2bus(mainout.entry->value, bus_main);
+    fprintf(out, " - entry `%s` (0x%06X)\n", mainout.entry->name, (unsigned int)ba.addr);
   }
 
   const BLSLL(group) *grpl;
@@ -921,30 +922,6 @@ void bls_compile()
 
 void bls_map()
 {
-  BLSLL(group) *grpl;
-  group *grp;
-
-  // Premap all sources
-  grpl = sources;
-  BLSLL_FOREACH(grp, grpl) {
-    switch(grp->format) {
-    case format_gcc:
-      printf("Premapping %s\n", grp->name);
-      source_premap_gcc(grp);
-      break;
-    case format_png:
-      printf("Premapping %s\n", grp->name);
-      source_premap_png(grp);
-      break;
-    case format_asmx:
-      printf("Premapping %s\n", grp->name);
-      source_premap_asmx(grp);
-      break;
-    default:
-      break;
-    }
-  }
-
   // Do logical section mapping
   BLSLL(section) *secl = sections;
   section *sec;
@@ -982,6 +959,10 @@ void bls_map()
           chip_align(&sec->symbol->value);
           printf("%06X\n", (unsigned int)sec->symbol->value.addr);
           goto bls_map_next_section_addr;
+        }
+        else
+        {
+          printf("No\n");
         }
       }
       // Found
@@ -1126,6 +1107,67 @@ void bls_finalize_binary_dependencies()
       o->uses_binaries = blsll_insert_unique_group(o->uses_binaries, grp);
     }
   }
+
+  if(mainout.target == target_ram)
+  {
+    // Remap all cart symbols to ram
+    BLSLL(symbol) *syml;
+    symbol *sym;
+    BLSLL_FOREACH(sym, syml) {
+      if(sym->value.chip == chip_cart)
+      {
+        sym->value.chip = chip_ram;
+      }
+    }
+  }
+
+  if(mainout.mainstack->symbol->value.addr == -1)
+  {
+    // Map stack to a default place
+    mainout.mainstack->symbol->value.chip = chip_ram;
+    mainout.mainstack->symbol->value.addr = 0xFC00;
+    mainout.mainstack->size = 0x100;
+    mainout.mainstack->format = format_empty;
+  }
+
+  // Premap all sources
+  grpl = sources;
+  BLSLL_FOREACH(grp, grpl) {
+    switch(grp->format) {
+    case format_gcc:
+      printf("Premapping %s\n", grp->name);
+      source_premap_gcc(grp);
+      break;
+    case format_png:
+      printf("Premapping %s\n", grp->name);
+      source_premap_png(grp);
+      break;
+    case format_asmx:
+      printf("Premapping %s\n", grp->name);
+      source_premap_asmx(grp);
+      break;
+    default:
+      break;
+    }
+  }
+
+/*  // Remove useless sections
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL(section) *usedsections = NULL;
+  BLSLL_FOREACH(sec, secl) {
+    if(!sec->source) continue;
+
+    grpl = mainout.bol;
+    BLSLL_FOREACH(grp, grpl) {
+      if(grp == sec->source) {
+        usedsections = blsll_insert_unique_section(usedsections, sec);
+        break;
+      }
+    }
+  }
+  blsll_free_section(sections);
+  sections = usedsections;*/
 }
 
 void bls_pack_binaries()
@@ -1154,7 +1196,6 @@ void bls_pack_sections()
   BLSLL_FOREACH(sec, secl) {
     if(!sec->size || !sec->physsize) {
       // Ignore empty sections
-      sec->size = 0;
       sec->physsize = 0;
       continue;
     }
@@ -1171,7 +1212,6 @@ void bls_pack_sections()
       case format_empty:
       case format_zero:
       {
-        sec->size = 0;
         sec->physsize = 0;
         break;
       }
@@ -1207,8 +1247,9 @@ void bls_build_cart_image()
 
   // Write default stackpointer
   fseek(f, 0x000000, SEEK_SET);
-  chipaddr ca = {chip_ram, chip_start(chip_ram) + chip_size(chip_ram)};
-  fputaddr(ca, bus_main, f);
+  chipaddr stk = mainout.mainstack->symbol->value;
+  stk.addr += mainout.mainstack->size;
+  fputaddr(stk, bus_main, f);
 
   // Write entry point
   fputaddr(mainout.entry->value, bus_main, f);
@@ -1345,8 +1386,17 @@ void tmpdir(char *out, const char *f)
   sprintf(out, BUILDDIR "/%s", f);
 }
 
+void confdump()
+{
+  FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
+  blsconf_dump(f); // Dump full configuration for reference and debugging
+  fclose(f);
+}
+
 int main(int argc, char **argv)
 {
+  atexit(confdump);
+
   mkdir(BUILDDIR, 0777);
   if(argc > 1) {
     strncpy(path_prefixes[0], argv[1], sizeof(path_prefixes[0]));
@@ -1376,8 +1426,4 @@ int main(int argc, char **argv)
     bls_pack_binaries(); // Final packing pass
     bls_physmap_cd(); // Map physical CD
   }
-
-  FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
-  blsconf_dump(f); // Dump full configuration for reference and debugging
-  fclose(f);
 }

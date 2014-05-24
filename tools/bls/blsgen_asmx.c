@@ -62,7 +62,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 
     int l = strlen(line);
 
-    if(l > 10 && sec->symbol->value.addr == -1 && line[0] >= '0')
+    if(setvalues && l > 10 && sec->symbol->value.addr == -1 && line[0] >= '0')
     {
       const char *c = line;
       sv address = parse_hex_skip(&c);
@@ -81,10 +81,11 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
           exit(1);
         }
         sec->symbol->value = ca;
+        printf("Set address from ORG : 0x%06X\n", (unsigned int)address);
       }
     }
 
-		char *sub;
+		const char *sub;
 		if(l > 10 && (sub = strstr(line, "BLS_LOAD_BINARY_")))
 		{
 			sub += 16;
@@ -122,7 +123,15 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       // Parse ending address to find out estimated size
       // Only appears in one-pass compilation phase
       sv binend = parse_hex(line);
-      sec->size = binend - chip2bus(sec->symbol->value, src->bus).addr;
+      if(sec->symbol->value.addr != -1)
+      {
+        sec->size = binend - chip2bus(sec->symbol->value, src->bus).addr;
+      }
+      else
+      {
+        sec->size = binend - 0x40000;
+        printf("## SIZE = $%04X\n", (unsigned int)sec->size);
+      }
       continue;
     }
 
@@ -287,13 +296,13 @@ const char *gen_load_defines_asmx()
           break;
 
         case chip_vram:
-          fprintf(out, "VDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+          fprintf(out, "\t\tVDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           break;
         case chip_cram:
-          fprintf(out, "VDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+          fprintf(out, "\t\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)sec->physaddr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           break;
         case chip_ram:
-          fprintf(out, "BLSFASTCOPY_WORD\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)sec->physaddr, (unsigned int)((sec->size + 1) / 2));
+          fprintf(out, "\t\tBLSFASTCOPY_WORD\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)sec->physaddr, (unsigned int)((sec->size + 1) / 2));
           break;
         }
       }
@@ -317,7 +326,7 @@ void source_get_symbols_asmx(group *s)
     exit(1);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -w -e -1 %s -i %s -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", include_prefixes, defs, s->name, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x40000 -w -e -1 %s -i %s -l "BUILDDIR"/%s.lst %s", include_prefixes, defs, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -338,8 +347,11 @@ void source_compile_asmx(group *s)
     exit(1);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -w -e -1 %s -i %s -i "BUILDDIR"/%s.inc -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", include_prefixes, defs, s->name, s->name, s->name, srcname);
-  printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
+  section *sec = section_find_ext(s->name, ".bin");
+  busaddr org = chip2bus(sec->symbol->value, s->bus);
+
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i %s -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org.addr, include_prefixes, defs, s->name, s->name, s->name, srcname);
+  printf("\n\nSecond pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
   // Generate and parse symbols from listing

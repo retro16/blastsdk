@@ -34,14 +34,14 @@ Binary blsload.c
 ----------------
 
 Binary vdp.c
-----------------
+------------
 
-Output mygame.img
+Output mygame.bin
 =================
 
 An output defines the image on the physical medium.
 
- - target vcart (or scd or vcart, deduced from output name if ending in img, gen, iso or vcart)
+ - target ram (or gen or scd or vcart, deduced from output name if ending in bin, gen, iso, vct or ram)
  - region JUE
  - copyright 2014 GPL
  - author Retro 16

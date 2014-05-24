@@ -3565,7 +3565,11 @@ void PreInclude(void)
     // Setup pre-includes
     while(preInclude[nInclude + 1][0])
     {
-        OpenInclude(preInclude[nInclude + 1]);
+        if(!OpenInclude(preInclude[nInclude + 1]))
+        {
+            fprintf(stderr, "Error: cannot include %s\n", preInclude[nInclude + 1]);
+            exit(1);
+        }
     }
 }
 
@@ -5507,6 +5511,7 @@ void getopts(int argc, char * const argv[])
                     // get start parameter
                     if (GetWord(word) != -1) usage();
                     cl_Binbase = EvalNum(word);
+                    CodeAbsOrg(cl_Binbase);
                     if (errFlag)
                     {
                         printf("Invalid number '%s' in -b option\n",word);

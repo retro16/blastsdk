@@ -72,7 +72,7 @@ group * source_parse(const mdconfnode *n, const char *name) {
 
   MDCONF_GET_ENUM(n, bus, bus, s->bus);
   MDCONF_GET_INT(n, bank, s->banks.bank[s->bus]);
-  
+
   switch(s->format) {
     case format_auto:
       break;
@@ -104,6 +104,8 @@ group * source_parse(const mdconfnode *n, const char *name) {
 
   return s;
 }
+
+section * section_parse_nosrc(const mdconfnode *md, const char *name);
 
 void output_parse(const mdconfnode *n, const char *name)
 {
@@ -142,6 +144,8 @@ void output_parse(const mdconfnode *n, const char *name)
     BLSLL_FINDSTR(entry, name, "MAIN");
     if(entry)
       mainout.entry = entry->data;
+
+    mainout.mainstack = section_parse_nosrc(NULL, "mainstack");
   }
 }
 
@@ -377,7 +381,7 @@ char *symname(const char *s)
       } else {
         *sn = *s;
       }
-      ++s; 
+      ++s;
       ++sn;
     }
 
@@ -406,7 +410,7 @@ char *symname2(const char *s, const char *s2)
       } else {
         *sn = *s;
       }
-      ++s; 
+      ++s;
       ++sn;
     }
 

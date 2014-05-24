@@ -11,6 +11,11 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
   (void)mdconf;
   section *s;
 
+  if(source->bus == bus_none && mainout.target != target_scd) {
+    // For genesis, default to main bus
+    source->bus = bus_main;
+  }
+
   // Generate the .text section
   source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".text")));
   s->source = source;
@@ -24,11 +29,6 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
   s->source = source;
   s->physsize = 0; // Do not store BSS on physical medium
   s->format = format_zero;
-
-  if(source->bus == bus_none && mainout.target != target_scd) {
-    // For genesis, default to main bus
-    source->bus = bus_main;
-  }
 }
 
 const char *compiler = "m68k-elf-gcc";
@@ -333,13 +333,16 @@ const char *gen_load_defines()
           break;
 
         case chip_vram:
-          fprintf(out, "blsvdp_dma(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->physaddr, (unsigned int)sec->size);
+          fprintf(out, "blsvdp_dma(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)sec->size);
           break;
         case chip_cram:
-          fprintf(out, "blsvdp_set_cram(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->physaddr, (unsigned int)sec->size);
+          fprintf(out, "blsvdp_set_cram(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)sec->size);
           break;
         case chip_ram:
-          fprintf(out, "blsfastcopy_word(0x%08X, 0x%08X, 0x%08X);", (unsigned int)ba.addr, (unsigned int)sec->physaddr, (unsigned int)((sec->size + 1) / 2));
+          if(mainout.target != target_ram)
+          {
+            fprintf(out, "blsfastcopy_word(0x%08X, 0x%08X, 0x%08X);", (unsigned int)ba.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)((sec->size + 1) / 2));
+          }
           break;
         }
       }
@@ -523,6 +526,8 @@ void source_premap_gcc(group *s)
   section *text = section_find_ext(s->name, ".text");
   section *data = section_find_ext(s->name, ".data");
   section *bss = section_find_ext(s->name, ".bss");
+
+  printf(" !!!! premapping %s : %p;%p;%p\n", s->name, (void*)text, (void*)data, (void*)bss);
 
   if(text->symbol->value.chip == chip_none) {
     switch(s->bus) {

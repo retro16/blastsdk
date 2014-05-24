@@ -127,6 +127,7 @@ typedef enum target {
   target_gen,
   target_scd,
   target_vcart,
+  target_ram,
   target_max
 } target;
 BLSENUM(target, 8)
@@ -206,6 +207,8 @@ typedef struct output {
   symbol *entry;
   section *ip;
   section *sp;
+  section *mainstack;
+  section *substack;
 
   BLSLL(group) *bol; // Build order list
   BLSLL(group) *sol; // Section order lost
