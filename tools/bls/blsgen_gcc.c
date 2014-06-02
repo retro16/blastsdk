@@ -372,7 +372,7 @@ static void section_get_size_gcc(section *s)
     char line[1024];
     fgets(line, 1024, in);
 
-    if(strncmp(line + 4, sname, strlen(sname)) == 0)
+    if(strlen(line) > 4 && strncmp(line + 4, sname, strlen(sname)) == 0)
     {
       s->size = parse_hex(line + 4 + strlen(sname));
       if(sname[1] == 'd' && s->size == 1) {

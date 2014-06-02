@@ -202,7 +202,17 @@ BLSLL_DECLARE(element, element_free)
 typedef struct output {
   target target;
   char *name;
-  char *region;
+
+  // ROM header information
+  char *copyright;
+  char *serial;
+  sv rom_end; // Initially set to -1 to pad ROM to the NPOT or -2 to leave as-is
+  int bram_type; // 0 = none, 1 = odd, 2 = even, 3 = both
+  sv bram_start;
+  sv bram_end;
+  char *notes;
+  char *region; // For SCD images, only one region is allowed
+
   char *file;
   symbol *entry;
   section *ip;

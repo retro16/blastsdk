@@ -41,6 +41,27 @@ const struct {
   { "", format_max}
 };
 
+char * strdupnorm(const char *s, int len)
+{
+	char *target = malloc(len + 1);
+	target[len] = '\0';
+	char *t = target;
+	while(*s && len)
+	{
+		*t = *s;
+		++s;
+		++t;
+		--len;
+	}
+	while(len)
+	{
+		*t = ' ';
+		++t;
+		--len;
+	}
+	return target;
+}
+
 format format_guess(const char *name) {
   // Try to deduce format from file/section name
   const char *c = strchr(name, '.');
@@ -109,15 +130,45 @@ section * section_parse_nosrc(const mdconfnode *md, const char *name);
 
 void output_parse(const mdconfnode *n, const char *name)
 {
-  mainout.name = strdupnul(name);
+  mainout.name = strdupnorm(name, 48);
   mainout.target = target_parse(mdconfget(n, "target"));
   /*
   mainout.name = strdupnul(mdconfget(n, "name"));
   if(!mainout.name) mainout.name = strdupnul(n->value);
   */
-  mainout.region = strdupnul(mdconfget(n, "region"));
+	mainout.copyright = strdupnorm(mdconfget(n, "copyright"), 16);
+  mainout.region = strdupnorm(mdconfget(n, "region"), 16);
+	mainout.notes = strdupnorm(mdconfget(n, "notes"), 40);
+	mainout.rom_end = -2;
+	if(mdconfget(n, "pad"))
+	{
+		mainout.rom_end = -1;
+	}
+
   mainout.file = strdupnul(mdconfget(n, "file"));
-  if(!mainout.file) mainout.file = strdupnul(mainout.name);
+  if(!mainout.file)
+	{
+		char n[4096];
+		strcpy(n, name);
+		switch(mainout.target)
+		{
+			case target_gen:
+				strcat(n, ".bin");
+				break;
+			case target_scd:
+				strcat(n, ".iso");
+				break;
+			case target_vcart:
+				strcat(n, ".vgc");
+				break;
+			case target_ram:
+				strcat(n, ".ram");
+				break;
+			default:
+				break;
+		}
+		mainout.file = strdupnul(n);
+	}
 
   const mdconfnode *ni;
   for(ni = n; (ni = mdconfsearch(ni, "binaries")); ni = ni->next) {

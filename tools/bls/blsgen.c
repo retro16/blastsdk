@@ -1111,7 +1111,7 @@ void bls_finalize_binary_dependencies()
   if(mainout.target == target_ram)
   {
     // Remap all cart symbols to ram
-    BLSLL(symbol) *syml;
+    BLSLL(symbol) *syml = symbols;
     symbol *sym;
     BLSLL_FOREACH(sym, syml) {
       if(sym->value.chip == chip_cart)

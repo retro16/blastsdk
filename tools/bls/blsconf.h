@@ -10,5 +10,6 @@ group * binary_parse(const mdconfnode *mdnode, const char *name);
 void blsconf_load(const char *file);
 char *symname(const char *s);
 char *symname2(const char *s, const char *s2);
+char *strdupnorm(const char *s, int len);
 
 #endif//BLSCONF_H
