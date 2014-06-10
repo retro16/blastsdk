@@ -24,7 +24,6 @@
 #define GENACK GENTL
 #define GENOUT GENTR
 
-#include <avr/wdt.h>
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #ifdef TCPBRIDGE
 #include <Ethernet.h>
@@ -189,6 +188,11 @@ void GenPort::begin() {
   pinMode(GEND1, INPUT);
   pinMode(GEND2, INPUT);
   pinMode(GEND3, INPUT);
+
+  digitalWrite(GEND0, LOW);
+  digitalWrite(GEND1, LOW);
+  digitalWrite(GEND2, LOW);
+  digitalWrite(GEND3, LOW);
 #endif
 
   buflen = 0;
@@ -374,12 +378,10 @@ void setup()
   Ethernet.begin(mac, ip);
   server.begin();
 #endif
-//  wdt_enable(WDTO_8S); // Use the watchdog in case the Genesis hangs during a transfer
 }
 
 void loop()
 {
-//  wdt_reset();
 #ifdef TCPBRIDGE
   if(!client.connected())
   {
