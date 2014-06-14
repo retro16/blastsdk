@@ -179,7 +179,7 @@ addresses.
 
 Mapping is the following :
 
-FFFFB6 : D0..D7
-FFFFD6 : A0..A7
-FFFFF6 : PC
-FFFFFE : SR
+    FFFFBA : D0..D7
+    FFFFDA : A0..A7
+    FFFFFA : PC
+    FFFFFE : SR
