@@ -17,17 +17,25 @@ Looking at the console socket :
      \ 6 7 8 9 /
        -------
 
-    Bit Pin Ard Name Pad0  Pad1  Serial Monitor
-     0  1   4   D0   Up    Up    -      D0
-     1  2   5   D1   Down  Down  -      D1
-     2  3   6   D2   0     Left  -      D2
-     3  4   7   D3   0     Right -      D3
-     4  6   8   TL   A     B     Tx     Ack
-     5  9   9   TR   Start C     Rx     Busreq
-     6  7   3   TH   Sel   Sel   INT    Clock
-     7  NC  -   -    ?     ?     -      -
-     -  8   GND GND  -     -     -      -
-     -  5   NC  Vcc  -     -     -      -
+    Pin Bit Ard Name Monitor  Pad0  Pad1 Serial
+     1   0    4   D0      D0    Up    Up      -
+     2   1    5   D1      D1  Down  Down      -
+     3   2    6   D2      D2     0  Left      -
+     4   3    7   D3      D3     0 Right      -
+     5   -   NC  Vcc       -     -     -      -
+     6   4    8   TL     Ack     A     B     Tx
+     7   6    3   TH   Clock   Sel   Sel    INT
+     8   -  GND  GND       -     -     -      -
+     9   5    9   TR  Busreq Start     C     Rx
+    NC   7    -   -        -    ?      ?      -
+
+Bit is the control bit of the port register in the genesis.
+
+Ard is the Arduino pin. To remap pins, you must modify the Arduino source code.
+
+Pad0 is the value returned by the gamepad when Sel is low, Pad1 is the state
+when Sel is high. Serial is the pin role when the port is in serial mode
+(unused in blast debugger).
 
 
 Byte transmission format
@@ -35,8 +43,8 @@ Byte transmission format
 
 The debug mode communicates via D-Pad data lines, passing 4 bits per clock.  TH
 is the clock, read on edge. Format is big nybble first. For example, to pass
-0xF3, digit F would be passed first, then 3. Each nybble is acknowledged by a
-TL transition. 5V is logic high and 0V is logic low.
+0xA3, digit A would be passed first, then 3. Each nybble is acknowledged by a
+TL transition. 5V pull-up is logic high and 0V is logic low.
 
 Example transmitting 0xA3 to the genesis :
 
@@ -74,10 +82,13 @@ Example receiving 0xE0 from the genesis :
     TR ---                                    ------ output
 
 Notes :
+ * input/output is the pin state of the arduino.
  * Clock and data must not change until Ack line is switched.
  * Ack pulse can be very late. Please put a long timeout (100ms at least).
- * Genesis checks that TR is high while waiting for ack. This solves bus access
-   collisions. This way, the debugger has priority over the genesis.
+ * When the genesis sends data, it checks TR while waiting for acknowledge.
+   This way, if the debugger sends data while the genesis is transmitting,
+   the genesis immediatly stops and enters receive mode. This solves bus access
+   conflicts and can help waking up the genesis from a blocked state.
 
 
 High level protocol
@@ -87,7 +98,7 @@ The high level protocol uses only bytes (it never transmits an odd number of
 nybbles). All 16/32 bits values are big endian (native 68k ordering).
 
 Packets cannot grow over 36 bytes including data (that is the maximum buffer
-you will ever need).
+you will ever need for one command).
 
 Monitor mode can be triggered externally by sending any command. Clock pin low
 triggers a level 2 interrupt in the genesis, effectively making it enter the
@@ -118,16 +129,16 @@ Note : the data size field always indicates the size in *bytes*, even if you
 send words or longs. Sending an odd number of bytes during word transfers leads
 to undefined behaviour.
 
+
 Command-level protocol
 ----------------------
 
 The genesis can be in 2 different states : normal mode and monitor mode. Normal
 mode means that the genesis runs its main program. Monitor mode means that all
-interrupts are disabled, all other chips are halted and the genesis waits for
-incoming commands. Monitor mode is entered by sending any command to the
-genesis ; to exit monitor mode, send the corresponding command when in monitor
-mode. Whenever the genesis leaves monitor mode, it signals it by sending an
-exit monitor mode command.
+interrupts are disabled and the genesis waits for incoming commands. Monitor
+mode is entered by sending any command to the genesis ; to exit monitor mode,
+send the corresponding command when in monitor mode. Whenever the genesis
+leaves monitor mode, it sends an exit monitor mode command.
 
 Other commands have different meanings depending on whether they are sent from
 or to the genesis.
@@ -175,7 +186,8 @@ Accessing genesis CPU state from the monitor
 On the genesis, the last 74 bytes of RAM contain CPU registers, updated when
 entering and leaving the monitor. Since these registers are read/write, you can
 read and alter CPU registers directly in monitor mode by accessing the correct
-addresses.
+addresses. This includes SR to do, for example, step by step execution using
+TRACE mode of the 68000.
 
 Mapping is the following :
 
@@ -183,3 +195,25 @@ Mapping is the following :
     FFFFDA : A0..A7
     FFFFFA : PC
     FFFFFE : SR
+
+
+Catching interrupts
+-------------------
+
+The Blast ! Debugger Agent (BDA) catches TRAP 7 and TRACE interrupts. When such
+interrupts occur, the genesis sends a handshake packet with the address field
+set to the exception vector and enters monitor mode :
+
+Data sent by the genesis when TRACE triggered :
+
+    00 00 00 09
+
+
+Data sent by the genesis when TRAP 7 triggered :
+
+    00 00 00 27
+
+Only these 2 interrupts are caught by default. You must ensure that the
+interrupt vectors are set to g_int_trace and g_int_trap07 of bda.inc to make
+it work correctly.
+

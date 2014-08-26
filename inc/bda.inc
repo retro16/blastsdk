@@ -174,10 +174,10 @@ g_int_pad
 
 ; Breakpoint interrupt
 g_int_trace
-		move.l	#16, bda_pkt_header.w
+		move.l	#$09, bda_pkt_header.w
 		bra.b	bda_enter
 g_int_trap07
-		move.l	#7, bda_pkt_header.w    ; Send TRAP 7 code once entered monitor
+		move.l	#$27, bda_pkt_header.w    ; Send TRAP 7 code once entered monitor
 bda_enter
 		move.w	#$2700, sr		; Disable all interrupts
 
