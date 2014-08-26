@@ -1,22 +1,12 @@
 This program is a test program for blsgen.
 Displays a scrollable hello world on screen.
 
-It generates both Genesis, SCD and vcart programs.
 
-
-Source test.c
-======
- - type gcc
- - section .text
-  - addr $300
-
-
-Output **Genesis**
-==================
+Output **blsgentest.bin**
+=========================
 
 Compiled binaries:
- - binary main
-  - source main.asm
+ - binaries main font.png
 
 Output properties:
  - name **BLSGEN Test**
@@ -26,17 +16,13 @@ Output properties:
  - entry main
 
 
-Output **VCart**
-================
+Binary **main**
+===============
 
-Compiled binaries:
- - binary main
-  - source main.asm
+ - provides main.asm ram.asm interrupt.asm inttable.asm font.png
 
-Output properties:
- - name **BLSGEN Test**
- - target vcart
- - region JUE
- - file blsgentest_vcart.bin
- - entry main
 
+Source **font.png**
+===================
+
+ - chip cart

@@ -63,15 +63,7 @@ chipaddr bus2chip(busaddr ba)
       }
       if(ba.addr >= 0x200000 && ba.addr < 0x240000)
       {
-          if(mainout.target == target_vcart)
-          {
-            printf("cart\n");
-              ca.chip = chip_cart;
-          }
-          else
-          {
-              ca.chip = chip_wram;
-          }
+          ca.chip = chip_wram;
           ca.addr = ba.addr - 0x200000;
           return ca;
       }
@@ -81,6 +73,15 @@ chipaddr bus2chip(busaddr ba)
         {
           ca.chip = chip_pram;
           ca.addr = ba.bank * 0x020000 + ba.addr - 0x020000;
+          return ca;
+        }
+      }
+      else if(mainout.target == target_vcart)
+      {
+        if(ba.addr >= 0x020000 && ba.addr < 0x040000)
+        {
+          ca.chip = chip_pram;
+          ca.addr = ba.addr - 0x020000;
           return ca;
         }
       }
@@ -148,11 +149,12 @@ busaddr chip2bus(chipaddr ca, bus bus)
       if(ca.addr < 0 || ca.addr >= MAXCARTSIZE) break;
       if(mainout.target == target_vcart)
       {
-        if(ca.addr >= 0x040000)
+        if(ca.addr >= 0x020000)
         {
           break;
         }
-        ca.addr += 0x200000;
+        ca.addr += 0x020000;
+        ba.bank = 0;
       } else if(mainout.target == target_ram)
       {
         if(ca.addr >= 0x00FD00)
@@ -311,7 +313,7 @@ static sv hw_chip_start(chip chip, bus bus, int bank)
 */
 sv chip_start(chip chip)
 {
-  if(chip == chip_cart)
+  if(chip == chip_cart && mainout.target != target_vcart)
   {
     return ROMHEADERSIZE;
   }
@@ -343,7 +345,7 @@ sv chip_size(chip chip)
       return -1;
     case chip_cart:
       if(mainout.target == target_vcart) {
-        return chip_size(chip_wram) - ROMHEADERSIZE;
+        return chip_size(chip_pram);
       } else if(mainout.target == target_ram) {
         return chip_size(chip_ram);
       }
@@ -366,6 +368,9 @@ sv chip_size(chip chip)
       return 0xFFB6; // Avoid allocating over monitor CPU state
     case chip_sstack:
     case chip_pram:
+      if(mainout.target == target_vcart) {
+        return 0x20000;
+      }
       return 0x40000 - 0x6000;
     case chip_wram:
       return 0x20000;
