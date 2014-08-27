@@ -1391,6 +1391,28 @@ void confdump()
 {
   FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
   blsconf_dump(f); // Dump full configuration for reference and debugging
+  // Dump physical mapping
+  
+  fprintf(f, "\n----------------------------------------\n\nOutput map\n==========\n\n    offset   size     section\n");
+  
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    if(sec->physaddr == -1 || sec->physsize == 0) continue;
+
+    char inname[4096];
+    snprintf(inname, 4096, BUILDDIR"/%s.phy", sec->name);
+    FILE *i = fopen(inname, "r");
+    if(!i) {
+      continue;
+    }
+    
+    fseek(i, 0, SEEK_END);
+    fprintf(f, "    %08X %08X%s %s\n", (unsigned int)sec->physaddr, (unsigned int)sec->physsize, sec->physsize != ftell(i) ? " (wrong)" : "", sec->name);
+
+    fclose(i);
+  }
+  
   fclose(f);
 }
 

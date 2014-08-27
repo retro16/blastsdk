@@ -313,7 +313,7 @@ static sv hw_chip_start(chip chip, bus bus, int bank)
 */
 sv chip_start(chip chip)
 {
-  if(chip == chip_cart && mainout.target != target_vcart)
+  if(chip == chip_cart && mainout.target != target_vcart && mainout.target != target_ram)
   {
     return ROMHEADERSIZE;
   }
@@ -326,10 +326,6 @@ sv chip_start(chip chip)
   {
     // Skip CD BIOS
     return 0x6000;
-  }
-  else if(mainout.target == target_ram && chip == chip_ram)
-  {
-    return ROMHEADERSIZE;
   }
 
   return 0;
@@ -360,7 +356,7 @@ sv chip_size(chip chip)
     case chip_mstack:
     case chip_ram:
       if(mainout.target == target_ram) {
-        return 0xFD00 - ROMHEADERSIZE;
+        return 0xFD00;
       }
       if(mainout.target != target_gen) {
         return 0xFD00; // Avoid allocating over exception vectors
@@ -371,9 +367,9 @@ sv chip_size(chip chip)
       if(mainout.target == target_vcart) {
         return 0x20000;
       }
-      return 0x40000 - 0x6000;
+      return 0x80000 - 0x6000;
     case chip_wram:
-      return 0x20000;
+      return 0x40000;
     case chip_pcm:
       return 0x10000;
   }
