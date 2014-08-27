@@ -15,8 +15,8 @@ Binary a.asm
 Binary splash.c
 ---------------
 
-Binary splash.png
------------------
+Binary splash.png.img
+---------------------
 
 Binary loader.c
 ---------------
@@ -47,4 +47,4 @@ An output defines the image on the physical medium.
  - author Retro 16
  - binaries splash.c
 
- - entry splash.c
+ - entry main

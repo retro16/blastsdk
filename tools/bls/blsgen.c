@@ -1360,7 +1360,6 @@ size_t getbasename(char *output, const char *name)
 
 int findfile(char *name, const char *f)
 {
-  strcpy(name, f);
   FILE *fp = fopen(name, "r");
   if(fp) {
     fclose(fp);
@@ -1399,8 +1398,9 @@ int main(int argc, char **argv)
 
   mkdir(BUILDDIR, 0777);
   if(argc > 1) {
-    strncpy(path_prefixes[0], argv[1], sizeof(path_prefixes[0]));
-    dirname(path_prefixes[0]);
+    char arg[1024];
+    strcpy(arg, argv[1]);
+    strncpy(path_prefixes[0], dirname(arg), sizeof(path_prefixes[0]));
     gen_include_prefixes();
     blsconf_load(argv[1]);
   } else {

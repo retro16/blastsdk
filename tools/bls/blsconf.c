@@ -43,6 +43,9 @@ const struct {
 
 char * strdupnorm(const char *s, int len)
 {
+	if(!s)
+	  return NULL;
+	
 	char *target = malloc(len + 1);
 	target[len] = '\0';
 	char *t = target;
@@ -404,15 +407,30 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   }
 
   if(!explicitdeps && strchr(name, '.')) {
-    // Binary represents a source
-    g = source_parse(NULL, name);
-    if(bin->bus != bus_none && g->bus == bus_none)
-    {
-      g->bus = bin->bus;
-      g->banks = bin->banks;
-    }
-    bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
-  }
+		char srcname[1024];
+		// Binary not explicit : it may represent a source or a section
+		if(findfile(srcname, name)) {
+			// File exists as-is : binary is a source
+			g = source_parse(NULL, name);
+			if(bin->bus != bus_none && g->bus == bus_none)
+			{
+				g->bus = bin->bus;
+				g->banks = bin->banks;
+			}
+			bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
+		} else {
+			// Try to remove the last extension which may be a section name
+			strncpy(srcname, name, 1024);
+			srcname[1023] = '\0';
+			*strrchr(srcname, '.') = '\0';
+
+      char realname[1024];
+			if(findfile(realname, srcname)) {
+				section *s = section_parse_nosrc(NULL, name);
+				bin->provides = blsll_insert_section(bin->provides, s);
+			}
+		}
+	}
 
   return bin;
 }

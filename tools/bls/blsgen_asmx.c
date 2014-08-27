@@ -86,7 +86,9 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
     }
 
 		const char *sub;
-		if(l > 10 && (sub = strstr(line, "BLS_LOAD_BINARY_")))
+		if(l > 10
+       && ((line[0] >= '0' && line[0] <= '9') || (line[0] >= 'A' && line[0] <= 'F'))
+       && (sub = strstr(line, "BLS_LOAD_BINARY_")))
 		{
 			sub += 16;
 			char binname[4096];
@@ -94,6 +96,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 
 			group *binary = binary_find_sym(binname);
 			if(binary) {
+        printf("asm %s loads %s\n", src->name, binary->name);
 				sec->loads = blsll_insert_unique_group(sec->loads, binary);
 			} else {
 				printf("Could not find binary with symbol name %s\n", binname);
