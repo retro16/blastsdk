@@ -320,7 +320,7 @@ sv chip_start(chip chip)
   else if(chip == chip_vram)
   {
     // Skip null tile
-    return 32;
+    return 0x20;
   }
   else if(chip == chip_pram)
   {

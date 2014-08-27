@@ -1360,6 +1360,8 @@ size_t getbasename(char *output, const char *name)
 
 int findfile(char *name, const char *f)
 {
+  strcpy(name, f);
+  
   FILE *fp = fopen(name, "r");
   if(fp) {
     fclose(fp);
