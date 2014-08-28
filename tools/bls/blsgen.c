@@ -920,6 +920,33 @@ void bls_compile()
   }
 }
 
+void bls_cart_to_ram()
+{
+  BLSLL(symbol) *syml;
+  symbol *sym;
+
+  syml = symbols;
+  BLSLL_FOREACH(sym, syml) {
+    printf("Sym %s : %s\n", sym->name, chip_names[sym->value.chip]);
+    if(sym->value.chip == chip_cart) {
+      sym->value.chip = chip_ram;
+      printf(" Sym changed to %s\n", chip_names[sym->value.chip]);
+    }
+  }
+
+  BLSLL(section) *secl;
+  section *sec;
+
+  secl = sections;
+  BLSLL_FOREACH(sec, secl) {
+    printf("Section Sym %s : %s\n", sec->symbol->name, chip_names[sec->symbol->value.chip]);
+    if(sec->symbol->value.chip == chip_cart) {
+      sec->symbol->value.chip = chip_ram;
+      printf(" Sym changed to %s\n", chip_names[sec->symbol->value.chip]);
+    }
+  }
+}
+
 void bls_map()
 {
   // Do logical section mapping
@@ -995,15 +1022,26 @@ void bls_physmap_cart()
     }
     if(sec->physsize == 0) {
       // Sections with null size don't need mapping
+      sec->physaddr = -1;
       continue;
     }
     if(sec->symbol->value.chip == chip_cart) {
       // Section on cartridge are already mapped
       sec->physaddr = sec->symbol->value.addr;
+      if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
+      {
+        printf("Error : Mapped physical address %06X out of range\n", (unsigned int)sec->physaddr);
+        exit(1);
+      }
       continue;
     }
     if(sec->physaddr != -1) {
       // Section address already known
+      if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
+      {
+        printf("Error : Manually specified physical address %06X out of range\n", (unsigned int)sec->physaddr);
+        exit(1);
+      }
       continue;
     }
 
@@ -1019,11 +1057,17 @@ void bls_physmap_cart()
         if(sections_phys_overlap(sec, s)) {
           printf("YES : %06X => ", (unsigned int)sec->physaddr);
           sec->physaddr = align_value(s->physaddr + s->physsize, 2);
+          if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
+          {
+            printf("Error : Physical address %06X out of range\n", (unsigned int)sec->physaddr);
+            exit(1);
+          }
           printf("%06X\n", (unsigned int)sec->physaddr);
           goto bls_map_next_section_addr;
         }
       }
       // Found
+      printf("NO\n");
       goto bls_map_next_section;
 bls_map_next_section_addr:
       continue;
@@ -1245,6 +1289,25 @@ void bls_build_cart_image()
     fclose(i);
   }
 
+  const char *ramloader =
+    // Unlock TMSS
+    "\x10\x39\x00\xA1\x00\x01"
+    "\x02\x00\x00\x0F"
+    "\x67\x08"
+    "\x23\xF8\x01\x00\x00\xA1\x40\x00"
+
+    // Copy program to RAM
+    "\x41\xF8\x02\x00"
+    "\x43\xF9\x00\xFF\x00\x00"
+    "\x30\x38\x3F\x3F"
+    "\x22\xD8"
+    "\x51\xC8\xFF\xFC"
+
+    // Jump to the entry point
+    "\x4E\xF9";
+  sv ramloader_size = 0x2A; // This does not count the 4 bytes of the entry point immediatly following
+  sv ramloader_padding = 0x100 - ramloader_size - 4 - 0xC0;
+
   // Write default stackpointer
   fseek(f, 0x000000, SEEK_SET);
   chipaddr stk = mainout.mainstack->symbol->value;
@@ -1252,7 +1315,14 @@ void bls_build_cart_image()
   fputaddr(stk, bus_main, f);
 
   // Write entry point
-  fputaddr(mainout.entry->value, bus_main, f);
+  if(mainout.target == target_ram)
+  {
+    fputlong(0x00000C0 + ramloader_padding, f); // Boot on RAM loader
+  }
+  else
+  {
+    fputaddr(mainout.entry->value, bus_main, f);
+  }
 
   // Write interrupt vectors
   sv addr;
@@ -1296,14 +1366,43 @@ void bls_build_cart_image()
   INTVECT(TRAP13)
   INTVECT(TRAP14)
   INTVECT(TRAP15) // 0xBC
-  for(i = 0; i < 16; ++i) fputaddr(mainout.entry->value, bus_main, f);
+  if(mainout.target == target_ram)
+  {
+    // Embed RAM loader in reserved interrupt vectors
+    for(i = 0; i < ramloader_padding; ++i) fputc('\xFF', f);
+    fwrite(ramloader, ramloader_size, 1, f);
+    fputaddr(mainout.entry->value, bus_main, f);
+  }
+  else
+  {
+    // Reserved interrupt vectors
+    for(i = 0; i < 16; ++i) fputaddr(mainout.entry->value, bus_main, f);
+  }
 #undef INTVECT
 #undef INTVECT2
 
   // Write SEGA header
   fseek(f, 0x000100, SEEK_SET);
-  fprintf(f, "SEGA");
-  // TODO
+  if(mainout.target == target_gen)
+  {
+    if(mainout.region[0] == 'U')
+    {
+      fprintf(f, "SEGA GENESIS    ");
+    }
+    else
+    {
+      fprintf(f, "SEGA MEGA DRIVE ");
+    }
+  }
+  else if(mainout.target == target_vcart)
+  {
+      fprintf(f, "SEGA VIRTUALCART");
+  }
+  else if(mainout.target == target_ram)
+  {
+      fprintf(f, "SEGA RAM PROGRAM");
+  }
+  // TODO : build header
 
   // Compute checksum
   // TODO
@@ -1437,13 +1536,16 @@ int main(int argc, char **argv)
   bls_find_entry();
   bls_gen_bol();
   bls_finalize_binary_dependencies();
+  if(mainout.target == target_ram) {
+    bls_cart_to_ram();
+  }
   bls_map();
   bls_get_symbol_values();
   bls_compile(); // Compile with most values to get a good approximation of file sizes
   if(mainout.target != target_scd) {
     bls_pack_sections(); // Final packing pass
     bls_physmap_cart(); // Map physical cartridge image
-		bls_compile(); // Recompile with physical addresses
+    bls_compile(); // Recompile with physical addresses
     bls_build_cart_image(); // Build the final cart image
   }
   else {

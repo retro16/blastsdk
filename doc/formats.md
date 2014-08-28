@@ -6,7 +6,7 @@ blsgen can generate many types of output formats, each of them having their own 
 Genesis cartridge (gen)
 -----------------------
 
-This is a raw genesis cart image, in flat binary format. It is directly mapped by the genesis at addresses 000000-400000.
+This is a raw genesis cart image, in flat binary format. It is directly mapped by the genesis at addresses 000000-3FFFFF.
 
     000000 : stack pointer
     000004 : reset vector (ROM entry point)
@@ -25,15 +25,17 @@ This is a raw Sega CD image (in "iso" mode 1 format, 2048 bytes per block). It c
 Virtual cart (vcart)
 --------------------
 
-This special type of image can run in Sega CD program RAM to simulate a cartridge (useful to test programs).
+This special type of image can simulate a genesis cartridge using Sega CD program RAM (useful to test programs).
 
-Size is limited to 128k, RAM above FFFD00 must not be used.
+ROM size is limited to 128k, RAM above FFFD00 must not be used.
 
 To run on a Sega CD, a boot CD with the correct loader is required. When running on the Sega CD, interrupt processing is delayed.
 
-To run on the genesis, simply burn the ROM as-is and it will run.
+To run on the genesis, simply burn the ROM as-is and it will run. ROM data starts at 020000 and data between 000200 and 01FFFF is ignored.
 
 Header at 0x100 must contain 'SEGA VIRTUALCART'
+
+The image MUST be exactly 0x040000 bytes.
 
 
 ### Boot loader process
@@ -51,7 +53,6 @@ On the main CPU :
  * Read the ROM header and set the interrupt vectors in the reserved RAM area (FFFD00).
  * Set program RAM access to bank 1 and enable write protection.
  * Set the stack pointer based on ROM header.
- * Mask interrupts in SR.
  * Reset VDP registers to default values.
  * Reset gamepad registers (Level 2 interrupt may be left enabled for BDA).
  * Jump to the entry point specified in ROM header.
@@ -60,22 +61,22 @@ On the main CPU :
 RAM program (ram)
 -----------------
 
-This type of program entirely runs in the Genesis main RAM (64k). When blsgen creates this type of image, it adds a correct genesis ROM header and a small boot loader.
+This type of program entirely runs in the Genesis main RAM (64k). When blsgen creates this type of image, it adds a correct genesis ROM header and a small boot loader located in the unused interrupt vectors.
 
 Since these programs may be run by the Sega CD, RAM after FFFD00 is reserved.
 
-The image MUST be precisely 0x010100 bytes long.
+The image MUST be precisely 0x00FF00 bytes long.
 
 ROM header is not copied in RAM to make more room.
 
     000000 : stack pointer
     000004 : reset vector (ROM entry point of boot loader)
-    000008-0000FF : Interrupt vectors
+    000008-0000BF : Interrupt vectors
+    0000C0-0000FB : RAM program boot loader
+    0000FC-0000FF : Entry point
     000100 : 'SEGA RAM PROGRAM' encoded in ASCII
     000110-0001FF : SEGA Genesis header
-    000200 : RAM entry point
-    000204-0003FF : Boot loader
-    000400-0100FF : Program to be copied in RAM
+    000200-00FEFF : Program to be copied in RAM
 
 
 ### Boot loader process
@@ -83,7 +84,7 @@ ROM header is not copied in RAM to make more room.
 The provided boot loader will do the following :
 
  * Unlock TMSS
- * Copy 000400-0100FF to FF0000-FFFCFF
- * Jump at address specified at 000200
+ * Copy 000200-00FEFF to FF0000-FFFCFF
+ * Jump at address specified at 0000EA
 
 The process should be the same when loading from Sega CD or other loaders.
