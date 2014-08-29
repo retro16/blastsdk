@@ -329,7 +329,7 @@ void source_get_symbols_asmx(group *s)
     exit(1);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x40000 -w -e -1 %s -i %s -l "BUILDDIR"/%s.lst %s", include_prefixes, defs, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x40000 -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -l "BUILDDIR"/%s.lst %s", include_prefixes, defs, s->bus, mainout.target, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -353,7 +353,7 @@ void source_compile_asmx(group *s)
   section *sec = section_find_ext(s->name, ".bin");
   busaddr org = chip2bus(sec->symbol->value, s->bus);
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i %s -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org.addr, include_prefixes, defs, s->name, s->name, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i %s -d BUS:=%d -d SCD:=%d -i bls.inc -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org.addr, include_prefixes, defs, s->bus, mainout.target, s->name, s->name, s->name, srcname);
   printf("\n\nSecond pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 

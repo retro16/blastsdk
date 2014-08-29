@@ -1,35 +1,30 @@
 ; Main include for Blast ! SDK
 
 ; Bus constants
-BUS_NONE	equ	-1
-BUS_MAIN	equ	0
-BUS_SUB		equ	1
-BUS_Z80		equ	2
+BUS_NONE	equ	0
+BUS_MAIN	equ	1
+BUS_SUB		equ	2
+BUS_Z80		equ	3
 
 ; Chip constants
-CHIP_NONE	equ	-1
-CHIP_CART	equ	0
-CHIP_BRAM	equ	1
-CHIP_ZRAM	equ	2
-CHIP_VRAM	equ	3
-CHIP_RAM	equ	4
-CHIP_PRAM	equ	5
-CHIP_WRAM	equ	6
-CHIP_PCM	equ	7
-
-rti		macro
-		if SCD == 0
-		rte
-		else
-		rts
-		endif
-		endm
+CHIP_NONE	equ	0
+CHIP_MSTACK equ 1
+CHIP_SSTACK equ 2
+CHIP_ZSTACK equ 3
+CHIP_CART	equ	4
+CHIP_BRAM	equ	5
+CHIP_ZRAM	equ	6
+CHIP_VRAM	equ	7
+CHIP_RAM	equ	8
+CHIP_PRAM	equ	9
+CHIP_WRAM	equ	10
+CHIP_PCM	equ	11
 
 ; Controllers
 ; Mapping :
 ; Bit 7  6  5  4  3  2  1  0
 ;       TH TR TL RT LT DN UP
-; 	 0  C  B RT LT DN UP
+;        0  C  B RT LT DN UP
 ;        1 ST  A  -  - DN UP
 
 ; Game controller lines
@@ -97,8 +92,6 @@ ZBUSREQ		equ	$A11100
 ZRESET		equ	$A11200
 ZREQ		equ	$0100			; Value to be written to ZBUSREQ or ZRESET
 
-		include	bls_vdp.inc
-
 ; Sound defines
 
 		if BUS == BUS_Z80
@@ -115,7 +108,8 @@ FM2DATA		equ	$A04003
 PSG		equ	$C00011
 		endif
 
-		include	bls_macros.inc
+        include bls_routines.inc
+		include	bls_vdp.inc
 
 		if SCD != 0
 		include	blsscd.inc

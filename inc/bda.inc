@@ -350,12 +350,12 @@ bda_code_source_end
 	if SCD != 0
 bdasub_d0	set	$0000C0			; Place monitor after exception vectors
 
-bdasub_sp	set	bdasub_d0 + 15*4+2
-bdasub_pc	set	bdasub_d0 + 16*4+2
-bdasub_sr	set	bdasub_d0 + 17*4+2
+bdasub_sp	set	bdasub_d0 + 15*4
+bdasub_pc	set	bdasub_d0 + 16*4
+bdasub_sr	set	bdasub_d0 + 17*4
 
 bda_sub_code_source
-		rorg	bdasub_d0 + 17*4+2	; Place code after CPU state
+		rorg	bdasub_d0 + 17*4 + 2	; Place code after CPU state
 bda_sub_code
 bda_sub_l2	btst	#15, GA_COMMFLAGS
 		beq.b	bda_l2_jmp		; Bit not set : call user-defined interrupt
