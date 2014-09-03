@@ -775,83 +775,153 @@ void blsconf_dump(FILE *out)
   fprintf(out, "\n");
 }
 
-void gen_bol(group *s)
+void gen_bol(group *bin)
 {
   BLSLL(section) *secl;
   section *sec;
   BLSLL(group) *grpl;
   group *grp;
-  BLSLL(symbol) *syml;
-  symbol *sym;
 
   // Check if the source is already in the BOL
-  grpl = mainout.bol;
+  grpl = usedbinaries;
   BLSLL_FOREACH(grp, grpl) {
-    if(grp == s) {
-      // Source already in the BOL : stop processing it.
+    if(grp == bin) {
+      // Binary already processed
       return;
     }
   }
 
-  mainout.bol = blsll_append_group(mainout.bol, s);
+  usedbinaries = blsll_append_group(usedbinaries, bin);
 
-  // For each section provided by the source
-  secl = s->provides;
+  secl = bin->provides;
   BLSLL_FOREACH(sec, secl) {
-    // For each external symbol
-    syml = sec->extsym;
-    BLSLL_FOREACH(sym, syml) {
-      // Recurse with the source of the external symbol
-      if(sym->section) {
-        if(sym->section->source) {
-          gen_bol(sym->section->source);
-        }
-        // Add this section to the section dependencies
-        sec->uses = blsll_insert_unique_section(sec->uses, sym->section);
-      }
-    }
+    usedsections = blsll_append_section(usedsections, sec);
+    mainout.bol = blsll_insert_unique_group(mainout.bol, sec->source);
+  }
+
+  grpl = bin->loads;
+  BLSLL_FOREACH(grp, grpl) {
+    gen_bol(grp);
   }
 }
 
 void bls_gen_bol()
 {
   if(mainout.target == target_scd) {
-    gen_bol(mainout.ip->source);
-    gen_bol(mainout.sp->source);
+    gen_bol(mainout.ipbin);
+    gen_bol(mainout.spbin);
   } else {
-    gen_bol(mainout.entry->section->source);
+    gen_bol(mainout.entrybin);
+  }
+}
+
+void bls_check_binary_load()
+{
+  // Checks that all used binaries are loaded
+  BLSLL(group) *loadedbinl = usedbinaries;
+  group *loadedbin;
+  BLSLL_FOREACH(loadedbin, loadedbinl) {
+    BLSLL(group) *usedbinl = loadedbin->uses_binaries;
+    group *usedbin;
+    BLSLL_FOREACH(usedbin, usedbinl) {
+      // Check that usedbin appears in usedbinaries
+      BLSLL(group) *ubl = usedbinaries;
+      group *ub;
+      BLSLL_FOREACH(ub, ubl) {
+        if(ub == usedbin) goto bls_check_binary_load_bin_ok;
+      }
+
+      printf("Binary %s is used by %s, but is never loaded.\n", usedbin->name, loadedbin->name);
+      exit(1);
+
+bls_check_binary_load_bin_ok:
+      continue;
+    }
   }
 }
 
 void bls_find_entry()
 {
   switch(mainout.target) {
-  default:
-    mainout.entry = symbol_find("MAIN");
-    if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
-    if(!mainout.entry) mainout.entry = symbol_find("main");
-    if(!mainout.entry) {
-      printf("Could not find MAIN entry point.\n");
-      exit(1);
+    default:
+    {
+      mainout.entry = symbol_find("MAIN");
+      if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
+      if(!mainout.entry) mainout.entry = symbol_find("main");
+      if(!mainout.entry) {
+        printf("Could not find MAIN entry point.\n");
+        exit(1);
+      }
+      mainout.entrybin = 0;
+      BLSLL(group) *binl = binaries;
+      group *bin;
+      BLSLL_FOREACH(bin, binl) {
+        BLSLL(section) *secl = bin->provides;
+        section *sec;
+        BLSLL_FOREACH(sec, secl) {
+          BLSLL(symbol) *syml = sec->intsym;
+          symbol *sym;
+          BLSLL_FOREACH(sym, syml) {
+            if(sym == mainout.entry) {
+              mainout.entrybin = bin;
+              goto bls_find_entry_default_exit;
+            }
+          }
+        }
+      }
+bls_find_entry_default_exit:
+      if(!mainout.entrybin) {
+        printf("Could not find binary providing the MAIN entry point.\n");
+        exit(1);
+      }
+      break;
     }
-    break;
 
-  case target_scd:
-    mainout.ip = section_find("IP_ASM");
-    if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
-    if(!mainout.ip) mainout.ip = section_find("ip_main");
-    if(!mainout.ip) {
-      printf("Could not find IP entry point.\n");
-      exit(1);
+    case target_scd:
+    {
+      mainout.ip = section_find("IP_ASM");
+      if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
+      if(!mainout.ip) mainout.ip = section_find("ip_main");
+      if(!mainout.ip) {
+        printf("Could not find IP entry point.\n");
+        exit(1);
+      }
+      BLSLL(group) *binl = binaries;
+      group *bin;
+      BLSLL_FOREACH(bin, binl) {
+        BLSLL(section) *secl = bin->provides;
+        section *sec;
+        BLSLL_FOREACH(sec, secl) {
+          if(sec == mainout.ip) {
+            mainout.ipbin = bin;
+            goto bls_find_entry_scd_ip_exit;
+          }
+        }
+      }
+bls_find_entry_scd_ip_exit:
+
+      mainout.sp = section_find("SP_ASM");
+      if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
+      if(!mainout.sp) mainout.sp = section_find("sp_main");
+      if(!mainout.sp) {
+        printf("Could not find SP entry point.\n");
+        exit(1);
+      }
+      binl = binaries;
+      BLSLL_FOREACH(bin, binl) {
+        BLSLL(section) *secl = bin->provides;
+        section *sec;
+        BLSLL_FOREACH(sec, secl) {
+          if(sec == mainout.sp) {
+            mainout.spbin = bin;
+            goto bls_find_entry_scd_sp_exit;
+          }
+        }
+      }
+bls_find_entry_scd_sp_exit:
+
+      break;
     }
-    mainout.sp = section_find("SP_ASM");
-    if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
-    if(!mainout.sp) mainout.sp = section_find("sp_main");
-    if(!mainout.sp) {
-      printf("Could not find SP entry point.\n");
-      exit(1);
-    }
-    break;
   }
 }
 
@@ -927,10 +997,8 @@ void bls_cart_to_ram()
 
   syml = symbols;
   BLSLL_FOREACH(sym, syml) {
-    printf("Sym %s : %s\n", sym->name, chip_names[sym->value.chip]);
     if(sym->value.chip == chip_cart) {
       sym->value.chip = chip_ram;
-      printf(" Sym changed to %s\n", chip_names[sym->value.chip]);
     }
   }
 
@@ -939,10 +1007,8 @@ void bls_cart_to_ram()
 
   secl = sections;
   BLSLL_FOREACH(sec, secl) {
-    printf("Section Sym %s : %s\n", sec->symbol->name, chip_names[sec->symbol->value.chip]);
     if(sec->symbol->value.chip == chip_cart) {
       sec->symbol->value.chip = chip_ram;
-      printf(" Sym changed to %s\n", chip_names[sec->symbol->value.chip]);
     }
   }
 }
@@ -950,7 +1016,7 @@ void bls_cart_to_ram()
 void bls_map()
 {
   // Do logical section mapping
-  BLSLL(section) *secl = sections;
+  BLSLL(section) *secl = usedsections;
   section *sec;
   BLSLL_FOREACH(sec, secl) {
     if(sec->size < 0) {
@@ -975,7 +1041,7 @@ void bls_map()
     sec->symbol->value.addr = chipstart;
     printf("Section %s : size=%04X chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->size, (unsigned int)chipstart, (unsigned int)chipend);
     while(sec->symbol->value.addr + sec->size <= chipend) {
-      BLSLL(section) *sl = sections;
+      BLSLL(section) *sl = usedsections;
       section *s;
       BLSLL_FOREACH(s, sl) {
         if(s == sec || s->size == 0 || s->symbol->value.addr == -1) continue;
@@ -1013,7 +1079,7 @@ void bls_physmap_cart()
   sv chipend = MAXCARTSIZE - ROMHEADERSIZE;
 
   // Do logical section mapping
-  BLSLL(section) *secl = sections;
+  BLSLL(section) *secl = usedsections;
   section *sec;
   BLSLL_FOREACH(sec, secl) {
     if(sec->physsize == -1) {
@@ -1049,7 +1115,7 @@ void bls_physmap_cart()
     sec->physaddr = chipstart;
     printf("Section %s : size=%04X chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->physsize, (unsigned int)chipstart, (unsigned int)chipend);
     while(sec->physaddr + sec->physsize <= chipend) {
-      BLSLL(section) *sl = sections;
+      BLSLL(section) *sl = usedsections;
       section *s;
       BLSLL_FOREACH(s, sl) {
         if(s == sec || s->physsize == 0 || s->physaddr == -1) continue;
@@ -1194,24 +1260,6 @@ void bls_finalize_binary_dependencies()
       break;
     }
   }
-
-/*  // Remove useless sections
-  BLSLL(section) *secl = sections;
-  section *sec;
-  BLSLL(section) *usedsections = NULL;
-  BLSLL_FOREACH(sec, secl) {
-    if(!sec->source) continue;
-
-    grpl = mainout.bol;
-    BLSLL_FOREACH(grp, grpl) {
-      if(grp == sec->source) {
-        usedsections = blsll_insert_unique_section(usedsections, sec);
-        break;
-      }
-    }
-  }
-  blsll_free_section(sections);
-  sections = usedsections;*/
 }
 
 void bls_pack_binaries()
@@ -1533,9 +1581,10 @@ int main(int argc, char **argv)
 
 
   bls_get_symbols();
+  bls_finalize_binary_dependencies();
   bls_find_entry();
   bls_gen_bol();
-  bls_finalize_binary_dependencies();
+  bls_check_binary_load();
   if(mainout.target == target_ram) {
     bls_cart_to_ram();
   }

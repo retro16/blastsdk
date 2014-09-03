@@ -18,6 +18,7 @@ void load_level(int l)
 void loader_main()
 {
   BLS_LOAD_BINARY_COMMON_C();
+  BLS_LOAD_BINARY_A_ASM();
   common_level_init();
   load_level(1);
 }

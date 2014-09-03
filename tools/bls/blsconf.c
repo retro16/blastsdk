@@ -14,7 +14,9 @@ type * name ## _new() { \
 }
 GLOBLL(group, sources)
 GLOBLL(section, sections)
+GLOBLL(section, usedsections)
 GLOBLL(group, binaries)
+GLOBLL(group, usedbinaries)
 GLOBLL(output, outputs)
 GLOBLL(symbol, symbols)
 #undef GLOBLL

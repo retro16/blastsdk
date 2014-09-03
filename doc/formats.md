@@ -88,3 +88,36 @@ The provided boot loader will do the following :
  * Jump at address specified at 0000EA
 
 The process should be the same when loading from Sega CD or other loaders.
+
+
+Compression formats
+===================
+
+lz68k
+-----
+
+lz68k is a compression format inspired by LZ4, but modified for easier decompression on a m68k CPU. Input and output are byte streams.
+
+### lz68k format :
+
+  number: litteral count
+ n bytes: litterals
+  number: backcopy offset
+  number: backcopy count
+
+Number format is variable size : values <= 127 are on one byte, values between 128 and 32767 are on a word, with the most significant bit ignored (since it is always set)
+
+Stream ends when backcopy offset is 0.
+
+
+bits field
+   5 backcopy length (if > 30, all bits set and size is specified in 1 or 2 extra bytes)
+   3 litteral length (if > 6, 3 bits to 1 and followed by a 8 bits value)
+(o)1 Present only if backcopy length is > 0 : backcopy offset size flag (if set : 2 bytes, if clear : 1 byte)
+(o)7 MSB of backcopy offset
+(o)8 LSB of backcopy offset
+(o)8 If backcopy length == 31, this byte indicates backcopy length - 30
+(o)8 If litteral length == 7, this optional byte indicates litteral length
+   n litteral data
+
+If both backcopy length and litteral length are 0 : end of stream. The first strip must start with a backcopy length of 0.

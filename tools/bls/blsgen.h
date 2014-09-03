@@ -30,7 +30,9 @@
 
 extern BLSLL(group) *sources;
 extern BLSLL(section) *sections;
+extern BLSLL(section) *usedsections; // Sections included in final image
 extern BLSLL(group) *binaries;
+extern BLSLL(group) *usedbinaries; // Binaries included in final image
 extern BLSLL(output) *outputs;
 extern BLSLL(symbol) *symbols;
 
@@ -214,9 +216,12 @@ typedef struct output {
   char *region; // For SCD images, only one region is allowed
 
   char *file;
-  symbol *entry;
+  symbol *entry; // Entry point for genesis
+  group *entrybin; // Entry point binary for genesis
   section *ip;
+  group *ipbin; // Binary of IP
   section *sp;
+  group *spbin; // Binary of SP
   section *mainstack;
   section *substack;
 
