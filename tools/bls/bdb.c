@@ -668,7 +668,7 @@ int main(int argc, char **argv)
 
       char out[262144];
       int suspicious;
-      d68k(out, 262144, data, size, address, 1, &suspicious);
+      d68k(out, 262144, data, size, address, 1, 1, &suspicious);
       printf("%s\n", out);
 
       continue;

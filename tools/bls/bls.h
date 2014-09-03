@@ -328,7 +328,7 @@ extern void fix_genimage(); // Fix checksum and ROM size fields in the header an
 
 ////// d68k.c : m68k disassembler
 
-extern int d68k(char *target, int tsize, const u8 *code, int size, sv_t address, int labels, int *suspicious);
+extern int d68k(char *target, int tsize, const u8 *code, int size, sv_t address, int labels, int showcycles, int *suspicious);
 extern const char * d68k_error(int r);
 
 
