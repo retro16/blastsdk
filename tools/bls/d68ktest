@@ -1,243 +1,245 @@
 #!/bin/bash
 
 cat > test1.asm <<'EOF'
-	ADDX.B	D1, D2
-	ADDX.W	-(A2), -(A4)
-	ABCD	D3, D2
-	ABCD	-(A1), -(A1)
-	ADD.B	(A3), D1
-	ADD.W	3(A2,D0.L), D4
-	ADD.L	(A2)+, D2
-	ADD.B	D0, $000024.W
-	ADD.W	D0, $000028.L
-	ADD.L	D0, (A1)
-	ADDA.W	2(A1,D2.L), A2
-	ADDA.L	$000002.L, A1
-	ADDI.B	#3, D1
-	ADDI.W	#-2, 2(A1)
-	ADDI.L	#1, D7
-	ADDQ.B	#2, D1
-	ADDQ.W	#4, D2
-	ADDQ.L	#1, $000004.W
-	AND.B	(A2)+, D3
-	AND.W	4(A3), D4
-	AND.L	(A1), D5
-	AND.B	D6, 6(A2,D6.L)
-	AND.W	D7, D7
-	AND.L	D4, -(A7)
-	ANDI	#$12, CCR
-	ANDI.B	#$23, D1
-	ANDI.W	#$33A1, (A2)+
-	ANDI.L	#$AA211121, -(A1)
-	ASL.B	#1, D0
-	ASL.B	D1, D2
-	ASL.W	#8, D3
-	ASL.W	D4, D5
-	ASL.L	#7, D6
-	ASL.L	D0, D7
-	ASR.B	#1, D0
-	ASR.B	D1, D2
-	ASR.W	#8, D3
-	ASR.W	D4, D5
-	ASR.L	#7, D6
-	ASR.L	D0, D7
-	BRA.W	$FF0000
-	BRA.B	$FF0040
-	BSR.W	$FF0200
-	BSR.B	$FF0080
-	BHI.W	$FF0080
-	BHI.B	$FF0080
-	BLS.W	$FF1000
-	BLS.B	$FF0100
-	BCC.W	$FF0100
-	BCC.B	$FF0100
-	BCS.W	$FF0100
-	BCS.B	$FF0100
-	BNE.W	$FF0100
-	BNE.B	$FF0100
-	BEQ.W	$FF0100
-	BEQ.B	$FF0100
-	BVC.W	$FF0100
-	BVC.B	$FF0100
-	BVS.W	$FF0100
-	BVS.B	$FF0100
-	BPL.W	$FF0100
-	BPL.B	$FF0100
-	BMI.W	$FF0100
-	BMI.B	$FF0100
-	BGE.W	$FF0100
-	BGE.B	$FF0100
-	BLT.W	$FF0000
-	BLT.B	$FF0100
-	BGT.W	$FF0000
-	BGT.B	$FF0100
-	BLE.W	$FF0100
-	BLE.B	$FF0100
-	BCHG.L	D3, D1
-	BCHG.B	#2, (A3)
-	BCLR.L	D5, D4
-	BCLR.B	#4, (A1)
-	BSET.L	D1, D1
-	BSET.B	#2, $000010.W
-	BTST.L	D7, D0
-	BTST.B	#1, $433243.L
-	CHK.W	(A3), D1
-	CLR.B	3(A2)
-	CLR.W	D1
-	CLR.L	D1
-	CMP.B	(A1)+, D1
-	CMP.W	D1, D1
-	CMP.L	D2, D2
-	CMPA.W	D1, A1
-	CMPA.L	D1, A1
-	CMPI.B	#44, D1
-	CMPI.W	#33, (A1)
-	CMPI.L	#22, 4(A1,D2.L)
-	CMPM.B	(A1)+, (A2)+
-	CMPM.W	(A3)+, (A4)+
-	CMPM.L	(A5)+, (A6)+
-	DBRA	D3, $FF0140
-	DBHI	D0, $FF0150
-	DIVS	(A1), D2
-	DIVU	D3, D4
-	MULS	D1, D0
-	MULU	(A3)+, D2
-	EOR.B	D3, (A1)
-	EOR.W	D1, D2
-	EOR.L	D1, D2
-	EORI	#$2, CCR
-	EORI.B	#$12, (A3)
-	EORI.W	#$1214, D1
-	EORI.L	#$5512FFAE, -(A1)
-	EXG	D1, D2
-	EXG	A2, A4
-	EXG	D1, A2
-	EXT.W	D2
-	EXT.L	D2
-	ILLEGAL
-	JMP	(A1)
-	JMP	$002000.W
-	JMP	$FF00A1.L
-	JSR	$FF0000.L
-	PEA	4(A2,D1.L)
-	LEA	(A3), A1
-	LINK	A1, #3
-	LSR.B	#5, D1
-	LSR.B	D0, D1
-	LSR.W	#5, D1
-	LSR.W	D0, D1
-	LSR.L	#5, D1
-	LSR.L	D0, D1
-	LSL.B	#5, D1
-	LSL.B	D0, D1
-	LSL.W	#5, D1
-	LSL.W	D0, D1
-	LSL.L	#5, D1
-	LSL.L	D0, D1
-	MOVEA.W	(A1)+, A2
-	MOVEA.L	-(A3), A4
-	MOVE.B	(A1)+, (A2)+
-	MOVE.W	4(A3), 2(A4,D1.L)
-	MOVE.L	(A1), (A0)
-	MOVE.L	D2, $00FF00.L
-	MOVE.L	D1, $000000.W
-	MOVE	(A0)+, CCR
-	MOVE	SR, D0
-	MOVE	D1, SR
-	MOVEM.W	D0-D7/A0-A7, -(A7)
-	MOVEM.L	D0-D2/D4-D7/A0/A3/A6, -(A7)
-	MOVEM.W	$000000.W, D1/D5/A3
-	MOVEM.L	$FF0000.L, A0-A7
-	MOVEM.W	(A1)+, D3-D5
-	MOVEM.L	(A7)+, D4
-	MOVEM.W	D0-D7, $000000.W
-	MOVEM.L	A5-A6, $FF0000.L
-	MOVEP.W	(A0), D1
-	MOVEP.W	4(A0), D2
-	MOVEP.L	(A0), D1
-	MOVEP.W	D0, (A0)
-	MOVEP.L	D1, -4(A1)
-	NBCD	D1
-	NBCD	(A1)
-	NEG.B	(A1)+
-	NEG.W	D2
-	NEG.L	4(A1)
-	NEGX.B	(A1)+
-	NEGX.W	D2
-	NEGX.L	4(A1)
-	NOP
-	OR.B	(A1), D2
-	OR.B	D1, (A2)
-	OR.W	(A1), D2
-	OR.W	D1, (A2)
-	OR.L	(A1), D2
-	OR.L	D1, (A2)
-	ORI	#$22, CCR
-	ORI.B	#$14, (A3)
-	ORI.W	#$4412, D1
-	ORI.L	#$AAEAFFAE, (A3)+
-	ROR.B	#8, D0
-	ROR.B	D2, D1
-	ROR.W	#5, D1
-	ROR.W	D2, D1
-	ROR.L	#5, D1
-	ROR.L	D2, D1
-	ROL.B	#5, D1
-	ROL.B	D2, D1
-	ROL.W	#5, D1
-	ROL.W	D2, D1
-	ROL.L	#5, D1
-	ROL.L	D2, D1
-	ROXR.B	#5, D1
-	ROXR.B	D2, D1
-	ROXR.W	#5, D1
-	ROXR.W	D2, D1
-	ROXR.L	#5, D1
-	ROXR.L	D2, D1
-	ROXL.B	#5, D1
-	ROXL.B	D2, D1
-	ROXL.W	#5, D1
-	ROXL.W	D2, D1
-	ROXL.L	#5, D1
-	ROXL.L	D2, D1
-	RESET
-	RTE
-	RTR
-	RTS
-	SEQ	(A1)
-	SNE	D2
-	SHI	3(A2)
-	STOP	#$FF00
-	SUBX.B	D1, D2
-	SUBX.B	-(A1), -(A2)
-	SUBX.W	D1, D2
-	SUBX.W	-(A1), -(A2)
-	SUBX.L	D1, D2
-	SUBX.L	-(A1), -(A2)
-	SBCD	D1, D2
-	SBCD	-(A1), -(A2)
-	SUB.B	(A1), D1
-	SUB.B	D1, (A1)
-	SUB.W	(A1), D1
-	SUB.W	D1, (A1)
-	SUB.L	(A1), D1
-	SUB.L	D1, (A1)
-	SUBA.W	D1, A2
-	SUBA.L	D1, A1
-	SUBI.B	#5, D0
-	SUBI.W	#1, (A1)
-	SUBI.L	#1, (A6)
-	SUBQ.B	#2, D1
-	SUBQ.W	#6, (A3)
-	SUBQ.L	#4, (A2)+
-	SWAP	D1
-	TAS	(A2)
-	TRAP	#2
-	TRAPV
-	TST.B	(A1)
-	TST.W	D1
-	TST.L	-(A7)
-	UNLK	A6
+        ADDX.B  D1, D2
+        ADDX.W  -(A2), -(A4)
+        SUBX.L  D1, D2
+        SUBX.L  -(A4), -(A7)
+        ABCD    D3, D2
+        ABCD    -(A1), -(A1)
+        ADD.B   (A3), D1
+        ADD.W   3(A2,D0.L), D4
+        ADD.L   (A2)+, D2
+        ADD.B   D0, $000024.W
+        ADD.W   D0, $000028.L
+        ADD.L   D0, (A1)
+        ADDA.W  2(A1,D2.L), A2
+        ADDA.L  $000002.L, A1
+        ADDI.B  #3, D1
+        ADDI.W  #-2, 2(A1)
+        ADDI.L  #1, D7
+        ADDQ.B  #2, D1
+        ADDQ.W  #4, D2
+        ADDQ.L  #1, $000004.W
+        AND.B   (A2)+, D3
+        AND.W   4(A3), D4
+        AND.L   (A1), D5
+        AND.B   D6, 6(A2,D6.L)
+        AND.W   D7, D7
+        AND.L   D4, -(A7)
+        ANDI    #$12, CCR
+        ANDI.B  #$23, D1
+        ANDI.W  #$33A1, (A2)+
+        ANDI.L  #$AA211121, -(A1)
+        ASL.B   #1, D0
+        ASL.B   D1, D2
+        ASL.W   #8, D3
+        ASL.W   D4, D5
+        ASL.L   #7, D6
+        ASL.L   D0, D7
+        ASR.B   #1, D0
+        ASR.B   D1, D2
+        ASR.W   #8, D3
+        ASR.W   D4, D5
+        ASR.L   #7, D6
+        ASR.L   D0, D7
+        BRA.W   $FF0000
+        BRA.B   $FF0040
+        BSR.W   $FF0200
+        BSR.B   $FF0080
+        BHI.W   $FF0080
+        BHI.B   $FF0080
+        BLS.W   $FF1000
+        BLS.B   $FF0100
+        BCC.W   $FF0100
+        BCC.B   $FF0100
+        BCS.W   $FF0100
+        BCS.B   $FF0100
+        BNE.W   $FF0100
+        BNE.B   $FF0100
+        BEQ.W   $FF0100
+        BEQ.B   $FF0100
+        BVC.W   $FF0100
+        BVC.B   $FF0100
+        BVS.W   $FF0100
+        BVS.B   $FF0100
+        BPL.W   $FF0100
+        BPL.B   $FF0100
+        BMI.W   $FF0100
+        BMI.B   $FF0100
+        BGE.W   $FF0100
+        BGE.B   $FF0100
+        BLT.W   $FF0000
+        BLT.B   $FF0100
+        BGT.W   $FF0000
+        BGT.B   $FF0100
+        BLE.W   $FF0100
+        BLE.B   $FF0100
+        BCHG.L  D3, D1
+        BCHG.B  #2, (A3)
+        BCLR.L  D5, D4
+        BCLR.B  #4, (A1)
+        BSET.L  D1, D1
+        BSET.B  #2, $000010.W
+        BTST.L  D7, D0
+        BTST.B  #1, $433243.L
+        CHK.W   (A3), D1
+        CLR.B   3(A2)
+        CLR.W   D1
+        CLR.L   D1
+        CMP.B   (A1)+, D1
+        CMP.W   D1, D1
+        CMP.L   D2, D2
+        CMPA.W  D1, A1
+        CMPA.L  D1, A1
+        CMPI.B  #44, D1
+        CMPI.W  #33, (A1)
+        CMPI.L  #22, 4(A1,D2.L)
+        CMPM.B  (A1)+, (A2)+
+        CMPM.W  (A3)+, (A4)+
+        CMPM.L  (A5)+, (A6)+
+        DBRA    D3, $FF0140
+        DBHI    D0, $FF0150
+        DIVS    (A1), D2
+        DIVU    D3, D4
+        MULS    D1, D0
+        MULU    (A3)+, D2
+        EOR.B   D3, (A1)
+        EOR.W   D1, D2
+        EOR.L   D1, D2
+        EORI    #$2, CCR
+        EORI.B  #$12, (A3)
+        EORI.W  #$1214, D1
+        EORI.L  #$5512FFAE, -(A1)
+        EXG     D1, D2
+        EXG     A2, A4
+        EXG     D1, A2
+        EXT.W   D2
+        EXT.L   D2
+        ILLEGAL
+        JMP     (A1)
+        JMP     $002000.W
+        JMP     $FF00A1.L
+        JSR     $FF0000.L
+        PEA     4(A2,D1.L)
+        LEA     (A3), A1
+        LINK    A1, #3
+        LSR.B   #5, D1
+        LSR.B   D0, D1
+        LSR.W   #5, D1
+        LSR.W   D0, D1
+        LSR.L   #5, D1
+        LSR.L   D0, D1
+        LSL.B   #5, D1
+        LSL.B   D0, D1
+        LSL.W   #5, D1
+        LSL.W   D0, D1
+        LSL.L   #5, D1
+        LSL.L   D0, D1
+        MOVEA.W (A1)+, A2
+        MOVEA.L -(A3), A4
+        MOVE.B  (A1)+, (A2)+
+        MOVE.W  4(A3), 2(A4,D1.L)
+        MOVE.L  (A1), (A0)
+        MOVE.L  D2, $00FF00.L
+        MOVE.L  D1, $000000.W
+        MOVE    (A0)+, CCR
+        MOVE    SR, D0
+        MOVE    D1, SR
+        MOVEM.W D0-D7/A0-A7, -(A7)
+        MOVEM.L D0-D2/D4-D7/A0/A3/A6, -(A7)
+        MOVEM.W $000000.W, D1/D5/A3
+        MOVEM.L $FF0000.L, A0-A7
+        MOVEM.W (A1)+, D3-D5
+        MOVEM.L (A7)+, D4
+        MOVEM.W D0-D7, $000000.W
+        MOVEM.L A5-A6, $FF0000.L
+        MOVEP.W (A0), D1
+        MOVEP.W 4(A0), D2
+        MOVEP.L (A0), D1
+        MOVEP.W D0, (A0)
+        MOVEP.L D1, -4(A1)
+        NBCD    D1
+        NBCD    (A1)
+        NEG.B   (A1)+
+        NEG.W   D2
+        NEG.L   4(A1)
+        NEGX.B  (A1)+
+        NEGX.W  D2
+        NEGX.L  4(A1)
+        NOP
+        OR.B    (A1), D2
+        OR.B    D1, (A2)
+        OR.W    (A1), D2
+        OR.W    D1, (A2)
+        OR.L    (A1), D2
+        OR.L    D1, (A2)
+        ORI     #$22, CCR
+        ORI.B   #$14, (A3)
+        ORI.W   #$4412, D1
+        ORI.L   #$AAEAFFAE, (A3)+
+        ROR.B   #8, D0
+        ROR.B   D2, D1
+        ROR.W   #5, D1
+        ROR.W   D2, D1
+        ROR.L   #5, D1
+        ROR.L   D2, D1
+        ROL.B   #5, D1
+        ROL.B   D2, D1
+        ROL.W   #5, D1
+        ROL.W   D2, D1
+        ROL.L   #5, D1
+        ROL.L   D2, D1
+        ROXR.B  #5, D1
+        ROXR.B  D2, D1
+        ROXR.W  #5, D1
+        ROXR.W  D2, D1
+        ROXR.L  #5, D1
+        ROXR.L  D2, D1
+        ROXL.B  #5, D1
+        ROXL.B  D2, D1
+        ROXL.W  #5, D1
+        ROXL.W  D2, D1
+        ROXL.L  #5, D1
+        ROXL.L  D2, D1
+        RESET
+        RTE
+        RTR
+        RTS
+        SEQ     (A1)
+        SNE     D2
+        SHI     3(A2)
+        STOP    #$FF00
+        SUBX.B  D1, D2
+        SUBX.B  -(A1), -(A2)
+        SUBX.W  D1, D2
+        SUBX.W  -(A1), -(A2)
+        SUBX.L  D1, D2
+        SUBX.L  -(A1), -(A2)
+        SBCD    D1, D2
+        SBCD    -(A1), -(A2)
+        SUB.B   (A1), D1
+        SUB.B   D1, (A1)
+        SUB.W   (A1), D1
+        SUB.W   D1, (A1)
+        SUB.L   (A1), D1
+        SUB.L   D1, (A1)
+        SUBA.W  D1, A2
+        SUBA.L  D1, A1
+        SUBI.B  #5, D0
+        SUBI.W  #1, (A1)
+        SUBI.L  #1, (A6)
+        SUBQ.B  #2, D1
+        SUBQ.W  #6, (A3)
+        SUBQ.L  #4, (A2)+
+        SWAP    D1
+        TAS     (A2)
+        TRAP    #2
+        TRAPV
+        TST.B   (A1)
+        TST.W   D1
+        TST.L   -(A7)
+        UNLK    A6
 EOF
 
 asmx -C 68k -b 0xFF0000 -l test1.lst -o test1.bin test1.asm &>/dev/null
@@ -248,6 +250,6 @@ asmx -C 68k -b 0xFF0000 -l test2.lst -o test2.bin test2.asm
 
 # Compare listings
 if ! diff -u test1.lst test2.lst; then
-	echo 'Listing differ : test failed'
-	exit 1
+        echo 'Listing differ : test failed'
+        exit 1
 fi
