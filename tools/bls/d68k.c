@@ -5,13 +5,20 @@
 #include <unistd.h>
 #include "bls.h"
 
+void help()
+{
+  fprintf(stderr, "Usage: d68k [-acl] FILE ADDRESS [SYMFILE]\nDisassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n    -a assemble FILE before disassembling\n    -c shows cycles for each instruction.\n    -l shows labels.\n");
+  exit(1);
+}
+
 int main(int argc, char **argv)
 {
   int cycles = 0;
   int labels = 0;
+  int assemble = 0;
 
   int c;  
-  while((c = getopt (argc, argv, "cl")) != -1)
+  while((c = getopt (argc, argv, "acl")) != -1)
   {
     switch(c)
     {
@@ -22,17 +29,20 @@ int main(int argc, char **argv)
       case 'l':
       labels = 1;
       break;
+
+      case 'a':
+      assemble = 1;
+      break;
       
       default:
-      fprintf(stderr, "Usage: d68k [-cl] FILE ADDRESS [SYMFILE]\nDisassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n   -c shows cycles for each instruction.\n   -l shows labels.\n");
-      return 1;
+      help();
+      break;
     }
   }
   
   if(argc < optind + 2 || argc > optind + 3)
   {
-    fprintf(stderr, "Usage: d68k [-cl] FILE ADDRESS [SYMFILE]\nDisassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n   -c shows cycles for each instruction.\n   -l shows labels.\n");
-    return 1;
+    help();
   }
 
   if(argc == optind + 3)
@@ -45,8 +55,26 @@ int main(int argc, char **argv)
     labels = 1;
   }
 
+  char infilename[4096];
+  strcpy(infilename, argv[optind + 0]);
+
+  if(assemble)
+  {
+    snprintf(infilename, 4096, "%s.tmp", argv[optind + 0]);
+    char cmdline[4096];
+    snprintf(cmdline, 4096, "asmx -b 0x100000 -o %s -C 68000 %s", infilename, argv[optind + 0]);
+    printf("Assembling : %s\n", cmdline);
+    system(cmdline);
+  }
+
   u8 *data;
-  int size = readfile(argv[optind + 0], &data);
+  int size = readfile(infilename, &data);
+
+  if(assemble)
+  {
+    unlink(infilename);
+  }
+
   const char *addrptr = argv[optind + 1];
   u32 address = parse_int(&addrptr, 10);
 
