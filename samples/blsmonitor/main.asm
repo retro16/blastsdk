@@ -1,0 +1,8 @@
+		include bls.inc
+		include bda.inc
+MAIN
+		VDPSECURITY			; Unlock TMSS
+		bsr.b	monitor_init		; Initialize monitor
+		move.w	#$2000, sr		; Enable interrupts
+.1		bra.b	.1			; Monitor logic is in the vblank interrupt
+
