@@ -16,6 +16,7 @@ VDPSETADDRREG	macro	; Use a4 / a5 and set them
 
 ; Security code for genesis boot
 VDPSECURITY	macro
+        if TARGET == TARGET_GEN
 		move.b	d0, -(a7)
 		move.b	$A10001, d0
 		andi.b	#$0F, d0
@@ -23,6 +24,7 @@ VDPSECURITY	macro
 		move.l	$100.l, $A14000
 oldgen\?
 		move.b	(a7)+, d0
+        endif
 		endm
 
 		if ..UNDEF PLANE_A
@@ -263,15 +265,15 @@ VDPDMAFILL	macro	data, tgt, sz, ram	; Fill sz words to vram address tgt using da
 		; Set DMA fill mode
 		VDPSETREG 23, $80
 
-		if _VFPREG
+		if _VDPREG
 		; Set destination address
 		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a5)
 		; Set data word and start DMA
-		move.w	data, VDPDATA
+		move.w	data, (a4)
 
 		else
 		; Set destination address
-		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a4)
+		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), VDPCTRL
 		; Set data word and start DMA
 		move.w	data, VDPDATA
 		endif

@@ -187,7 +187,7 @@ void gen_setvector(u32 v, u32 value)
     readmem((u8*)romid, 0x120, 16);
     if(strstr(romid, "BOOT ROM"))
     {
-      // Sega CD detected : write the vector at the special address
+      printf("Sega CD detected : write the HBLANK vector at the special address\n");
       if((value & 0x00FF0000) != 0x00FF0000)
       {
         printf("Warning : cannot set HBLANK outside main RAM for Sega CD.\n");
@@ -206,6 +206,7 @@ void gen_setvector(u32 v, u32 value)
     return;
   }
 
+  printf("Set interrupt vector code %02X at %06X, jumping to %06X\n", v, wrapper, value);
   writeword(wrapper, 0x4EF9); // Write jmp instruction
   writelong(wrapper + 2, value); // Write target address
 }
@@ -240,7 +241,7 @@ void boot_vcart(u8 *image, int imgsize)
   writeword(0xA12002, 1 << 6);
 
   // Upload PRAM program
-  sendmem(0x020000, image + 0x020000, 0x020000);
+  sendmem(0x020000, image + 0x020000, imgsize - 0x020000);
 
   // Set SR, SP and PC
   writelong(REG_SP, sp);
@@ -254,7 +255,7 @@ void boot_ram(u8 *image, int imgsize)
 {
   if(imgsize != 0xFF00)
   {
-    printf("Invalid RAM image : image size is not 0xFF00\n");
+    printf("Incorrect image size (must be 0xFF00)\n");
     return;
   }
 
@@ -265,18 +266,19 @@ void boot_ram(u8 *image, int imgsize)
   for(v = 0x08; v < 0xC0; v += 4)
   {
     u32 value = getint(image + v, 4);
-    if(v != pc && v >= 0x200)
+    if(value != pc && value >= 0x200)
     {
       if(v == 0x68)
       {
-        printf("Warning : erasing BDA interrupt\n");
+        printf("Warning : Prevented erasing BDA interrupt\n");
+        continue;
       }
       gen_setvector(v, value);
     }
   }
 
   // Upload RAM program
-  sendmem(0xFF0000, image + 0x200, 0xFD00);
+  sendmem(0xFF0000, image + 0x200, imgsize - 0x200);
 
   // Set SR, SP and PC
   writelong(REG_SP, sp);

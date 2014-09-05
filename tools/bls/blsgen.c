@@ -1424,6 +1424,33 @@ void bls_build_cart_image()
     fclose(i);
   }
 
+  if(mainout.target == target_ram)
+  {
+    fseek(f, 0, SEEK_END);
+    sv sz = ftell(f);
+    if(sz < 0xFF00)
+    {
+      sv i;
+      for(i = sz; i < 0xFF00; ++i)
+      {
+        fputc('\xFF', f);
+      }
+    }
+  }
+  else if(mainout.target == target_vcart)
+  {
+    fseek(f, 0, SEEK_END);
+    sv sz = ftell(f);
+    if(sz < 0x040000)
+    {
+      sv i;
+      for(i = sz; i < 0x040000; ++i)
+      {
+        fputc('\xFF', f);
+      }
+    }
+  }
+
   const char *ramloader =
     // Unlock TMSS
     "\x10\x39\x00\xA1\x00\x01"
@@ -1434,7 +1461,7 @@ void bls_build_cart_image()
     // Copy program to RAM
     "\x41\xF8\x02\x00"
     "\x43\xF9\x00\xFF\x00\x00"
-    "\x30\x38\x3F\x3F"
+    "\x30\x3C\x3F\x3F"
     "\x22\xD8"
     "\x51\xC8\xFF\xFC"
 
