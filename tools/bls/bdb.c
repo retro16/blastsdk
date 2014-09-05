@@ -175,13 +175,26 @@ void boot_sp(u8 *image, int imgsize)
   printf("New SP code running.\n");
 }
 
-void vcart_setvector(u8 *image, u32 v, u32 pc)
+// v is the vector offset (0x08-0xBC)
+// value is the target of the vector
+void gen_setvector(u32 v, u32 value)
 {
-  u32 target = getint(image + v, 4) & 0x00FFFFFF;
-  if(target == pc || target < 0x100)
+  if(v == 0x70)
   {
-    // Vector is not set
-    return;
+    // LEVEL4/HBLANK interrupt
+    char romid[17];
+    romid[16] = '\0';
+    readmem((u8*)romid, 0x120, 16);
+    if(strstr(romid, "BOOT ROM"))
+    {
+      // Sega CD detected : write the vector at the special address
+      if((value & 0x00FF0000) != 0x00FF0000)
+      {
+        printf("Warning : cannot set HBLANK outside main RAM for Sega CD.\n");
+      }
+      writelong(0xA12006, value & 0xFFFF);
+      return;
+    }
   }
 
   // Fetch wrapper from genesis
@@ -194,29 +207,78 @@ void vcart_setvector(u8 *image, u32 v, u32 pc)
   }
 
   writeword(wrapper, 0x4EF9); // Write jmp instruction
-  writelong(wrapper + 2, target); // Write target address
+  writelong(wrapper + 2, value); // Write target address
 }
 
 void boot_vcart(u8 *image, int imgsize)
 {
-  (void)image;
-  (void)imgsize;
-
-  u32 imgstart = (u32)image[5] << 16;
-  printf("Uploading image %06X-%06X (%d bytes) ...\n", imgstart, (u32)(imgstart + imgsize - 1), imgsize);
-  sendmem(imgstart, image + ROMHEADERSIZE, imgsize - ROMHEADERSIZE);
-
-  u32 sp = getint(image, 4) & 0x00FFFFFF;
-  u32 pc = getint(image + 4, 4) & 0x00FFFFFF;
-
-  u32 v;
-  for(v = 0x08; v < 0x100; v += 4)
+  if(imgsize != 0x40000)
   {
-    vcart_setvector(image, v, pc);
+    printf("Invalid VCART image : image size is not 0x40000\n");
+    return;
   }
 
-  printf("Set main CPU registers.\n%06X PC=%08X\n%06X SP=%08X\n%06X SR=%04X\n", REG_PC, pc, REG_SP, sp, REG_SR, 0x2700);
+  u32 sp = getint(image, 4);
+  u32 pc = getint(image + 0xFC, 4);
 
+  u32 v;
+  for(v = 0x08; v < 0xC0; v += 4)
+  {
+    u32 value = getint(image + v, 4);
+    if(v != pc && v >= 0x200)
+    {
+      if(v == 0x68)
+      {
+        printf("Warning : setting agent interrupt\n");
+      }
+      gen_setvector(v, value);
+    }
+  }
+
+  // Set PRAM bank 1 accessible
+  writeword(0xA12000, 0x0003);
+  writeword(0xA12002, 1 << 6);
+
+  // Upload PRAM program
+  sendmem(0x020000, image + 0x020000, 0x020000);
+
+  // Set SR, SP and PC
+  writelong(REG_SP, sp);
+  writelong(REG_PC, pc);
+  writeword(REG_SR, 0x2700);
+
+  printf("Ready to boot.\n");
+}
+
+void boot_ram(u8 *image, int imgsize)
+{
+  if(imgsize != 0xFF00)
+  {
+    printf("Invalid RAM image : image size is not 0xFF00\n");
+    return;
+  }
+
+  u32 sp = getint(image, 4);
+  u32 pc = getint(image + 0xFC, 4);
+
+  u32 v;
+  for(v = 0x08; v < 0xC0; v += 4)
+  {
+    u32 value = getint(image + v, 4);
+    if(v != pc && v >= 0x200)
+    {
+      if(v == 0x68)
+      {
+        printf("Warning : erasing BDA interrupt\n");
+      }
+      gen_setvector(v, value);
+    }
+  }
+
+  // Upload RAM program
+  sendmem(0xFF0000, image + 0x200, 0xFD00);
+
+  // Set SR, SP and PC
   writelong(REG_SP, sp);
   writelong(REG_PC, pc);
   writeword(REG_SR, 0x2700);
@@ -246,8 +308,10 @@ void boot_img(const char *filename)
       boot_cd(image, imgsize);
       break;
     case 3:
-    case 4:
       boot_vcart(image, imgsize);
+      break;
+    case 4:
+      boot_ram(image, imgsize);
       break;
   }
   free(image);

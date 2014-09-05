@@ -158,7 +158,7 @@ struct instr m68k_instr[] =
   {"BSET.L", 0x01C0, 0xF1C0, op2_Dn, op1_EA, 4, 8},
   {"BSET.B", 0x08C0, 0xFFC0, ope_ims, op1_EA, 1, 4},
   {"BTST.L", 0x0100, 0xF1C0, op2_Dn, op1_EA, 4, 6},
-  {"BTST.B", 0x0800, 0xFFC0, ope_ims, op1_EA, 1, 0},
+  {"BTST.B", 0x0800, 0xFFC0, ope_ims, op1_EA, 1, 4},
   
   {"CHK.W", 0x4180, 0xF1C0, op1_EA, op2_Dn, 2, 10},
 

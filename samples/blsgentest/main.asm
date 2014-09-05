@@ -1,16 +1,15 @@
-		include bls.inc
-
 main
-		VDPSECURITY			; Unlock TMSS
-
-		jsr	interrupt_asm
-
+		if TARGET == TARGET_GEN
+		VDPSECURITY
+		endif
+		
 		; Use a5 and a6 registers for VDP address
 		VDPSETADDRREG			; Use a5/a6 for VDP macros
 
 		VDPSETALLREGS reg_init_vdp	; Load reg_init_vdp to VDP registers
-		VDPDMASEND FONT_PNG_ROM, FONT_PNG, FONT_PNG_SIZE/2, VRAM ; Upload font tiles
-		VDPSETPALETTE FONT_PNG_PAL, 0	; Set palette 0 to egapalette.bin
+		VDPDMASEND FONT_PNG_IMG, 0, FONT_PNG_IMG_SIZE/2, VRAM ; Upload font tiles
+; 		VDPSETPALETTE FONT_PNG_PAL, 0	; Set palette 0 to egapalette.bin
+		BLS_LOAD_BINARY_MAIN
 
 		move.b	#CSEL, CCTRL1		; Setup select line on controller
 

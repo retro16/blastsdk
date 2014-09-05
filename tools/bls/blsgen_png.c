@@ -51,15 +51,15 @@ void section_create_png(group *source, const mdconfnode *mdconf)
   section *s;
 
   // Generate the .img section
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".img")));
+  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".img")));
   s->source = source;
 
   // Generate the .pal section
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".pal")));
+  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".pal")));
   s->source = source;
 
   // Generate the .map section
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".map")));
+  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".map")));
   s->source = source;
   s->align = 0x2000;
 

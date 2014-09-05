@@ -34,8 +34,8 @@ PLANE_B		set	$E000
 		if .. UNDEF SPRAT
 SPRAT		set	$BC00
 		endif
-		if .. UNDEF HSCROLL
-HSCROLL		set	$B800
+		if .. UNDEF HSCROLL_TABLE
+HSCROLL_TABLE		set	$B800
 		endif
 
 VDPR00		set	$04		; VDP register #00
@@ -71,7 +71,7 @@ VDPILACE	set	$02		; Interlace mode
 VDPILACEDBL	set	$06		; Interlace mode (double resolution)
 
 
-VDPR13		set	(HSCROLL >> 10 & $3F)	; VDP register #13 - hscroll table
+VDPR13		set	(HSCROLL_TABLE >> 10 & $3F)	; VDP register #13 - hscroll table
 VDPR14		set	$00		; VDP register #14
 VDPR15		set	$00		; VDP register #15 : autoincrement
 
@@ -139,6 +139,7 @@ VDPSETAUTOINCR	macro	s		; Set VDP auto increment by writing to register 15
 
 VDPPREPAUTOINCR	macro	s
 		VDPPREPREG 15, s
+        endm
 
 VRAM		equ	$00000000
 CRAM		equ	$80000000
@@ -303,7 +304,7 @@ VDPSETBG	macro	color
 		endm
 
 VDPSETWRITEHSCROLL	macro	line		; Place VDP write address in hscroll table
-		VDPSETWRITE (line * 4 + HSCROLL), VRAM
+		VDPSETWRITE (line * 4 + HSCROLL_TABLE), VRAM
 		endm
 
 VDPSETWRITEVSCROLL	macro	column		; Place VDP write address in vscroll table

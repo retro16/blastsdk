@@ -93,7 +93,7 @@ The process should be the same when loading from Sega CD or other loaders.
 Compression formats
 ===================
 
-lz68k
+lz68k (not finalized)
 -----
 
 lz68k is a compression format inspired by LZ4, but modified for easier decompression on a m68k CPU. Input and output are byte streams.

@@ -1,4 +1,6 @@
-		if SCD == 0
+		include bls.inc
+
+        if SCD == 0
 g_int_buserr	move.w	#$0008, -(a7)
 		bra.w	beh_display_exception
 		endif

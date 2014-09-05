@@ -1,5 +1,9 @@
 ; Main include for Blast ! SDK
 
+            if ..DEF BLS_VERSION
+            else
+BLS_VERSION set 1
+
 ; Bus constants
 BUS_NONE	equ	0
 BUS_MAIN	equ	1
@@ -19,6 +23,12 @@ CHIP_RAM	equ	8
 CHIP_PRAM	equ	9
 CHIP_WRAM	equ	10
 CHIP_PCM	equ	11
+
+; Target constants
+TARGET_GEN  equ 0
+TARGET_SCD  equ 1
+TARGET_VCART equ 2
+TARGET_RAM  equ 3
 
 ; Controllers
 ; Mapping :
@@ -114,3 +124,5 @@ PSG		equ	$C00011
 		if SCD != 0
 		include	blsscd.inc
 		endif
+
+        endif

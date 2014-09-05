@@ -311,10 +311,25 @@ static sv hw_chip_start(chip chip, bus bus, int bank)
   return -1;
 }
 */
+
+sv physoffset()
+{
+  if(mainout.target == target_ram)
+  {
+    return 0xFF0000;
+  }
+
+  return 0;
+}
+
 sv chip_start(chip chip)
 {
-  if(chip == chip_cart && mainout.target != target_vcart && mainout.target != target_ram)
+  if(chip == chip_cart)
   {
+    if(mainout.target == target_vcart)
+    {
+      return 0x020000;
+    }
     return ROMHEADERSIZE;
   }
   else if(chip == chip_vram)
@@ -341,9 +356,9 @@ sv chip_size(chip chip)
       return -1;
     case chip_cart:
       if(mainout.target == target_vcart) {
-        return chip_size(chip_pram);
+        return 0x020000;
       } else if(mainout.target == target_ram) {
-        return chip_size(chip_ram);
+        return 0xFD00;
       }
       return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
     case chip_zstack:
@@ -355,9 +370,6 @@ sv chip_size(chip chip)
       return 0x80;
     case chip_mstack:
     case chip_ram:
-      if(mainout.target == target_ram) {
-        return 0xFD00;
-      }
       if(mainout.target != target_gen) {
         return 0xFD00; // Avoid allocating over exception vectors
       }
@@ -569,15 +581,45 @@ sv tilemap_addr8(sv addr, sv width)
   return (tyi * 32 * tw) + txi * 32      + tyo * 4             + txo / 2;
 }
 
-busaddr phys2bus(sv physaddr, bus target)
+chipaddr phys2chip(sv physaddr)
 {
-  busaddr ba = {bus_none, -1, -1};
-  if(mainout.target != target_scd)
+  switch(mainout.target)
   {
-    ba.bus = target;
-    chipaddr ca = {chip_cart, physaddr};
-    ba = chip2bus(ca, target);
-  }
+    case target_gen:
+    case target_vcart:
+      {
+        chipaddr ca = {chip_cart, physaddr};
+        return ca;
+      }
 
-  return ba;
+    case target_ram:
+      {
+        chipaddr ca = {chip_ram, physaddr - ROMHEADERSIZE};
+        return ca;
+      }
+
+    default:
+      {
+        chipaddr ca = {chip_none, -1};
+        return ca;
+      }
+  }
+}
+
+busaddr phys2bus(sv physaddr, bus bus)
+{
+  return chip2bus(phys2chip(physaddr), bus);
+}
+
+sv chip2phys(chipaddr ca)
+{
+  switch(mainout.target)
+  {
+    case target_ram:
+      if(ca.chip == chip_ram || ca.chip == chip_cart)
+        return ca.addr + ROMHEADERSIZE;
+    default:
+      break;
+  }
+  return ca.addr;
 }

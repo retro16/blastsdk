@@ -1,7 +1,7 @@
-hscroll
-hscroll_a	dw	0
-hscroll_b	dw	0
+HSCROLL
+HSCROLL_A	dw	0
+HSCROLL_B	dw	0
 
-vscroll
-vscroll_a	dw	0
-vscroll_b	dw	0
+VSCROLL
+VSCROLL_A	dw	0
+VSCROLL_B	dw	0

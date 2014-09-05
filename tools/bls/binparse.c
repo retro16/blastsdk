@@ -1,12 +1,14 @@
 #include "bls.h"
 
 // Returns the type of the image
+// Needs at least 0x200 bytes
+//
 // 0 = invalid
 // 1 = genesis
-// 2 = CD
-// 3 = SCD WRAM program
-// 4 = Genesis RAM program
-// 5 = SCD PRAM program
+// 2 = SCD ISO
+// 3 = Virtual cart
+// 4 = RAM program
+//
 int getimgtype(const u8 *img, int size)
 {
   if(size < 0x200)
@@ -17,22 +19,17 @@ int getimgtype(const u8 *img, int size)
   {
     return 2;
   }
-  if(strncmp((const char *)img + 0x100, "SEGA", 4) == 0)
-  {
-    // Cart image
-    return 1;
-  }
-  if(strncmp((const char *)img + 0x100, "WRAM", 4) == 0)
+  if(strncmp((const char *)img + 0x100, "SEGA VIRTUALCART", 16) == 0)
   {
     return 3;
   }
-  if(strncmp((const char *)img + 0x100, "MRAM", 4) == 0)
+  if(strncmp((const char *)img + 0x100, "SEGA RAM PROGRAM", 16) == 0)
   {
     return 4;
   }
-  if(strncmp((const char *)img + 0x100, "PRAM", 4) == 0)
+  if(strncmp((const char *)img + 0x100, "SEGA", 4) == 0)
   {
-    return 5;
+    return 1;
   }
 
   return 0;

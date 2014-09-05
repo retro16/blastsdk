@@ -55,6 +55,9 @@ int main(int argc, char **argv)
     labels = 1;
   }
 
+  const char *addrptr = argv[optind + 1];
+  u32 address = parse_int(&addrptr, 10);
+
   char infilename[4096];
   strcpy(infilename, argv[optind + 0]);
 
@@ -62,8 +65,7 @@ int main(int argc, char **argv)
   {
     snprintf(infilename, 4096, "%s.tmp", argv[optind + 0]);
     char cmdline[4096];
-    snprintf(cmdline, 4096, "asmx -b 0x100000 -o %s -C 68000 %s", infilename, argv[optind + 0]);
-    printf("Assembling : %s\n", cmdline);
+    snprintf(cmdline, 4096, "asmx -b 0x%08X -o %s -C 68000 %s > /dev/null 2>/dev/null", address, infilename, argv[optind + 0]);
     system(cmdline);
   }
 
@@ -74,9 +76,6 @@ int main(int argc, char **argv)
   {
     unlink(infilename);
   }
-
-  const char *addrptr = argv[optind + 1];
-  u32 address = parse_int(&addrptr, 10);
 
   char *dasm = malloc(size * 40);
 

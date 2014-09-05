@@ -469,7 +469,7 @@ symbol *symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, secti
     printf("Warning : symbol %s multiply defined (%s and %s at least).\n", symname, section->name, s->section->name);
   }
 
-  if(value.chip != chip_none && value.addr != -1) {
+  if(value.addr != -1) {
     s->value = value;
   }
 
@@ -945,6 +945,33 @@ void bls_get_symbols()
       break;
     }
   }
+
+  // Generate _SIZE, _PHYS and _PHYSSIZE symbols for sections
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    char s[1024];
+
+    chipaddr nullca;
+    nullca.chip = chip_none;
+    nullca.addr = 0;
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_SIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_PHYSSIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
+
+    if(mainout.target != target_scd)
+    {
+      nullca.chip = mainout.target == target_ram ? chip_ram : chip_cart;
+    }
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_PHYS");
+    symbol_set(&sec->intsym, s, nullca, sec);
+  }
 }
 
 void bls_get_symbol_values()
@@ -965,6 +992,27 @@ void bls_get_symbol_values()
       break;
     }
   }
+
+  // Update _SIZE symbols with approx values
+  BLSLL(section) *secl;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    char s[1024];
+
+    chipaddr nullca;
+    nullca.chip = chip_none;
+    nullca.addr = sec->size;
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_SIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
+
+    // Set _PHYSSIZE to the same size as _SIZE
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_PHYSSIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
+  }
+  
 }
 
 void bls_compile()
@@ -987,6 +1035,21 @@ void bls_compile()
     default:
       break;
     }
+  }
+
+  // Update _SIZE symbols with final values
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    char s[1024];
+
+    chipaddr nullca;
+    nullca.chip = chip_none;
+    nullca.addr = sec->size;
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_SIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
   }
 }
 
@@ -1075,8 +1138,8 @@ bls_map_next_section:
 
 void bls_physmap_cart()
 {
-  sv chipstart = ROMHEADERSIZE;
-  sv chipend = MAXCARTSIZE - ROMHEADERSIZE;
+  sv chipstart = chip_start(chip_cart);
+  sv chipend = chipstart + chip_size(chip_cart);
 
   // Do logical section mapping
   BLSLL(section) *secl = usedsections;
@@ -1091,12 +1154,12 @@ void bls_physmap_cart()
       sec->physaddr = -1;
       continue;
     }
-    if(sec->symbol->value.chip == chip_cart) {
+    if(sec->symbol->value.chip == chip_cart || (mainout.target == target_ram && sec->symbol->value.chip == chip_ram)) {
       // Section on cartridge are already mapped
-      sec->physaddr = sec->symbol->value.addr;
+      sec->physaddr = chip2phys(sec->symbol->value);
       if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
       {
-        printf("Error : Mapped physical address %06X out of range\n", (unsigned int)sec->physaddr);
+        printf("Error : Mapped physical address %06X out of range (%06X-%06X)\n", (unsigned int)sec->physaddr, (unsigned int)chipstart, (unsigned int)chipend);
         exit(1);
       }
       continue;
@@ -1105,7 +1168,7 @@ void bls_physmap_cart()
       // Section address already known
       if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
       {
-        printf("Error : Manually specified physical address %06X out of range\n", (unsigned int)sec->physaddr);
+        printf("Error : Manually specified physical address %06X out of range (%06X-%06X)\n", (unsigned int)sec->physaddr, (unsigned int)chipstart, (unsigned int)chipend);
         exit(1);
       }
       continue;
@@ -1125,7 +1188,7 @@ void bls_physmap_cart()
           sec->physaddr = align_value(s->physaddr + s->physsize, 2);
           if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
           {
-            printf("Error : Physical address %06X out of range\n", (unsigned int)sec->physaddr);
+            printf("Error : Physical address %06X out of range (%06X-%06X)\n", (unsigned int)sec->physaddr, (unsigned int)chipstart, (unsigned int)chipend);
             exit(1);
           }
           printf("%06X\n", (unsigned int)sec->physaddr);
@@ -1145,6 +1208,17 @@ bls_map_next_section_addr:
     }
 bls_map_next_section:
     continue;
+  }
+
+  secl = usedsections;
+  BLSLL_FOREACH(sec, secl) {
+    char s[1024];
+
+    chipaddr nullca = phys2chip(sec->physaddr);
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_PHYS");
+    symbol_set(&sec->intsym, s, nullca, sec);
   }
 }
 
@@ -1309,6 +1383,19 @@ void bls_pack_sections()
       }
     }
   }
+
+  // Update _PHYSSIZE symbols with final values
+  BLSLL_FOREACH(sec, secl) {
+    char s[1024];
+
+    chipaddr nullca;
+    nullca.chip = chip_none;
+    nullca.addr = sec->physsize;
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_PHYSSIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
+  }
 }
 
 void bls_build_cart_image()
@@ -1433,7 +1520,7 @@ void bls_build_cart_image()
   fseek(f, 0x000100, SEEK_SET);
   if(mainout.target == target_gen)
   {
-    if(mainout.region[0] == 'U')
+    if(mainout.region && mainout.region[0] == 'U')
     {
       fprintf(f, "SEGA GENESIS    ");
     }
@@ -1602,3 +1689,4 @@ int main(int argc, char **argv)
     bls_physmap_cd(); // Map physical CD
   }
 }
+

@@ -1,13 +1,5 @@
-		include	bls.inc
-
-	if PGMCHIP == CHIP_CART
-		bls_relocate inttable_asm
-	endif
-		bls_setvectors
-		rts
-
 		include	beh.inc
-
+		
 g_int_level6
 		btst	#BCUP, CDATA1		; Test up button
 		beq.b	go_up

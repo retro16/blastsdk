@@ -240,8 +240,15 @@ symbol * symbol_parse(const mdconfnode *md, const char *name) {
   } else if(!md) {
     return s;
   }
-  MDCONF_GET_INT(md, addr, s->value.addr);
-  MDCONF_GET_ENUM(md, chip, chip, s->value.chip);
+  if(s->value.addr == -1)
+  {
+    MDCONF_GET_INT(md, addr, s->value.addr);
+  }
+
+  if(s->value.chip == chip_none)
+  {
+    MDCONF_GET_ENUM(md, chip, chip, s->value.chip);
+  }
 
   return s;
 }
@@ -379,8 +386,25 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
   section *s;
   for(n = mdnode; (n = mdconfsearch(n, "provides")); n = n->next) {
     const char *name = n->value;
-    if((s = section_parse_nosrc(NULL, name))) {
+    char filename[4096];
+    if(findfile(filename, name))
+    {
+      // Matches an existing file : represents a source
+      explicitdeps = 1;
+      g = source_parse(NULL, name);
+      if(bin->bus != bus_none && g->bus == bus_none)
+      {
+        g->bus = bin->bus;
+        g->banks = bin->banks;
+      }
+      printf("Binary provides source %s\n", g->name);
+      bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
+      continue;
+    }
+    else if((s = section_parse_nosrc(NULL, name))) {
       // Represents a section name
+      explicitdeps = 1;
+      printf("Binary provides section %s\n", s->name);
       bin->provides = blsll_insert_section(bin->provides, s);
       continue;
     }
@@ -388,12 +412,14 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 
   for(n = mdnode; (n = mdconfsearch(n, "source")); n = n->next) {
     explicitdeps = 1;
+    const char *name = n->value;
     g = source_parse(NULL, name);
     if(bin->bus != bus_none && g->bus == bus_none)
     {
       g->bus = bin->bus;
       g->banks = bin->banks;
     }
+    printf("Binary provides explicit source %s\n", g->name);
     bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
   }
 
