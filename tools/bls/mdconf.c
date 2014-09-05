@@ -151,7 +151,7 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
     // Escaped value
     l = line + 2;
     char sep = *line;
-    while(*l && l[1] && *l != sep && l[1] != sep)
+    while(*l && l[1] && !(*l == sep && l[1] == sep))
     {
       ++l;
     }
