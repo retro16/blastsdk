@@ -76,15 +76,6 @@ chipaddr bus2chip(busaddr ba)
           return ca;
         }
       }
-      else if(mainout.target == target_vcart)
-      {
-        if(ba.addr >= 0x020000 && ba.addr < 0x040000)
-        {
-          ca.chip = chip_pram;
-          ca.addr = ba.addr - 0x020000;
-          return ca;
-        }
-      }
       break;
 
     case bus_z80:
@@ -147,15 +138,7 @@ busaddr chip2bus(chipaddr ca, bus bus)
       return ba;
     case chip_cart:
       if(ca.addr < 0 || ca.addr >= MAXCARTSIZE) break;
-      if(mainout.target == target_vcart)
-      {
-        if(ca.addr >= 0x020000)
-        {
-          break;
-        }
-        ca.addr += 0x020000;
-        ba.bank = 0;
-      } else if(mainout.target == target_ram)
+      if(mainout.target == target_ram)
       {
         if(ca.addr >= 0x00FD00)
         {
@@ -240,7 +223,6 @@ busaddr chip2bus(chipaddr ca, bus bus)
             case target_ram:
               break;
             case target_scd:
-            case target_vcart:
               ba.addr = 0x200000 + ca.addr;
               return ba;
           }
@@ -266,51 +248,6 @@ busaddr translate(busaddr busaddr, bus target)
 {
   return chip2bus(bus2chip(busaddr), target);
 }
-/*
-static sv hw_chip_start(chip chip, bus bus, int bank)
-{
-  switch(chip)
-  {
-    case chip_mstack:
-    case chip_sstack:
-    case chip_zstack:
-      break;
-
-    case chip_none:
-    case chip_max:
-      return -1;
-    case chip_cart:
-      if(bus == bus_z80 && bank > 0)
-      {
-        return 0x8000 * bank;
-      }
-      return 0;
-    case chip_bram:
-      return -1; // TODO
-    case chip_pram:
-      if(bus == bus_main && bank > 0)
-      {
-        return 0x20000 * bank;
-      }
-      return 0x6000;
-    case chip_ram:
-      if(bus == bus_z80 && bank >= 510)
-      {
-        return (bank - 510) * 0x8000;
-      }
-      return 0;
-    case chip_zram:
-    case chip_vram:
-    case chip_cram:
-      return 0;
-    case chip_wram:
-      return 0x200000;
-    case chip_pcm:
-      return 0;
-  }
-  return -1;
-}
-*/
 
 sv physoffset()
 {
@@ -326,10 +263,6 @@ sv chip_start(chip chip)
 {
   if(chip == chip_cart)
   {
-    if(mainout.target == target_vcart)
-    {
-      return 0x020000;
-    }
     return ROMHEADERSIZE;
   }
   else if(chip == chip_vram)
@@ -355,9 +288,7 @@ sv chip_size(chip chip)
     case chip_max:
       return -1;
     case chip_cart:
-      if(mainout.target == target_vcart) {
-        return 0x020000;
-      } else if(mainout.target == target_ram) {
+      if(mainout.target == target_ram) {
         return 0xFD00;
       }
       return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
@@ -376,9 +307,6 @@ sv chip_size(chip chip)
       return 0xFFB6; // Avoid allocating over monitor CPU state
     case chip_sstack:
     case chip_pram:
-      if(mainout.target == target_vcart) {
-        return 0x20000;
-      }
       return 0x80000 - 0x6000;
     case chip_wram:
       return 0x40000;
@@ -387,57 +315,7 @@ sv chip_size(chip chip)
   }
   return -1;
 }
-/*
-static sv hw_chip_size(chip chip, bus bus, int bank)
-{
-  switch(chip)
-  {
-    case chip_mstack:
-    case chip_sstack:
-    case chip_zstack:
-    case chip_none:
-    case chip_max:
-      return -1;
-    case chip_cart:
-      if(bus == bus_z80)
-        return 0x8000;
-      return MAXCARTSIZE;
-    case chip_bram:
-      return -1; // TODO
-    case chip_zram:
-      return 0x2000;
-    case chip_vram:
-      return 0x10000;
-    case chip_cram:
-      return 0x80;
-    case chip_ram:
-      {
-        // Avoid allocation over the interrupt vector table for SCD
-        if(bus == bus_z80)
-        {
-          if(mainout.target != target_gen && bank == 511) return 0x7D00;
-          return 0x8000;
-        }
-        return mainout.target != target_gen ? 0xFD00 : 0x10000;
-      }
-    case chip_pram:
-      if(bus == bus_main)
-      {
-        if(bank == 0)
-        {
-          return 0x20000 - 0x6000;
-        }
-        return 0x20000;
-      }
-      return 0x80000 - 0x6000;
-    case chip_wram:
-      return 0x40000;
-    case chip_pcm:
-      return 0x10000;
-  }
-  return -1;
-}
-*/
+
 chipaddr bankmove(chipaddr addr, bus bus, int newbank)
 {
   busaddr ba = chip2bus(addr, bus);
@@ -586,7 +464,6 @@ chipaddr phys2chip(sv physaddr)
   switch(mainout.target)
   {
     case target_gen:
-    case target_vcart:
       {
         chipaddr ca = {chip_cart, physaddr};
         return ca;
@@ -618,6 +495,7 @@ sv chip2phys(chipaddr ca)
     case target_ram:
       if(ca.chip == chip_ram || ca.chip == chip_cart)
         return ca.addr + ROMHEADERSIZE;
+      break;
     default:
       break;
   }

@@ -22,42 +22,6 @@ Sega CD image (scd)
 This is a raw Sega CD image (in "iso" mode 1 format, 2048 bytes per block). It can be burnt as the first track of a CD.
 
 
-Virtual cart (vcart)
---------------------
-
-This special type of image can simulate a genesis cartridge using Sega CD program RAM (useful to test programs).
-
-ROM size is limited to 128k, RAM above FFFD00 must not be used.
-
-To run on a Sega CD, a boot CD with the correct loader is required. When running on the Sega CD, interrupt processing is delayed.
-
-To run on the genesis, simply burn the ROM as-is and it will run. ROM data starts at 020000 and data between 000200 and 01FFFF is ignored.
-
-Header at 0x100 must contain 'SEGA VIRTUALCART'
-
-The image MUST be exactly 0x040000 bytes.
-
-
-### Boot loader process
-
-When loaded from the Sega CD, the following procedure must be done :
-
-On the sub CPU :
-
- * Copy the area 020000-040000 to 020000-040000 in the program RAM.
- * Switch SCD to mode 2 (256k word RAM) and put the header (000000-000200) in word RAM, then switch word RAM to main CPU.
- 
-On the main CPU :
-
- * Wait for word RAM.
- * Read the ROM header and set the interrupt vectors in the reserved RAM area (FFFD00).
- * Set program RAM access to bank 1 and enable write protection.
- * Set the stack pointer based on ROM header.
- * Reset VDP registers to default values.
- * Reset gamepad registers (Level 2 interrupt may be left enabled for BDA).
- * Jump to the entry point specified in ROM header.
-
-
 RAM program (ram)
 -----------------
 
@@ -96,28 +60,16 @@ Compression formats
 lz68k (not finalized)
 -----
 
-lz68k is a compression format inspired by LZ4, but modified for easier decompression on a m68k CPU. Input and output are byte streams.
-
-### lz68k format :
-
-  number: litteral count
- n bytes: litterals
-  number: backcopy offset
-  number: backcopy count
-
-Number format is variable size : values <= 127 are on one byte, values between 128 and 32767 are on a word, with the most significant bit ignored (since it is always set)
-
-Stream ends when backcopy offset is 0.
-
+lz68k is a compression format inspired by LZ4, but modified for easier decompression on a m68k CPU and smaller offsets. Input and output are byte streams.
 
 bits field
-   5 backcopy length (if > 30, all bits set and size is specified in 1 or 2 extra bytes)
-   3 litteral length (if > 6, 3 bits to 1 and followed by a 8 bits value)
-(o)1 Present only if backcopy length is > 0 : backcopy offset size flag (if set : 2 bytes, if clear : 1 byte)
-(o)7 MSB of backcopy offset
-(o)8 LSB of backcopy offset
-(o)8 If backcopy length == 31, this byte indicates backcopy length - 30
-(o)8 If litteral length == 7, this optional byte indicates litteral length
+                           4 backcopy offset (0 == extension bytes)
+   6 litteral length       2 litteral length (3 == extension byte)
+   2 backcopy length = 0   2 backcopy length (0 == no backcopy, 3 == extension bytes)
+   8 Backcopy offset - 16 (if MSB set, split over 2 bytes)
+   8 Backcopy offset bits 7-14
+   8 Backcopy length if length == 3 in header
+   8 litteral length
    n litteral data
 
 If both backcopy length and litteral length are 0 : end of stream. The first strip must start with a backcopy length of 0.

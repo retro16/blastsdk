@@ -176,7 +176,7 @@ void group_free(group *p)
 const char bus_names[][8] = {"none", "main", "sub", "z80"};
 const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
-const char target_names[][8] = {"gen", "scd", "vcart", "ram"};
+const char target_names[][8] = {"gen", "scd", "ram"};
 
 section *section_new()
 {
@@ -206,8 +206,6 @@ void symbol_free(symbol *p)
   if(p->name) free(p->name);
   free(p);
 }
-
-const char target_name[][8] = {"gen", "scd", "vcart"};
 
 output *output_new()
 {
@@ -1138,8 +1136,10 @@ bls_map_next_section:
 
 void bls_physmap_cart()
 {
-  sv chipstart = chip_start(chip_cart);
-  sv chipend = chipstart + chip_size(chip_cart);
+  chipaddr chipaddrstart = {chip_cart, chip_start(chip_cart)};
+  chipaddr chipaddrend = {chip_cart, chip_start(chip_cart) + chip_size(chip_cart)};
+  sv chipstart = chip2phys(chipaddrstart);
+  sv chipend = chip2phys(chipaddrend);
 
   // Do logical section mapping
   BLSLL(section) *secl = usedsections;
@@ -1437,19 +1437,6 @@ void bls_build_cart_image()
       }
     }
   }
-  else if(mainout.target == target_vcart)
-  {
-    fseek(f, 0, SEEK_END);
-    sv sz = ftell(f);
-    if(sz < 0x040000)
-    {
-      sv i;
-      for(i = sz; i < 0x040000; ++i)
-      {
-        fputc('\xFF', f);
-      }
-    }
-  }
 
   const char *ramloader =
     // Unlock TMSS
@@ -1555,10 +1542,6 @@ void bls_build_cart_image()
     {
       fprintf(f, "SEGA MEGA DRIVE ");
     }
-  }
-  else if(mainout.target == target_vcart)
-  {
-      fprintf(f, "SEGA VIRTUALCART");
   }
   else if(mainout.target == target_ram)
   {

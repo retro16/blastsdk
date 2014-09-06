@@ -128,7 +128,6 @@ BLSENUM(format, 8)
 typedef enum target {
   target_gen,
   target_scd,
-  target_vcart,
   target_ram,
   target_max
 } target;

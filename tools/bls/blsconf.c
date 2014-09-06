@@ -163,9 +163,6 @@ void output_parse(const mdconfnode *n, const char *name)
 			case target_scd:
 				strcat(n, ".iso");
 				break;
-			case target_vcart:
-				strcat(n, ".vgc");
-				break;
 			case target_ram:
 				strcat(n, ".ram");
 				break;

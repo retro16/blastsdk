@@ -211,46 +211,6 @@ void gen_setvector(u32 v, u32 value)
   writelong(wrapper + 2, value); // Write target address
 }
 
-void boot_vcart(u8 *image, int imgsize)
-{
-  if(imgsize != 0x40000)
-  {
-    printf("Invalid VCART image : image size is not 0x40000\n");
-    return;
-  }
-
-  u32 sp = getint(image, 4);
-  u32 pc = getint(image + 0xFC, 4);
-
-  u32 v;
-  for(v = 0x08; v < 0xC0; v += 4)
-  {
-    u32 value = getint(image + v, 4);
-    if(v != pc && v >= 0x200)
-    {
-      if(v == 0x68)
-      {
-        printf("Warning : setting agent interrupt\n");
-      }
-      gen_setvector(v, value);
-    }
-  }
-
-  // Set PRAM bank 1 accessible
-  writeword(0xA12000, 0x0003);
-  writeword(0xA12002, 1 << 6);
-
-  // Upload PRAM program
-  sendmem(0x020000, image + 0x020000, imgsize - 0x020000);
-
-  // Set SR, SP and PC
-  writelong(REG_SP, sp);
-  writelong(REG_PC, pc);
-  writeword(REG_SR, 0x2700);
-
-  printf("Ready to boot.\n");
-}
-
 void boot_ram(u8 *image, int imgsize)
 {
   if(imgsize != 0xFF00)
@@ -270,8 +230,7 @@ void boot_ram(u8 *image, int imgsize)
     {
       if(v == 0x68)
       {
-        printf("Warning : Prevented erasing BDA interrupt\n");
-        continue;
+        printf("Warning : Image overrides level 2 (BDA/pad) interrupt\n");
       }
       gen_setvector(v, value);
     }
@@ -308,9 +267,6 @@ void boot_img(const char *filename)
       break;
     case 2:
       boot_cd(image, imgsize);
-      break;
-    case 3:
-      boot_vcart(image, imgsize);
       break;
     case 4:
       boot_ram(image, imgsize);
