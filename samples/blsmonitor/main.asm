@@ -1,5 +1,5 @@
 		include bls.inc
-		include bda.inc
+		;include bda.inc
 MAIN
 		VDPSECURITY			; Unlock TMSS
 		bsr.b	monitor_init		; Initialize monitor
