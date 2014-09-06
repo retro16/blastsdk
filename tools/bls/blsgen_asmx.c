@@ -11,7 +11,7 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
   (void)mdconf;
   section *s;
 
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(NULL, source->name, ".bin")));
+  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".bin")));
   s->source = source;
 
   if(source->bus == bus_none && mainout.target != target_scd) {

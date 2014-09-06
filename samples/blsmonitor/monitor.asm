@@ -2,6 +2,17 @@
 
 monitor_init	; Call this to initialize the monitor
 		VDPSETADDRREG			; Use a4/a5 for VDP macros
+
+		; Clear VRAM
+		VDPSETREG 1, VDPR01
+		VDPSETREG 15, VDPR15 | 2
+		VDPSETWRITE 0, VRAM
+		move.w	#$7FFF, d0
+		moveq	#0, d1
+.vram_clear
+		move.w	d1, (a4)
+		dbra	d0, .vram_clear
+
 		VDPSETALLREGS reg_init_vdp	; Load reg_init_vdp to VDP register
 
 		VDPDMASEND FONT_PNG_IMG, 0, FONT_PNG_IMG_SIZE/2, VRAM ; Upload font tiles

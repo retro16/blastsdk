@@ -1706,9 +1706,10 @@ int main(int argc, char **argv)
   bls_get_symbol_values();
   bls_compile(); // Compile with most values to get a good approximation of file sizes
   if(mainout.target != target_scd) {
-    bls_pack_sections(); // Final packing pass
+    bls_pack_sections(); // Pack once to find physical size for all files
     bls_physmap_cart(); // Map physical cartridge image
     bls_compile(); // Recompile with physical addresses
+    bls_pack_sections(); // Final packing pass
     bls_build_cart_image(); // Build the final cart image
   }
   else {
