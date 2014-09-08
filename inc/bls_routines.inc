@@ -1,28 +1,3 @@
-; Copy aligned words
-BLSFASTCOPY_WORD macro dest, src, words
-    if words == 0
-    elsif words == 1
-    move.w  src, dest
-    elsif words == 2
-    move.l  src, dest
-    else
-    movem.l d0/a0/a1, -(a7)
-    lea     src, a0
-    lea     dest, a1
-    if words <= 128
-    clr     d0
-    moveq   words - 1, d0
-    else
-    move.w  words - 1, d0
-    endif
-.fastcopy\?
-    move.w  (a0)+, (a1)+
-    dbra    d0, .fastcopy\?
-    movem.l (a7)+, d0/a0/a1
-    endif
-    endm
-
-
 ; Fill memory with the same word value
 BLSFASTFILL_WORD macro dest, words, value
     if words == 0
@@ -109,3 +84,18 @@ BLSFASTCOPY_ALIGNED macro dest, src, bytes
     endif
     endm
 
+BLS_SETINTVECTOR macro vect, target
+    if SCD != 0
+    movem.l d0/a0, -(a7)
+    ; Put target in d0 and vector in a0
+    move.l  #target, d0
+    lea     vect, a0
+    cmp.l   d0, (a0)        ; Check if vector in ROM already jumps to the correct address
+    beq.b   .vector_set\?
+    move.l  (a0), a0        ; Point a0 to the target of the interrupt handler
+    move.w  #$4EF9, (a0)+   ; Write JMP instruction
+    move.l  d0, (a0)+       ; JMP to the target
+.vector_set\?
+    movem.l (a7)+, d0/a0
+    endif
+    endm

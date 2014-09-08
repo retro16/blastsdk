@@ -17,17 +17,17 @@ Looking at the console socket :
      \ 6 7 8 9 /
        -------
 
-    Pin Bit Ard Name Monitor  Pad0  Pad1 Serial
-     1   0    4   D0      D0    Up    Up      -
-     2   1    5   D1      D1  Down  Down      -
-     3   2    6   D2      D2     0  Left      -
-     4   3    7   D3      D3     0 Right      -
-     5   -   NC  Vcc       -     -     -      -
-     6   4    8   TL     Ack     A     B     Tx
-     7   6    3   TH   Clock   Sel   Sel    INT
-     8   -  GND  GND       -     -     -      -
-     9   5    9   TR  Busreq Start     C     Rx
-    NC   7    -   -        -    ?      ?      -
+    Pin Bit Ard Name Mon.Out  Mon.In  Pad0  Pad1 Serial
+     1   0    4   D0      D0      D0    Up    Up      -
+     2   1    5   D1      D1      D1  Down  Down      -
+     3   2    6   D2      D2      D2     0  Left      -
+     4   3    7   D3      D3      D3     0 Right      -
+     5   -   NC  Vcc       -       -     -     -      -
+     6   4    8   TL  Clk/In  Clk/In     A     B     Tx
+     7   6    3   TH Clk/Out Clk/Out   Sel   Sel    INT
+     8   -  GND  GND       -       -     -     -      -
+     9   5    9   TR  Mode:1  Mode:0 Start     C     Rx
+    NC   7    -   -        -       -    ?      ?      -
 
 Bit is the control bit of the port register in the genesis.
 
@@ -37,54 +37,66 @@ Pad0 is the value returned by the gamepad when Sel is low, Pad1 is the state
 when Sel is high. Serial is the pin role when the port is in serial mode
 (unused in blast debugger).
 
+TR pin indicates communication direction : If high, genesis sends data to
+the arduino ; if TR is low, genesis is waiting for incoming data. This pin also
+indicates whether the arduino is allowed to set D0..D3 as outputs or not.
+
+When TR is high (genesis sends data), TL is the clock and TH is the ack pulse.
+When TR is low (arduino sends data), TH is the clock and TL is the ack pulse.
+
+When transmission is inactive, TH must be set to pull-up input, in case the
+genesis polls the gamepad on that port, which could cause a short-circuit.
 
 Byte transmission format
 ------------------------
 
-The debug mode communicates via D-Pad data lines, passing 4 bits per clock.  TH
-is the clock, read on edge. Format is big nybble first. For example, to pass
-0xA3, digit A would be passed first, then 3. Each nybble is acknowledged by a
-TL transition. 5V pull-up is logic high and 0V is logic low.
+The debug mode communicates via D-Pad data lines, passing 4 bits per clock.
+Format is big nybble first. For example, to pass 0xA3, digit A would be passed
+first, then 3. Each nybble is acknowledged by a transition. 5V pull-up is logic
+high and 0V is logic low. When unused, pins should be high.
 
-Example transmitting 0xA3 to the genesis :
+Example transmitting 0xA4 to the genesis :
 
-                           ___________________
-    D0 ---________________/                   ------ output
-          ____________________________________
-    D1 ---                                    ------ output
-
-    D2 ---____________________________________------ output
-          ________________
-    D3 ---                \___________________------ output
-          ____                      __________
-    TH ---    \____________________/          ------ output
-          _______                     ________
-    TL ---       \___________________/        ------ input
+    D0..D3       A               4
           _                               ____
-    TR --- \_____________________________/    ------ output
+    D0 --- \_____________________________/    ------ output
+          ________________                ____
+    D1 ---                \______________/    ------ output
+          _                ___________________
+    D2 --- \______________/                   ------ output
+          ________________                ____
+    D3 ---                \______________/    ------ output
+          ______                 _____________
+    TH ---      \_______________/             ------ output
+          ___________                 ________
+    TL ---           \_______________/        ------ input
+                                              
+    TR ---____________________________________------ input
 
 
 Example receiving 0xE0 from the genesis :
 
-          _____
-    D0 ---     \______________________________------ input
-          ____________________
-    D1 ---                    \_______________------ input
-          ____________________
-    D2 ---                    \_______________------ input
-          ____________________
-    D3 ---                    \_______________------ input
-          ________                  __________
-    TH ---        \________________/          ------ input
+    D0..D3         E             0
+          ____                            ____
+    D0 ---    \__________________________/    ------ input
+          ________________                ____
+    D1 ---                \______________/    ------ input
+          ________________                ____
+    D2 ---                \______________/    ------ input
+          ________________                ____
+    D3 ---                \______________/    ------ input
           ___________                  _______
-    TL ---           \________________/       ------ output
-          ____________________________________
-    TR ---                                    ------ output
+    TH ---           \________________/       ------ output
+          ________               _____________
+    TL ---        \_____________/             ------ input
+             ______________________________   
+    TR ---__/                              \__------ input
 
 Notes :
  * input/output is the pin state of the arduino.
  * Clock and data must not change until Ack line is switched.
- * Ack pulse can be very late. Please put a long timeout (100ms at least).
+ * First ack pulse can be very late. Please put a long timeout (100ms at least).
+ * Second ack pulse (low to high) is always very quick.
  * When the genesis sends data, it checks TR while waiting for acknowledge.
    This way, if the debugger sends data while the genesis is transmitting,
    the genesis immediatly stops and enters receive mode. This solves bus access

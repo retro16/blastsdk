@@ -1,6 +1,8 @@
 		; Debug protocol control and data ports
 		; To use the "serial" port of the old genesis, specify CCTRL3 / CDATA3
 
+		include	bls.inc
+
 	if BUS == BUS_MAIN
 
 BDPCTRL		equ	CCTRL2
@@ -17,16 +19,23 @@ bda_init					; Call at console initialization
 .1		move.w	(a1)+, (a0)+
 		dbra	d0, .1
 
+		; Initialize main CPU interrupt vectors
+		lea	$24, a0
+		move.l	#g_int_trace, d0
+		bsr.b	bda_set_int_vector
+		lea	$68, a0
+		move.l	#g_int_pad, d0
+		bsr.b	bda_set_int_vector
+		lea	$9C, a0
+		move.l	#g_int_trap07, d0
+		bsr.b	bda_set_int_vector
+
+	if SCD == 1
 		; Disable write protection and access bank 0
 		andi.w	#$003F, GA_MM
 
 		; Get sub CPU BUSREQ
 		move.w	#GA_BUSREQ|GA_NORESET, GA_RH
-
-		; Initialize Sega CD interrupt vectors
-		move.l	#g_int_pad, G_INTV_PAD
-		move.l	#g_int_trace, G_INTV_TRACE
-		move.l	#g_int_trap07, G_INTV_TRAP07
 
 		; Reset comm flags
 		move.w	#0, GA_COMMFLAGS
@@ -47,16 +56,28 @@ bda_init					; Call at console initialization
 		; Release BUSREQ
 		move.w	#GA_NORESET, GA_RH
 
+	endif	; SCD == 1
 	endif	; SCD != 0
 
+BDA_NEUTRALDATA	set	(CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_NEUTRALCTRL	set	(CTHINT|CTL|CTR)
+
 		; Setup gamepad port
-		move.b	#$7F, BDPDATA		; Reset all outputs to high
-		move.b	#(CTHINT), BDPCTRL	; Enable level 2 interrupts
+		move.b	#BDA_NEUTRALDATA, BDPDATA		; Set all high except TR low
+		move.b	#BDA_NEUTRALCTRL, BDPCTRL	; Enable level 2 interrupts and set TL+TR as output
 
 		rts
-
-
+		
 	if SCD != 0
+bda_set_int_vector
+		cmp.l	(a0), d0
+		beq.b	.vector_already_set
+		move.l	(a0), a0		; Point at exception handler
+		move.w	#$4EF9, (a0)+   ; Write JMP instruction
+		move.l	d0, (a0)		; Write JMP target
+.vector_already_set
+		rts
+
 ; From now on, this code will be run from RAM, copied by the init routine
 bda_code_source
 		rorg	$FFFDBE
@@ -66,17 +87,17 @@ bda_code
 		; Register usage during monitor operation
 
 		;  d0 GP / byte to send
-		;  d1
-		;  d2
-		;  d3
-		;  d4 burst length
+		;  d1 GP
+		;  d2 GP
+		;  d3 burst length
+		;  d4 $00000006 (bit number of the TH line)
 		;  d5 $00000007 (long transfert size mask)
 		;  d6 $0000001F (byte transfert size mask)
 		;  d7 $0000000F (word trasfert size mask)
 
 		;  a0 general purpose
 		;  a1 general purpose
-		;  a2 bda_readbyte
+		;  a2 bda_recvbyte
 		;  a3 bda_sendhead
 		;  a4 call return address register
 		;  a5 data port
@@ -89,7 +110,7 @@ sendhead	macro
 .\?
 		endm
 
-readbyte	macro
+recvbyte	macro
 		lea	.\?(pc), a4
 		jmp	(a2)
 .\?
@@ -106,72 +127,66 @@ subret		macro
 		endm
 
 
-bda_readbyte
-.1		btst	#BCTH, (a5)
+bda_recvbyte
+.1		btst	d4, (a5)		; Wait until clock low
 		bne.b	.1
-		move.b	(a5), d0
+		move.b	(a5), d0		; Read high nybble
 		eori.b	#CTL, (a5)		; Pulse ack
-		lsl.b	#4, d0
-.2		btst	#BCTH, (a5)
+.2		btst	d4, (a5)		; Wait until clock high
 		beq.b	.2
-		move.b	(a5), d1
+		move.b	(a5), d1		; Read low nybble
 		eori.b	#CTL, (a5)		; Pulse ack
-		and.b	d7, d1			; Merge nybbles
+		and.b	d7, d1			; Merge nybbles (D0+D1 => D0)
+		lsl.b	#4, d0
 		or.b	d1, d0
 		subret
 
 ; Execute a write command : parse header and write data to RAM
-; d4.b = first byte of the header
+; d3.b = first byte of the header
 bda_write
 		movea.l	(a7), a0		; a0 point to destination address
-		btst	#7, d4
+		btst	d5, d3
 		beq.b	bda_writebytes		; 0xx => bytes
-		btst	#6, d4
+		btst	d4, d3
 		beq.b	bda_writelongs		; x0x => longs
 
 bda_writewords
-		lsr.b	#1, d4
-		subq.b	#1, d4
-		and.w	d7, d4			; d4 = word counter
-.1		moveq	#1, d3			; d3 = byte counter
-.2		lsl.l	#8, d2
-		readbyte
-		move.b	d0, d2
-		dbra	d3, .2
-		move.w	d2, (a0)+		; Do the write
-		dbra	d4, .1			; Write next long
+		lsr.b	#1, d3
+		subq.b	#1, d3
+		and.w	d7, d3			; d3 = word counter
+.1		moveq	#1, d2			; d2 = byte counter
+.2		lsl.w	#8, d0
+		recvbyte
+		dbra	d2, .2
+		move.w	d0, (a0)+		; Do the write
+		dbra	d3, .1			; Write next long
 		bra.w	bda_wait
 
 bda_writelongs
-		lsr.b	#2, d4
-		subq.b	#1, d4
-		and.w	d5, d4			; d4 = long counter
-.1		moveq	#3, d3			; d3 = byte counter
-.2		lsl.l	#8, d2
-		readbyte
-		move.b	d0, d2
-		dbra	d3, .2
-		move.l	d2, (a0)+		; Do the write
-		dbra	d4, .1			; Write next long
+		lsr.b	#2, d3
+		subq.b	#1, d3
+		and.w	d5, d3			; d3 = long counter
+.1		moveq	#3, d2			; d2 = byte counter
+.2		lsl.l	#8, d0
+		recvbyte
+		dbra	d2, .2
+		move.l	d0, (a0)+		; Do the write
+		dbra	d3, .1			; Write next long
 		bra.b	bda_wait
 
 bda_writebytes
-		subq.b	#1, d4
-		and.w	d6, d4			; d4 = byte counter
-.1		readbyte
+		subq.b	#1, d3
+		and.w	d6, d3			; d3 = byte counter
+.1		recvbyte
 		move.b	d0, (a0)+		; Do the write
-		dbra	d4, .1			; Write next byte
+		dbra	d3, .1			; Write next byte
 		bra.b	bda_wait
 
 
 ; Gamepad interrupt
 g_int_pad
 		clr.l	bda_pkt_header.w	; No command callback
-		btst	#BCTR, BDPDATA		; Check that TR is low, indicating
-						; incoming data
-		beq.b	bda_enter
-		rte				; Spurious interrupt : ignore
-
+		bra.b	bda_enter
 ; Breakpoint interrupt
 g_int_trace
 		move.l	#$09, bda_pkt_header.w
@@ -184,14 +199,16 @@ bda_enter
 		move.w	(a7), bda_sr.w		; Copy SR value to a fixed address
 		move.l	2(a7), bda_pc.w		; Copy PC to a fixed address
 		addq.l	#6, a7			; Pop interrupt stack frame
-		move.l	a7, bda_sp.w		; Store application stack value
-		lea	bda_sp.w, a7		; Use monitor stack
+		move.l	a7, bda_a7.w		; Store application stack value
+		lea	bda_a7.w, a7		; Use monitor stack
 		movem.l	d0-d7/a0-a6, -(a7)	; Push registers to bda_regs
 		subq.l	#4, a7			; Point a7 to bda_pkt_header
-		moveq.l	#$00000007, d5
-		moveq.l	#$0000001F, d6
-		moveq.l	#$0000000F, d7
-		lea	bda_readbyte(pc), a2
+		; Load frequently used constants in registers (to save code space)
+		moveq.l	#$00000006, d4	; Bit number of TH line (BCTH)
+		moveq.l	#$00000007, d5	; Longs per packet
+		moveq.l	#$0000001F, d6	; Bytes per packet
+		moveq.l	#$0000000F, d7	; Words per packet
+		lea	bda_recvbyte(pc), a2
 		lea	bda_sendhead(pc), a3
 		lea	BDPDATA, a5
 		lea	BDPCTRL, a6
@@ -202,30 +219,31 @@ bda_enter
 
 ; Wait for a command and execute it (main loop)
 bda_wait
+ VDPSETBG $222
 		; Setup port in input mode
-		move.b	#$FF, (a5)		; Release all pins high
-		move.b	#(CTL), (a6)		; Set ack to output
-		; Wait the sender to pull TR
-.1		btst	#BCTR, (a5)
+		move.b	#BDA_NEUTRALDATA, (a5)		; Release all pins high
+		move.b	#BDA_NEUTRALCTRL, (a6)		; Set ack to output
+		; Wait the sender to pull TH
+.1		btst	d4, (a5)
 		bne.b	.1
 
 		; Read the incoming command
-		moveq	#3, d3
+		moveq	#3, d2
 		move.l	a7, a0			; a0 points to data to be sent
-bda_readbuf	readbyte
+.2		recvbyte
 		move.b	d0, (a0)+
-		dbra	d3, bda_readbuf
+		dbra	d2, .2
 
-		move.b	(a7), d4		; Read the first byte of the header
-		move.b	d4, d0			; Test command
+		move.b	(a7), d3		; Read the first byte of the header
+		move.b	d3, d0			; Test command
 		andi.b	#$C0, d0
 		beq.b	bda_escape		; 00xxxxxx = escape mode
-		btst	#5, d4			; xx1xxxxx = write, xx0xxxxx = read
+		btst	#5, d3			; xx1xxxxx = write, xx0xxxxx = read
 		bne.w	bda_write
 		bra.b	bda_send		; Send the requested data
 
 bda_escape
-		btst	#5, d4			; 001xxxxx = exit, 000xxxxx = handshake
+		btst	#5, d3			; 001xxxxx = exit, 000xxxxx = handshake
 		bne.b	bda_exit
 
 		sendhead			; Pong : reply with the same command
@@ -236,14 +254,13 @@ bda_exit
 		move.l	#$20000000, (a7)
 		sendhead			; Signal that we leave monitor mode
 
-bda_abort					; Jump here directly for panic exit
-
-		move.b	#(CTHINT), BDPCTRL	; Reset to interrupt mode, all pins as input
-		lea	bda_d0.w, a7		; Restore a7 in case of corruption
+		move.b	#BDA_NEUTRALDATA, (a5)
+		move.b	#BDA_NEUTRALCTRL, (a6)
+		addq.l	#4, a7		; Point a7 back to registers
 		movem.l	(a7)+, d0-d7/a0-a6	; Pop registers
-                move.l  bda_sp.w, a7
+		move.l  bda_a7.w, a7			; Restore stack pointer
 		subq.l	#6, a7			; Restore interrupt stack frame
-		move.w	bda_sr.w, (a7)		; Restore SR in case it was changed by the monitor
+		move.w	bda_sr.w, (a7)		; Restore SR
 		move.l	bda_pc.w, 2(a7)		; Restore PC
 
 		rte				; Return from interrupt
@@ -263,82 +280,81 @@ bda_send
 		sendhead			; Send updated header with the write command
 
 		move.l	(a7), a1		; Read source address from header
-		move.b	(a7), d4		; Read first header byte
+		move.b	(a7), d3		; Read first header byte
 
 		; Read word size
-		btst	#7, d4
+		btst	d5, d3
 		beq.b	bda_sendbytes
-		btst	#6, d4
+		btst	d4, d3
 		beq.b	bda_sendlongs
 
 ; Send words
-bda_sendwords	lsr.b	#1, d4			; Convert d4 from byte count to word count
-		subq	#1, d4			; Adjust for DBRA
-		and.w	d7, d4			; Filter out bits
+bda_sendwords	lsr.b	#1, d3			; Convert d3 from byte count to word count
+		subq	#1, d3			; Adjust for DBRA
+		and.w	d7, d3			; Filter out bits
 .1		move.w	(a1)+, d0		; Read value with a word operation
 		move.w	d0, (a7)		; Move data to header buffer
-		moveq	#1, d3			; Write 2 bytes
+		moveq	#1, d2			; Write 2 bytes
 		move.l	a7, a0			; a0 points to data to be sent
 		bracall	bda_sendbuf		; Send value in header
-		dbra	d4, .1
+		dbra	d3, .1
 		bra.w	bda_wait
 		
 ; Send byte by byte
-bda_sendbytes	subq	#1, d4			; Adjust for DBRA
-		and.w	d6, d4			; Filter out bits
-		move.w	d4, d3
+bda_sendbytes	subq	#1, d3			; Adjust for DBRA
+		and.w	d6, d3			; Filter out bits
+		move.w	d3, d2
 		movea.l	a1, a0
 		bracall	bda_sendbuf		; Send buffer byte per byte
 		bra.w	bda_wait
 
 ; Send longs
-bda_sendlongs	lsr.b	#2, d4			; Convert d4 from byte count to long count
-		subq	#1, d4			; Adjust for DBRA
-		and.w	d5, d4			; Filter out bits
+bda_sendlongs	lsr.b	#2, d3			; Convert d3 from byte count to long count
+		subq	#1, d3			; Adjust for DBRA
+		and.w	d5, d3			; Filter out bits
 .1		move.l	(a1)+, (a7)		; Read value to header
-		moveq	#3, d3			; Write 4 bytes
+		moveq	#3, d2			; Write 4 bytes
 		move.l	a7, a0			; a0 points to data to be sent
 		bracall	bda_sendbuf		; Send value in header
-		dbra	d4, .1
+		dbra	d3, .1
 		bra.w	bda_wait
 
 ; Send the 4 byte header
 bda_sendhead
-		; Wait the sender to release TR
-.1		btst	#BCTR, (a5)
-		beq.b	.1
 		; Setup port in output mode
-		move.b	#$FF, (a5)		; Release all pins high
-		move.b	#(CUP|CDOWN|CLEFT|CRIGHT|CTH), (a6)
+		move.b	#(CUP|CDOWN|CLEFT|CRIGHT|CTH|CTL|CTR), (a5)		; Raise TR
+		move.b	#(CUP|CDOWN|CLEFT|CRIGHT|CTL|CTR), (a6)
 
-		moveq	#3, d3			; Write 4 bytes
+		moveq	#3, d2			; Write 4 bytes
 		move.l	a7, a0			; a0 points to data to be sent
-; Send memory buffer (a0 = address, d3 = byte count)
+
+; Send memory buffer (a0 = address, d2 = byte count)
 bda_sendbuf	move.b	(a0)+, d0
 		move.b	d0, d1			; d1 is used as scratch register
 		lsr.b	#4, d1			; Prepare high nybble
-		ori.b	#CTH|CTR, d1		; Keep clock high and wait for ack low, busreq high
-
+		ori.b	#CTL|CTR, d1		; Keep clock high and wait for TH low, TR high
+ 
 .1		move.b	d1, (a5)		; Place value
-		eori.b	#CTH, d1
+		eori.b	#CTL, d1
 		move.b	d1, (a5)		; Pulse clock
 
-.2		cmp.b	(a5), d1		; Wait for ack
+.2	cmp.b	(a5), d1		; Wait for ack
 		bne.b	.2
-		btst	#BCTR, (a5)		; Keep an eye on output mode
-		beq.w	bda_abort		; Stop since the debugger is talking to us
-		btst	#BCTL, d1		; If ack was high, we were sending
+		btst	d4, d1		; If ack was high, we were sending
 		bne.b	.3			; the second nybble : stop now
+
 
 		move.b	d0, d1			; Load the low nybble
 		and.b	d7, d1
-		ori.b	#CTL|CTR, d1		; Wait for a high ack, high busreq this time
+		ori.b	#CTH|CTR, d1		; Wait for TH high, TR high this time
 		bra.b	.1
 .3
-		dbra	d3, bda_sendbuf
+ VDPSETBG $080
+		dbra	d2, bda_sendbuf
 		subret
 
 bda_code_end
+		assert bda_code_end < $FFFFB6
 	if SCD != 0
 		rend
 bda_code_source_end
@@ -347,7 +363,7 @@ bda_code_source_end
 
 		; Sub CPU code
 
-	if SCD != 0
+	if SCD == 1
 bdasub_d0	set	$0000C0			; Place monitor after exception vectors
 
 bdasub_sp	set	bdasub_d0 + 15*4
@@ -390,10 +406,10 @@ bda_sub_code_end
 		assert	bda_sub_code_end < $200	; Ensure subcode fits in header
 		rend
 bda_sub_code_source_end
-	endif	; SCD != 0
+	endif	; SCD == 1
 
 		; Sub CPU defines
 	else	; BUS == BUS_MAIN
-G_INTV_LEVEL2	set	bda_l2_jmp + 2		; Redirect exception vector to the jump
+;G_INTV_LEVEL2	set	bda_l2_jmp + 2		; Redirect exception vector to the jump
 	endif	; BUS == BUS_MAIN
 

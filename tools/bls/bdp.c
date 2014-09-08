@@ -24,26 +24,26 @@
 int genfd;
 u8 inp[40];
 int inpl;
-int bdpdump = 0;
+int bdpdump = 1;
 
 void senddata_ip(const u8 *data, int size);
 void senddata_serial(const u8 *data, int size);
 void (*senddata)(const u8 *data, int size);
 
 
-// Return data length based on header value
-int datalen(u8 header)
+// Return total packet length based on header value
+int packetlen(u8 header)
 {
   if((header & 0xC0) && (header & CMD_WRITE))
   {
     int l = header & CMD_LEN;
     if(!l)
     {
-      return 32;
+      return 36;
     }
-    return l;
+    return l + 4;
   }
-  return 0;
+  return 4;
 }
 
 
@@ -54,8 +54,8 @@ int readdata()
   inpl = 0;
   do
   {
-    // Read byte per byte (easier to handle)
-    ssize_t r = read(genfd, &inp[inpl], 1);
+    // Read the header byte, then the whole remaining packet
+    ssize_t r = read(genfd, &inp[inpl], inpl ? inpl - packetlen(inp[0]) : 1);
     if(r == 0)
     {
       fprintf(stderr, "Could not read from genesis : connection closed.\n");
@@ -82,7 +82,7 @@ int readdata()
       }
       inpl += r;
     }
-  } while(inpl < 4 + datalen(inp[0]));
+  } while(inpl < packetlen(inp[0]));
 
   return 1;
 }
@@ -120,10 +120,11 @@ void senddata_ip(const u8 *data, int size)
 
 void senddata_serial(const u8 *data, int size)
 {
+#define SERIAL_BUFFER 1
   while(size)
   {
-    // Avoid buffer overflow by transmitting bytes 2 by 2
-    ssize_t w = write(genfd, data, size < 2 ? size : 2);
+    // Avoid buffer overflow by limiting write size to SERIAL_BUFFER bytes
+    ssize_t w = write(genfd, data, size < SERIAL_BUFFER ? size : SERIAL_BUFFER);
     if(w == 0)
     {
       fprintf(stderr, "Could not send to genesis : connection closed.\n");
@@ -139,7 +140,8 @@ void senddata_serial(const u8 *data, int size)
     }
     else
     {
-      usleep(2 * w * 1000000 / (115200/8));
+      usleep(SERIAL_BUFFER * w * 1000000 / (115200/8));
+      // Wait until buffer is empty before sending data again
       while(tcdrain(genfd) == -1 && errno == EINTR);
       int b;
       if(bdpdump) for(b = 0; b < w; ++b)

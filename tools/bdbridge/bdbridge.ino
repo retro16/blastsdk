@@ -3,13 +3,7 @@
  Implements a bridge between the Genesis pad port and a TCP socket on the Ethernet shield or the USB serial I/O.
  */
 
-// Define pinout of the genesis pad port (see doc for pin meaning)
-// In direct mode, data lines are on port D 4..7 (pin 4 = D0 .. pin 7 = D3)
-
-#define GEN_DIRECTPORT       // Direct port mode : use AVR PORT D directly (faster)
-#define TCPBRIDGE        // Uncomment to enable TCP server (ethernet shield)
-
-// Pinout
+// Define pinout of the genesis pad port (see protocol doc for pin meaning)
 #define GEND0 4
 #define GEND1 5
 #define GEND2 6
@@ -17,12 +11,17 @@
 #define GENTL 8
 #define GENTR 9
 #define GENTH 3
-#define BLSM_PACKET_MAX 40
+#define TCPBRIDGE   // Uncomment to enable TCP server (ethernet shield)
+#define BLINKLED 13 // Set to the pin of the led to blink it while running. Undefine to disable blink.
 
+#if defined (__AVR_ATmega168__) || defined (__AVR_ATmega328P__)
+#if GEND0 == 4 && GEND1 == 5 && GEND2 == 6 && GEND3 == 7
+// In direct AVR port mode, data lines are on port D 4..7 (pin 4 = D0 .. pin 7 = D3)
+#define GEN_AVRPORT
+#endif
+#endif
 
-#define GENCLK GENTH
-#define GENACK GENTL
-#define GENOUT GENTR
+#define BLSM_PACKET_MAX 36
 
 #include <SPI.h>         // needed for Arduino versions later than 0018
 #ifdef TCPBRIDGE
@@ -32,6 +31,16 @@ byte mac[] = {
 IPAddress ip(192,168,0,177);              // Server IP
 EthernetServer server(2612);            // TCP port
 EthernetClient client;
+#endif
+
+#ifdef BLINKLED
+#define BLINK(c,d) do { for(uint8_t i = 0; i < c; ++i) {digitalWrite(BLINKLED, HIGH); delay(d/2); digitalWrite(BLINKLED, LOW);delay(d/2);}} while(0)
+#define LEDON() do { digitalWrite(BLINKLED, HIGH); } while(0)
+#define LEDOFF() do { digitalWrite(BLINKLED, LOW); } while(0)
+#else
+#define BLINK(c) do {} while(0)
+#define LEDON() do {} while(0)
+#define LEDOFF() do {} while(0)
 #endif
 
 
@@ -49,7 +58,7 @@ public:
   {
     if(!buflen) {
       // Nothing in buffer - check real hardware
-      if(writeMode == 0 && !digitalRead(GENCLK) && digitalRead(GENOUT)) {
+      if(writeMode == 0 && digitalRead(GENTH) && !digitalRead(GENTL) && digitalRead(GENTR)) {
         // Genesis is writing : let's check this out
         peek();
       }
@@ -74,11 +83,11 @@ public:
   virtual int read(uint8_t *buf, size_t size)
   {
     uint8_t s = (uint8_t)size;
-    
+
     if(writeMode) {
       genStopWrite();
     }
-    
+
     if(buflen)
     {
       // Read the first byte from peek buffer
@@ -86,13 +95,13 @@ public:
       --s;
       buflen = 0;
     }
-    
+
     while(s--)
     {
       *buf = genRead();
       ++buf;
     }
-    
+
     if(writeMode) {
       genStartWrite();
     }
@@ -131,9 +140,8 @@ public:
       genStartWrite();
       writeMode = 1;
     }
-    while(s--)
+    while(s-- && genWrite(*buf))
     {
-      genWrite(*buf);
       ++buf;
     }
     genStopWrite();
@@ -162,7 +170,7 @@ private:
   uint8_t buflen; // 0 or 1;
   uint8_t writeMode; // 0 or 1
   uint8_t genRead();
-  void genWrite(uint8_t c);
+  uint8_t genWrite(uint8_t c);
   void genStartWrite();
   void genStopWrite();
   void resetPins();
@@ -170,56 +178,65 @@ private:
 
 
 void GenPort::begin() {
-  pinMode(GENACK, INPUT);
-  pinMode(GENOUT, INPUT);
-  pinMode(GENCLK, INPUT);
-
-  // Release control lines
-  digitalWrite(GENACK, LOW);
-  digitalWrite(GENOUT, LOW);
-  digitalWrite(GENCLK, LOW);
+  pinMode(GENTH, INPUT);
+  digitalWrite(GENTH, LOW);
+  pinMode(GENTL, INPUT);
+  digitalWrite(GENTL, LOW);
+  pinMode(GENTR, INPUT);
+  digitalWrite(GENTR, LOW);
 
   // Release data lines
-#ifdef GEN_DIRECTPORT
+#ifdef GEN_AVRPORT
   DDRD &=~ 0xF0;
   PORTD &=~ 0xF0;
 #else
   pinMode(GEND0, INPUT);
-  pinMode(GEND1, INPUT);
-  pinMode(GEND2, INPUT);
-  pinMode(GEND3, INPUT);
-
   digitalWrite(GEND0, LOW);
+  pinMode(GEND1, INPUT);
   digitalWrite(GEND1, LOW);
+  pinMode(GEND2, INPUT);
   digitalWrite(GEND2, LOW);
+  pinMode(GEND3, INPUT);
   digitalWrite(GEND3, LOW);
 #endif
 
   buflen = 0;
   writeMode = 0;
-  
-  // Wait for stabilized all-high (neutral state)
-  for(uint8_t j = 20; j; --j)
+
+  // Wait for stabilized neutral state
+  for(uint16_t i = 0; i < 5000; ++i)
   {
-    for(uint8_t i = 255; i; --i)
-    {
-#ifdef GEN_DIRECTPORT
-      while((PIND & 0x0F) != 0x0F || !digitalRead(GENACK) || !digitalRead(GENOUT) || !digitalRead(GENCLK))
-        i = 0;
-#else
-      while(!digitalRead(GEND0) || !digitalRead(GEND1) || !digitalRead(GEND2) || !digitalRead(GEND3) || !digitalRead(GENACK) || !digitalRead(GENOUT) || !digitalRead(GENCLK))
-        i = 0;
-#endif
-      delayMicroseconds(200);
+#ifdef GEN_AVRPORT
+    while((PIND & 0xF0) != 0xF0 || !digitalRead(GENTH) || !digitalRead(GENTL) || digitalRead(GENTR)) {
+      i = 0;
     }
+#else
+    while(!digitalRead(GEND0) || !digitalRead(GEND1) || !digitalRead(GEND2) || !digitalRead(GEND3) || !digitalRead(GENTH) || !digitalRead(GENTL) || digitalRead(GENTR))
+      i = 0;
+#endif
+
+#if F_CPU >= 20000000L
+    delayMicroseconds(4);
+#endif
   }
 }
 
-void GenPort::genWrite(uint8_t n) {
-  while(!digitalRead(GENACK)); // Wait for ack to be released
+uint8_t GenPort::genWrite(uint8_t n) {
+  uint8_t timeout = 255;
+
+  while(!digitalRead(GENTL)) { // Wait for ack to be released
+    if(digitalRead(GENTR) || !timeout--) {
+      // Genesis left listening mode !
+      return 0;
+    }
+    else
+    {
+      delayMicroseconds(1);
+    }
+  }
 
   // Send high nybble
-#ifdef GEN_DIRECTPORT
+#ifdef GEN_AVRPORT
   PORTD = (PORTD & 0x0F) | (n & 0xF0);
 #else
   digitalWrite(GEND3, (n & 0X80) ? HIGH : LOW);
@@ -227,11 +244,17 @@ void GenPort::genWrite(uint8_t n) {
   digitalWrite(GEND1, (n & 0X20) ? HIGH : LOW);
   digitalWrite(GEND0, (n & 0X10) ? HIGH : LOW);
 #endif
-  digitalWrite(GENCLK, LOW); // Pulse clock until ack
-  while(digitalRead(GENACK)); // Wait for ack
+  digitalWrite(GENTH, LOW); // Pulse clock until ack
+  do {
+    if(digitalRead(GENTR)) {
+      // Genesis left listening mode !
+      return 0;
+    }
+  } 
+  while(digitalRead(GENTL)); // Wait for ack
 
   // Send low nybble
-#ifdef GEN_DIRECTPORT
+#ifdef GEN_AVRPORT
   PORTD = (PORTD & 0x0F) | (n << 4);
 #else
   digitalWrite(GEND3, (n & 0X08) ? HIGH : LOW);
@@ -239,68 +262,85 @@ void GenPort::genWrite(uint8_t n) {
   digitalWrite(GEND1, (n & 0X02) ? HIGH : LOW);
   digitalWrite(GEND0, (n & 0X01) ? HIGH : LOW);
 #endif
-  digitalWrite(GENCLK, HIGH); // Release clock
+
+  digitalWrite(GENTH, HIGH); // Release clock
+  return 1;
 }
 
 void GenPort::genStartWrite() {
-  // Set data pins to output high
-#ifdef GEN_DIRECTPORT
-  PORTD |= 0xF0;
+  // Wait until genesis is ready to receive data
+  while(digitalRead(GENTR));
+
+  // Set clock to output
+  digitalWrite(GENTH, HIGH);
+  pinMode(GENTH, OUTPUT);
+
+  // Set data pins to output
+#ifdef GEN_AVRPORT
   DDRD |= 0xF0;
 #else
   pinMode(GEND0, OUTPUT);
-  digitalWrite(GEND0, HIGH);
   pinMode(GEND1, OUTPUT);
-  digitalWrite(GEND1, HIGH);
   pinMode(GEND2, OUTPUT);
-  digitalWrite(GEND2, HIGH);
   pinMode(GEND3, OUTPUT);
-  digitalWrite(GEND3, HIGH);
 #endif
-
-  digitalWrite(GENOUT, LOW);
-  digitalWrite(GENCLK, HIGH);
-  pinMode(GENOUT, OUTPUT);
-  pinMode(GENCLK, OUTPUT);
-
-  // Signal the genesis that a write is coming  
-  digitalWrite(GENOUT, LOW);
 }
 
 void GenPort::genStopWrite() {
-  while(!digitalRead(GENACK)); // Wait for ack to be released
+  while(!digitalRead(GENTL)); // Wait for ack to be released
 
-  // Help the genesis pull-up to go high and release data pins
-#ifdef GEN_DIRECTPORT
-  PORTD |= 0xF0;
+  // Release data pins
+#ifdef GEN_AVRPORT
   DDRD &=~ 0xF0;
+  PORTD |= 0xF0;
 #else
-  digitalWrite(GEND0, HIGH);
-  digitalWrite(GEND1, HIGH);
-  digitalWrite(GEND2, HIGH);
-  digitalWrite(GEND3, HIGH);
   pinMode(GEND0, INPUT);
+  digitalWrite(GEND0, HIGH);
   pinMode(GEND1, INPUT);
+  digitalWrite(GEND1, HIGH);
   pinMode(GEND2, INPUT);
+  digitalWrite(GEND2, HIGH);
   pinMode(GEND3, INPUT);
+  digitalWrite(GEND3, HIGH);
 #endif
 
   // Release clock
-  pinMode(GENCLK, INPUT);  
-
-  // Quick release output mode
-  digitalWrite(GENOUT, HIGH);
-  pinMode(GENOUT, INPUT);
+  digitalWrite(GENTH, HIGH);
+  pinMode(GENTH, INPUT);
 }
 
 uint8_t GenPort::genRead() {
-  char v = 0;
+  uint8_t v = 0;
+  uint8_t timeout = 255;
 
+  while(!digitalRead(GENTR))
+  {
+    if(!timeout--) {
+      return 0;
+    } 
+    else {
+#if F_CPU >= 20000000L
+      delayMicroseconds(1);
+#endif
+    }
+  }
+
+  timeout = 255;
   // Wait for clock
-  while(digitalRead(GENCLK));
+  while(digitalRead(GENTL))
+  {
+    if(!timeout--) {
+      return 0;
+    } 
+    else {
+#if F_CPU >= 20000000L
+      delayMicroseconds(1);
+#endif
+    }
+  }
 
   // Read high nybble
-#ifdef GEN_DIRECTPORT
+#ifdef GEN_AVRPORT
   v = PIND & 0xF0;
 #else
   v = digitalRead(GEND3) ? 0x80 : 0;
@@ -310,14 +350,28 @@ uint8_t GenPort::genRead() {
 #endif
 
   // Acknowledge nybble read
-  pinMode(GENACK, OUTPUT);
-  digitalWrite(GENACK, LOW); // Quick load to low
+  pinMode(GENTH, OUTPUT);
+  digitalWrite(GENTH, LOW);
 
   // Wait for clock
-  while(!digitalRead(GENCLK));
+  timeout = 255;
+  while(!digitalRead(GENTL))
+  {
+    if(!digitalRead(GENTR) || !timeout--) {
+      // Genesis quit send mode
+      pinMode(GENTH, INPUT); // Reset TH to input mode
+      return 0;
+    }
+    else
+    {
+#if F_CPU >= 20000000L
+      delayMicroseconds(1);
+#endif
+    }
+  }
 
   // Read low nybble
-#ifdef GEN_DIRECTPORT
+#ifdef GEN_AVRPORT
   v |= PIND >> 4;
 #else
   v |= digitalRead(GEND3) ? 0x08 : 0;
@@ -327,42 +381,64 @@ uint8_t GenPort::genRead() {
 #endif
 
   // Acknowledge
-  digitalWrite(GENACK, HIGH); // Quick load to high
-  pinMode(GENACK, INPUT);
+  digitalWrite(GENTH, HIGH); // Quick load to high
+  pinMode(GENTH, INPUT);
 
   return v;
 }
 
-uint8_t computeDataLen(uint8_t header)
+uint8_t computePacketLen(uint8_t header)
 {
-  if((header & 0xC0) && (header & 0x20)) {
+  if((header & 0x20) && (header & 0xC0)) {
     // Write command : data in header LSB
-    char s = header & 0x1F;
+    uint8_t s = header & 0x1F;
     if(!s) { 
-      return 32; 
+      return 36; 
     }
-    return s;
+    return s + 4;
   }
-  
+
   // Other commands : no data
-  return 0;
+  return 4;
 }
 
 void forwardPacket(Stream *in, Stream *out)
 {
   uint8_t packet[BLSM_PACKET_MAX];
 
+  LEDON();
+
   // Read header and compute packet length
   uint8_t header = in->read();
-  uint8_t packetLen = computeDataLen(header) + 4;
+  uint8_t packetLen = computePacketLen(header);
 
   packet[0] = header;
 
   // Read address and payload
   in->readBytes((char*)&(packet[1]), packetLen - 1);
+if(header == '1') {
+  BLINK(2, 1000);
+  if(packet[0] == '1') packet[0]='5';
+  if(packet[1] == '2')  packet[1]='6';
+  if(packet[2] == '3')  packet[2]='7';
+  if(packet[3] == '4')  packet[3]='8';
+  in->write(packet, 4);
+  return;
+}
+  LEDOFF();
 
-  // Write packet to other end
-  out->write(packet, packetLen);
+  if(header == 0 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF)
+  {
+    // Special packet : self-test ping
+    BLINK(5, 1000);
+    packet[3] = 0xFE;
+    in->write(packet, packetLen);
+  }
+  else
+  {
+    // Write packet to other end
+    out->write(packet, packetLen);
+  }
 }
 
 Stream *pc;
@@ -370,10 +446,16 @@ GenPort genport;
 GenPort *gen = &genport;
 
 void setup()
-{ 
+{
+#ifdef BLINKLED
+  pinMode(BLINKLED, OUTPUT);
+#endif
+
   Serial.begin(115200);
   pc = &Serial; // By default, use serial port
+
   genport.begin();
+
 #ifdef TCPBRIDGE
   Ethernet.begin(mac, ip);
   server.begin();
@@ -396,20 +478,20 @@ void loop()
   }
 #endif
 
-  if(pc->available()) {
-    // Per-byte forward (slow)
-    //gen->write(pc->read());
+  LEDON();
 
+  if(pc->available()) {
     // Store and forward packet
     forwardPacket(pc, gen);
   }
+
+  LEDOFF();
+
   if(gen->available())
   {
-    // Per-byte forward (slow)
-    //pc->write(gen->read());
-
     // Store and forward packet
     forwardPacket(gen, pc);
   }
 }
+
 

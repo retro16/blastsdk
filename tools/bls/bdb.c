@@ -579,6 +579,33 @@ int main(int argc, char **argv)
       else
       {
         printf("pong !\n");
+        hexdump(inp, inpl, 0);
+      }
+
+      continue;
+    }
+
+    if(strcmp(token, "test") == 0)
+    {
+      printf("Test");
+      fflush(stdout);
+
+      sendcmd('1', 0x323334);
+
+      printf(" ... ");
+      fflush(stdout);
+
+      readdata();
+      if(inpl != 4 || inp[1] != 0xFF || inp[2] != 0xFF || inp[3] != 0xFE)
+      {
+        printf("crash !\n");
+        hexdump(inp, inpl, 0);
+        continue;
+      }
+      else
+      {
+        printf("OK !\n");
+        hexdump(inp, inpl, 0);
       }
 
       continue;

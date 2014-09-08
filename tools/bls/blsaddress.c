@@ -261,7 +261,7 @@ sv physoffset()
 
 sv chip_start(chip chip)
 {
-  if(chip == chip_cart)
+  if(chip == chip_cart && mainout.target != target_ram)
   {
     return ROMHEADERSIZE;
   }

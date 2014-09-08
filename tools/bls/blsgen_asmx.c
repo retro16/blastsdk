@@ -13,8 +13,24 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
 
   source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".bin")));
   s->source = source;
-
-  if(source->bus == bus_none && mainout.target != target_scd) {
+  
+  if(strstr(s->name, "_ram.bin")) {
+    if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_ram;
+    if(source->bus == bus_none) source->bus = bus_main;
+  }
+  else if(strstr(s->name, "_cart.bin")) {
+    if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_cart;
+    if(source->bus == bus_none) source->bus = bus_main;
+  }
+  else if(strstr(s->name, "_pram.bin")) {
+    if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_pram;
+    if(source->bus == bus_none) source->bus = bus_sub;
+  }
+  else if(strstr(s->name, "_wram.bin")) {
+    if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_wram;
+    if(source->bus == bus_none) source->bus = bus_sub;
+  }
+  else if(source->bus == bus_none && mainout.target != target_scd) {
     // For genesis, default to main bus
     source->bus = bus_main;
   }
@@ -52,7 +68,7 @@ static void gen_symtable_asmx(const group *s)
 }
 
 static void parse_lst_asmx(group *src, FILE *f, int setvalues)
-{
+{printf("####### parse_lst_asm %s %d\n", src->name, setvalues);
 	section *sec = section_find_ext(src->name, ".bin");
 
   while(!feof(f))
@@ -62,7 +78,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 
     int l = strlen(line);
 
-    if(setvalues && l > 10 && sec->symbol->value.addr == -1 && line[0] >= '0')
+    if(l > 10 && sec->symbol->value.addr == -1 && line[0] >= '0')
     {
       const char *c = line;
       sv address = parse_hex_skip(&c);
