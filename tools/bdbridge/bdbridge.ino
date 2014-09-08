@@ -416,15 +416,12 @@ void forwardPacket(Stream *in, Stream *out)
 
   // Read address and payload
   in->readBytes((char*)&(packet[1]), packetLen - 1);
-if(header == '1') {
-  BLINK(2, 1000);
-  if(packet[0] == '1') packet[0]='5';
-  if(packet[1] == '2')  packet[1]='6';
-  if(packet[2] == '3')  packet[2]='7';
-  if(packet[3] == '4')  packet[3]='8';
-  in->write(packet, 4);
-  return;
-}
+  if(header == 0x00 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF) {
+    BLINK(3, 1000);
+    packet[3] = 0xFE;
+    in->write(packet, 4);
+    return;
+  }
   LEDOFF();
 
   if(header == 0 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF)

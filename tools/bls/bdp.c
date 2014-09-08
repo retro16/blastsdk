@@ -55,7 +55,7 @@ int readdata()
   do
   {
     // Read the header byte, then the whole remaining packet
-    ssize_t r = read(genfd, &inp[inpl], inpl ? inpl - packetlen(inp[0]) : 1);
+    ssize_t r = read(genfd, &inp[inpl], inpl ? packetlen(inp[0]) - inpl : 1);
     if(r == 0)
     {
       fprintf(stderr, "Could not read from genesis : connection closed.\n");
