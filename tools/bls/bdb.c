@@ -590,7 +590,7 @@ int main(int argc, char **argv)
       printf("Test");
       fflush(stdout);
 
-      sendcmd('1', 0x323334);
+      sendcmd(CMD_HANDSHAKE, 0xFFFFFF);
 
       printf(" ... ");
       fflush(stdout);

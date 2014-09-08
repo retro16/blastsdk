@@ -24,7 +24,7 @@
 int genfd;
 u8 inp[40];
 int inpl;
-int bdpdump = 1;
+int bdpdump = 0;
 
 void senddata_ip(const u8 *data, int size);
 void senddata_serial(const u8 *data, int size);
