@@ -179,7 +179,7 @@ private:
 
 void GenPort::begin() {
   pinMode(GENTH, INPUT);
-  digitalWrite(GENTH, LOW);
+  digitalWrite(GENTH, HIGH);
   pinMode(GENTL, INPUT);
   digitalWrite(GENTL, LOW);
   pinMode(GENTR, INPUT);
@@ -204,7 +204,7 @@ void GenPort::begin() {
   writeMode = 0;
 
   // Wait for stabilized neutral state
-  for(uint16_t i = 0; i < 5000; ++i)
+  for(uint16_t i = 0; i < 10000; ++i)
   {
 #ifdef GEN_AVRPORT
     while((PIND & 0xF0) != 0xF0 || !digitalRead(GENTH) || !digitalRead(GENTL) || digitalRead(GENTR)) {
@@ -216,23 +216,21 @@ void GenPort::begin() {
 #endif
 
 #if F_CPU >= 20000000L
-    delayMicroseconds(4);
+    delayMicroseconds(2);
 #endif
   }
 }
 
 uint8_t GenPort::genWrite(uint8_t n) {
-  uint8_t timeout = 255;
-
-  while(!digitalRead(GENTL)) { // Wait for ack to be released
-    if(digitalRead(GENTR) || !timeout--) {
+  do {
+    if(digitalRead(GENTR)) {
       // Genesis left listening mode !
       return 0;
     }
-    else
-    {
-      delayMicroseconds(1);
-    }
+  } while(!digitalRead(GENTL)); // Wait for ack to be released
+  if(digitalRead(GENTR)) {
+    // Genesis left listening mode !
+    return 0;
   }
 
   // Send high nybble
@@ -252,6 +250,10 @@ uint8_t GenPort::genWrite(uint8_t n) {
     }
   } 
   while(digitalRead(GENTL)); // Wait for ack
+  if(digitalRead(GENTR)) {
+    // Genesis left listening mode !
+    return 0;
+  }
 
   // Send low nybble
 #ifdef GEN_AVRPORT
@@ -287,7 +289,11 @@ void GenPort::genStartWrite() {
 }
 
 void GenPort::genStopWrite() {
-  while(!digitalRead(GENTL)); // Wait for ack to be released
+  // Release clock
+  digitalWrite(GENTH, HIGH);
+  pinMode(GENTH, INPUT);
+
+  while(!digitalRead(GENTR) && !digitalRead(GENTL)); // Wait for ack to be released
 
   // Release data pins
 #ifdef GEN_AVRPORT
@@ -303,10 +309,6 @@ void GenPort::genStopWrite() {
   pinMode(GEND3, INPUT);
   digitalWrite(GEND3, HIGH);
 #endif
-
-  // Release clock
-  digitalWrite(GENTH, HIGH);
-  pinMode(GENTH, INPUT);
 }
 
 uint8_t GenPort::genRead() {
@@ -416,26 +418,18 @@ void forwardPacket(Stream *in, Stream *out)
 
   // Read address and payload
   in->readBytes((char*)&(packet[1]), packetLen - 1);
+
   if(header == 0x00 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF) {
-    BLINK(3, 1000);
+    // Handle communication test
+    BLINK(5, 300);
     packet[3] = 0xFE;
-    in->write(packet, 4);
+    in->write(packet, packetLen);
     return;
   }
   LEDOFF();
 
-  if(header == 0 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF)
-  {
-    // Special packet : self-test ping
-    BLINK(5, 1000);
-    packet[3] = 0xFE;
-    in->write(packet, packetLen);
-  }
-  else
-  {
-    // Write packet to other end
-    out->write(packet, packetLen);
-  }
+  // Write packet to other end
+  out->write(packet, packetLen);
 }
 
 Stream *pc;

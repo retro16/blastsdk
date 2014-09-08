@@ -126,6 +126,11 @@ subret		macro
 		jmp	(a4)
 		endm
 
+waitack macro
+.\?     btst    d4, (a5)
+        bne.b   .\?
+        endm
+
 
 bda_recvbyte
 .1		btst	d4, (a5)		; Wait until clock low
@@ -214,20 +219,23 @@ bda_enter
 		lea	BDPCTRL, a6
 
 		tst.l	(a7)			; Test if a message was pre-buffered
-		beq.b	bda_wait
+		beq.b	bda_readcmd
 		sendhead			; Send the pre-buffered message
 
-; Wait for a command and execute it (main loop)
-bda_wait
- VDPSETBG $222
+bda_finishwrite
 		; Setup port in input mode
-		move.b	#BDA_NEUTRALDATA, (a5)		; Release all pins high
+		move.b	#BDA_NEUTRALDATA, (a5)		; Release all pins high and TR low
 		move.b	#BDA_NEUTRALCTRL, (a6)		; Set ack to output
+
+        waitack
+
+bda_wait
 		; Wait the sender to pull TH
 .1		btst	d4, (a5)
 		bne.b	.1
 
-		; Read the incoming command
+		; Read the incoming command + address (4 bytes)
+bda_readcmd
 		moveq	#3, d2
 		move.l	a7, a0			; a0 points to data to be sent
 .2		recvbyte
@@ -256,6 +264,10 @@ bda_exit
 
 		move.b	#BDA_NEUTRALDATA, (a5)
 		move.b	#BDA_NEUTRALCTRL, (a6)
+
+        ; Wait until the exit command has been acknowledged
+        waitack
+
 		addq.l	#4, a7		; Point a7 back to registers
 		movem.l	(a7)+, d0-d7/a0-a6	; Pop registers
 		move.l  bda_a7.w, a7			; Restore stack pointer
@@ -265,13 +277,6 @@ bda_exit
 
 		rte				; Return from interrupt
 ; End of monitor main loop
-
-
-; Monitor subroutines
-
-; Reads a byte and returns it in d0
-; Alters d1
-; Tested : OK
 
 
 ; Parse header and send data
@@ -298,7 +303,7 @@ bda_sendwords	lsr.b	#1, d3			; Convert d3 from byte count to word count
 		move.l	a7, a0			; a0 points to data to be sent
 		bracall	bda_sendbuf		; Send value in header
 		dbra	d3, .1
-		bra.w	bda_wait
+		bra.w	bda_finishwrite
 		
 ; Send byte by byte
 bda_sendbytes	subq	#1, d3			; Adjust for DBRA
@@ -306,7 +311,7 @@ bda_sendbytes	subq	#1, d3			; Adjust for DBRA
 		move.w	d3, d2
 		movea.l	a1, a0
 		bracall	bda_sendbuf		; Send buffer byte per byte
-		bra.w	bda_wait
+		bra.w	bda_finishwrite
 
 ; Send longs
 bda_sendlongs	lsr.b	#2, d3			; Convert d3 from byte count to long count
@@ -317,39 +322,41 @@ bda_sendlongs	lsr.b	#2, d3			; Convert d3 from byte count to long count
 		move.l	a7, a0			; a0 points to data to be sent
 		bracall	bda_sendbuf		; Send value in header
 		dbra	d3, .1
-		bra.w	bda_wait
+		bra.w	bda_finishwrite
 
 ; Send the 4 byte header
 bda_sendhead
 		; Setup port in output mode
 		move.b	#(CUP|CDOWN|CLEFT|CRIGHT|CTH|CTL|CTR), (a5)		; Raise TR
-		move.b	#(CUP|CDOWN|CLEFT|CRIGHT|CTL|CTR), (a6)
+		move.b	#(CTHINT|CUP|CDOWN|CLEFT|CRIGHT|CTL|CTR), (a6)
 
 		moveq	#3, d2			; Write 4 bytes
 		move.l	a7, a0			; a0 points to data to be sent
 
 ; Send memory buffer (a0 = address, d2 = byte count)
-bda_sendbuf	move.b	(a0)+, d0
+bda_sendbuf
+        move.b	(a0)+, d0
 		move.b	d0, d1			; d1 is used as scratch register
 		lsr.b	#4, d1			; Prepare high nybble
-		ori.b	#CTL|CTR, d1		; Keep clock high and wait for TH low, TR high
- 
+		ori.b	#CTL|CTR, d1    ;
+
+        waitack
+
 .1		move.b	d1, (a5)		; Place value
 		eori.b	#CTL, d1
 		move.b	d1, (a5)		; Pulse clock
 
-.2	cmp.b	(a5), d1		; Wait for ack
+        ; Prepare low nybble
+		and.b	d7, d0
+		ori.b	#CTR, d0		; Wait for TH high, TR high this time
+
+.2	cmp.b	(a5), d1		; Wait for ack (wait until TH = 0)
 		bne.b	.2
 		btst	d4, d1		; If ack was high, we were sending
 		bne.b	.3			; the second nybble : stop now
 
-
-		move.b	d0, d1			; Load the low nybble
-		and.b	d7, d1
-		ori.b	#CTH|CTR, d1		; Wait for TH high, TR high this time
-		bra.b	.1
+        move.b  d0, (a5)    ; Send low nybble
 .3
- VDPSETBG $080
 		dbra	d2, bda_sendbuf
 		subret
 
