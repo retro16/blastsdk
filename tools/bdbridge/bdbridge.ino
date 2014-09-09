@@ -307,33 +307,12 @@ void GenPort::genStopWrite() {
 
 uint8_t GenPort::genRead() {
   uint8_t v = 0;
-  uint8_t timeout = 255;
 
-  while(!digitalRead(GENTR))
-  {
-    if(!timeout--) {
-      return 0;
-    } 
-    else {
-#if F_CPU >= 20000000L
-      delayMicroseconds(1);
-#endif
-    }
-  }
+  // Wait until the genesis is ready to send
+  while(!digitalRead(GENTR));
 
-  timeout = 255;
   // Wait for clock
-  while(digitalRead(GENTL))
-  {
-    if(!timeout--) {
-      return 0;
-    } 
-    else {
-#if F_CPU >= 20000000L
-      delayMicroseconds(1);
-#endif
-    }
-  }
+  while(digitalRead(GENTL));
 
   // Read high nybble
 #ifdef GEN_AVRPORT
@@ -350,19 +329,13 @@ uint8_t GenPort::genRead() {
   digitalWrite(GENTH, LOW);
 
   // Wait for clock
-  timeout = 255;
   while(!digitalRead(GENTL))
   {
-    if(!digitalRead(GENTR) || !timeout--) {
+    if(!digitalRead(GENTR)) {
       // Genesis quit send mode
+      digitalWrite(GENTH, HIGH);
       pinMode(GENTH, INPUT); // Reset TH to input mode
       return 0;
-    }
-    else
-    {
-#if F_CPU >= 20000000L
-      delayMicroseconds(1);
-#endif
     }
   }
 
@@ -402,8 +375,6 @@ void forwardPacket(Stream *in, Stream *out)
 {
   uint8_t packet[BLSM_PACKET_MAX];
 
-  LEDON();
-
   // Read header and compute packet length
   uint8_t header = in->read();
   uint8_t packetLen = computePacketLen(header);
@@ -419,7 +390,6 @@ void forwardPacket(Stream *in, Stream *out)
     in->write(packet, packetLen);
     return;
   }
-  LEDOFF();
 
   // Write packet to other end
   out->write(packet, packetLen);
@@ -464,8 +434,6 @@ void loop()
   }
 #endif
 
-  LEDOFF();
-
   if(pc->available()) {
     // Store and forward packet
     forwardPacket(pc, gen);
@@ -478,6 +446,8 @@ void loop()
     // Store and forward packet
     forwardPacket(gen, pc);
   }
+
+  LEDOFF();
 }
 
 
