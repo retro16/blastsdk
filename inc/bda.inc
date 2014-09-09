@@ -8,6 +8,16 @@
 BDPCTRL		equ	CCTRL2
 BDPDATA		equ	CDATA2
 
+BDA_NEUTRALDATA	set	(CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_NEUTRALCTRL	set	(CTHINT|CTR)
+
+BDA_RECVDATA    set (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_RECVCTRL    set (CTL|CTR)
+
+BDA_SENDDATA    set (CTH|CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_SENDCTRL    set (CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
+
+
 ; Call this to initialize the monitor and setup gamepad link
 ; Level 2 interrupts must be enabled within VDP
 bda_init					; Call at console initialization
@@ -59,10 +69,7 @@ bda_init					; Call at console initialization
 	endif	; SCD == 1
 	endif	; SCD != 0
 
-BDA_NEUTRALDATA	set	(CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
-BDA_NEUTRALCTRL	set	(CTHINT|CTL|CTR)
-
-		; Setup gamepad port
+		; Setup gamepad port in neutral state (TR low, all other pins input, enable interrupt)
 		move.b	#BDA_NEUTRALDATA, BDPDATA		; Set all high except TR low
 		move.b	#BDA_NEUTRALCTRL, BDPCTRL	; Enable level 2 interrupts and set TL+TR as output
 
@@ -110,6 +117,12 @@ sendhead	macro
 .\?
 		endm
 
+sendhead_then	macro tailcall
+		lea	tailcall(pc), a4
+		jmp	(a3)
+.\?
+		endm
+
 recvbyte	macro
 		lea	.\?(pc), a4
 		jmp	(a2)
@@ -122,13 +135,18 @@ bracall		macro	dest
 .\?
 		endm
 
+tailcall		macro	dest, tail
+		lea	tail(pc), a4
+		bra.b	dest
+		endm
+
 subret		macro
 		jmp	(a4)
 		endm
 
 waitack macro
 .\?     btst    d4, (a5)
-        bne.b   .\?
+        beq.b   .\?
         endm
 
 
@@ -136,11 +154,11 @@ bda_recvbyte
 .1		btst	d4, (a5)		; Wait until clock low
 		bne.b	.1
 		move.b	(a5), d0		; Read high nybble
-		eori.b	#CTL, (a5)		; Pulse ack
+		andi.b	#~CTL, (a5)		; Pulse ack to low
 .2		btst	d4, (a5)		; Wait until clock high
 		beq.b	.2
 		move.b	(a5), d1		; Read low nybble
-		eori.b	#CTL, (a5)		; Pulse ack
+		ori.b	#CTL, (a5)		; Pulse ack to high
 		and.b	d7, d1			; Merge nybbles (D0+D1 => D0)
 		lsl.b	#4, d0
 		or.b	d1, d0
@@ -165,7 +183,7 @@ bda_writewords
 		dbra	d2, .2
 		move.w	d0, (a0)+		; Do the write
 		dbra	d3, .1			; Write next long
-		bra.w	bda_wait
+		bra.w	bda_readcmd
 
 bda_writelongs
 		lsr.b	#2, d3
@@ -177,7 +195,7 @@ bda_writelongs
 		dbra	d2, .2
 		move.l	d0, (a0)+		; Do the write
 		dbra	d3, .1			; Write next long
-		bra.b	bda_wait
+		bra.b	bda_readcmd
 
 bda_writebytes
 		subq.b	#1, d3
@@ -185,7 +203,7 @@ bda_writebytes
 .1		recvbyte
 		move.b	d0, (a0)+		; Do the write
 		dbra	d3, .1			; Write next byte
-		bra.b	bda_wait
+		bra.b	bda_readcmd
 
 
 ; Gamepad interrupt
@@ -197,7 +215,7 @@ g_int_trace
 		move.l	#$09, bda_pkt_header.w
 		bra.b	bda_enter
 g_int_trap07
-		move.l	#$27, bda_pkt_header.w    ; Send TRAP 7 code once entered monitor
+		move.l	#$27, bda_pkt_header.w  ; Send TRAP 7 code once entered monitor
 bda_enter
 		move.w	#$2700, sr		; Disable all interrupts
 
@@ -209,10 +227,10 @@ bda_enter
 		movem.l	d0-d7/a0-a6, -(a7)	; Push registers to bda_regs
 		subq.l	#4, a7			; Point a7 to bda_pkt_header
 		; Load frequently used constants in registers (to save code space)
-		moveq.l	#$00000006, d4	; Bit number of TH line (BCTH)
-		moveq.l	#$00000007, d5	; Longs per packet
-		moveq.l	#$0000001F, d6	; Bytes per packet
-		moveq.l	#$0000000F, d7	; Words per packet
+		moveq.l	#$00000006, d4	        ; Bit number of TH line (BCTH)
+		moveq.l	#$00000007, d5	        ; Longs per packet
+		moveq.l	#$0000001F, d6	        ; Bytes per packet
+		moveq.l	#$0000000F, d7	        ; Words per packet
 		lea	bda_recvbyte(pc), a2
 		lea	bda_sendhead(pc), a3
 		lea	BDPDATA, a5
@@ -223,19 +241,19 @@ bda_enter
 		sendhead			; Send the pre-buffered message
 
 bda_finishwrite
-		; Setup port in input mode
-		move.b	#BDA_NEUTRALDATA, (a5)		; Release all pins high and TR low
-		move.b	#BDA_NEUTRALCTRL, (a6)		; Set ack to output
 
         waitack
 
-bda_wait
+bda_readcmd
+		; Setup port in input mode
+		move.b	#BDA_RECVDATA, (a5)	; Release all pins high and TR low
+		move.b	#BDA_RECVCTRL, (a6)	; Set ack to output
+
 		; Wait the sender to pull TH
 .1		btst	d4, (a5)
 		bne.b	.1
 
 		; Read the incoming command + address (4 bytes)
-bda_readcmd
 		moveq	#3, d2
 		move.l	a7, a0			; a0 points to data to be sent
 .2		recvbyte
@@ -254,19 +272,19 @@ bda_escape
 		btst	#5, d3			; 001xxxxx = exit, 000xxxxx = handshake
 		bne.b	bda_exit
 
-		sendhead			; Pong : reply with the same command
-		bra.b	bda_wait
+		sendhead_then bda_finishwrite ; Pong : reply with the same command
 
 ; Exit from monitor
 bda_exit
 		move.l	#$20000000, (a7)
 		sendhead			; Signal that we leave monitor mode
 
-		move.b	#BDA_NEUTRALDATA, (a5)
-		move.b	#BDA_NEUTRALCTRL, (a6)
-
         ; Wait until the exit command has been acknowledged
         waitack
+
+        ; Set pad pins back to neutral state
+		move.b	#BDA_NEUTRALDATA, (a5)
+		move.b	#BDA_NEUTRALCTRL, (a6)
 
 		addq.l	#4, a7		; Point a7 back to registers
 		movem.l	(a7)+, d0-d7/a0-a6	; Pop registers
@@ -310,8 +328,7 @@ bda_sendbytes	subq	#1, d3			; Adjust for DBRA
 		and.w	d6, d3			; Filter out bits
 		move.w	d3, d2
 		movea.l	a1, a0
-		bracall	bda_sendbuf		; Send buffer byte per byte
-		bra.w	bda_finishwrite
+		tailcall	bda_sendbuf, bda_finishwrite		; Send buffer byte per byte
 
 ; Send longs
 bda_sendlongs	lsr.b	#2, d3			; Convert d3 from byte count to long count
@@ -327,8 +344,8 @@ bda_sendlongs	lsr.b	#2, d3			; Convert d3 from byte count to long count
 ; Send the 4 byte header
 bda_sendhead
 		; Setup port in output mode
-		move.b	#(CUP|CDOWN|CLEFT|CRIGHT|CTH|CTL|CTR), (a5)		; Raise TR
-		move.b	#(CTHINT|CUP|CDOWN|CLEFT|CRIGHT|CTL|CTR), (a6)
+		move.b	#BDA_SENDDATA, (a5)		; Raise TR
+		move.b	#BDA_SENDCTRL, (a6)  ; Set all pins except TH as output
 
 		moveq	#3, d2			; Write 4 bytes
 		move.l	a7, a0			; a0 points to data to be sent
@@ -344,24 +361,24 @@ bda_sendbuf
 
 .1		move.b	d1, (a5)		; Place value
 		eori.b	#CTL, d1
-		move.b	d1, (a5)		; Pulse clock
+		move.b	d1, (a5)		; Pulse TL to low (clock)
 
         ; Prepare low nybble
 		and.b	d7, d0
-		ori.b	#CTR, d0		; Wait for TH high, TR high this time
+		ori.b	#CTR, d0
 
 .2	cmp.b	(a5), d1		; Wait for ack (wait until TH = 0)
 		bne.b	.2
-		btst	d4, d1		; If ack was high, we were sending
-		bne.b	.3			; the second nybble : stop now
 
-        move.b  d0, (a5)    ; Send low nybble
-.3
+        move.b  d0, (a5)    ; Set low nybble (ack will be handled on next write cycle)
+        eori.b  #CTL, d0
+        move.b  d0, (a5)    ; Pulse TL to high (clock)
+
 		dbra	d2, bda_sendbuf
 		subret
 
 bda_code_end
-		assert bda_code_end < $FFFFB6
+		assert bda_code_end <= $FFFFB6
 	if SCD != 0
 		rend
 bda_code_source_end

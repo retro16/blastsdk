@@ -209,6 +209,27 @@ Mapping is the following :
     FFFFFE : SR
 
 
+Testing intermediate connectivity
+---------------------------------
+
+A special handshake allows to test communication between the PC and the
+Arduino. This command never reaches the Genesis.
+
+Send a test request :
+
+    00 FF FF FF
+
+The Arduino board should reply
+
+    00 FF FF FE
+
+The current arduino board also supports connectivity tests from the genesis
+side (the genesis can send 00FFFFF), but no genesis code make use of it.
+
+If you enabled LED in the arduino code, this test also blinks the LED, so it
+may be a bit slow to respond.
+
+
 Catching interrupts
 -------------------
 

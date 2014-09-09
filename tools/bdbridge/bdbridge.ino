@@ -34,11 +34,10 @@ EthernetClient client;
 #endif
 
 #ifdef BLINKLED
-#define BLINK(c,d) do { for(uint8_t i = 0; i < c; ++i) {digitalWrite(BLINKLED, HIGH); delay(d/2); digitalWrite(BLINKLED, LOW);delay(d/2);}} while(0)
 #define LEDON() do { digitalWrite(BLINKLED, HIGH); } while(0)
 #define LEDOFF() do { digitalWrite(BLINKLED, LOW); } while(0)
 #else
-#define BLINK(c) do {} while(0)
+#define ledblink(c,d) do {} while(0)
 #define LEDON() do {} while(0)
 #define LEDOFF() do {} while(0)
 #endif
@@ -58,7 +57,7 @@ public:
   {
     if(!buflen) {
       // Nothing in buffer - check real hardware
-      if(writeMode == 0 && digitalRead(GENTH) && !digitalRead(GENTL) && digitalRead(GENTR)) {
+      if(writeMode == 0 && digitalRead(GENTR) && !digitalRead(GENTL)) {
         // Genesis is writing : let's check this out
         peek();
       }
@@ -127,11 +126,11 @@ public:
     if(!writeMode) {
       genStartWrite();
     }
-    genWrite(c); 
+    uint8_t written = genWrite(c);
     if(!writeMode) {
       genStopWrite();
     }
-    return 1;
+    return written;
   }
   virtual size_t write(const uint8_t *buf, size_t size)
   {
@@ -222,12 +221,12 @@ void GenPort::begin() {
 }
 
 uint8_t GenPort::genWrite(uint8_t n) {
-  do {
+  while(!digitalRead(GENTL)) { // Wait for ack to be released
     if(digitalRead(GENTR)) {
       // Genesis left listening mode !
       return 0;
     }
-  } while(!digitalRead(GENTL)); // Wait for ack to be released
+  } 
   if(digitalRead(GENTR)) {
     // Genesis left listening mode !
     return 0;
@@ -243,16 +242,11 @@ uint8_t GenPort::genWrite(uint8_t n) {
   digitalWrite(GEND0, (n & 0X10) ? HIGH : LOW);
 #endif
   digitalWrite(GENTH, LOW); // Pulse clock until ack
-  do {
+  while(digitalRead(GENTL)) { // Wait for ack
     if(digitalRead(GENTR)) {
       // Genesis left listening mode !
       return 0;
     }
-  } 
-  while(digitalRead(GENTL)); // Wait for ack
-  if(digitalRead(GENTR)) {
-    // Genesis left listening mode !
-    return 0;
   }
 
   // Send low nybble
@@ -293,7 +287,7 @@ void GenPort::genStopWrite() {
   digitalWrite(GENTH, HIGH);
   pinMode(GENTH, INPUT);
 
-  while(!digitalRead(GENTR) && !digitalRead(GENTL)); // Wait for ack to be released
+  while(!digitalRead(GENTL) && !digitalRead(GENTR)); // Wait for ack to be released
 
   // Release data pins
 #ifdef GEN_AVRPORT
@@ -421,7 +415,6 @@ void forwardPacket(Stream *in, Stream *out)
 
   if(header == 0x00 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF) {
     // Handle communication test
-    BLINK(5, 300);
     packet[3] = 0xFE;
     in->write(packet, packetLen);
     return;
@@ -439,11 +432,13 @@ GenPort *gen = &genport;
 void setup()
 {
 #ifdef BLINKLED
-  pinMode(BLINKLED, OUTPUT);
+  pinMode(BLINKLED, OUTPUT); 
 #endif
 
   Serial.begin(115200);
   pc = &Serial; // By default, use serial port
+
+  LEDON();
 
   genport.begin();
 
@@ -469,14 +464,14 @@ void loop()
   }
 #endif
 
-  LEDON();
+  LEDOFF();
 
   if(pc->available()) {
     // Store and forward packet
     forwardPacket(pc, gen);
   }
 
-  LEDOFF();
+  LEDON();
 
   if(gen->available())
   {
