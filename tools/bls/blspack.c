@@ -47,10 +47,8 @@ size_t pack_raw(const char *filename)
   return filesize;
 }
 
-const char * sections_cat(group *bin)
+const char * sections_cat(group *bin, const char *binname)
 {
-  static char binname[4096];
-  snprintf(binname, 4096, BUILDDIR"/%s.bin", bin->name);
   FILE *i, *o;
   o = fopen(binname, "wb");
 
@@ -63,8 +61,10 @@ const char * sections_cat(group *bin)
     }
     char secfile[4096];
     snprintf(secfile, 4096, BUILDDIR"/%s", sec->name);
+    sec->physaddr = ftell(o);
     i = fopen(secfile, "rb");
     filecat(i, o);
+    sec->physsize = ftell(i);
     fclose(i);
   }
 

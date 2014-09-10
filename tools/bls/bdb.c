@@ -529,7 +529,14 @@ int main(int argc, char **argv)
         signal(SIGINT, breakpoint_interrupt);
       }
       sendcmd(CMD_EXIT, 0);
-      readdata();
+      do {
+        readdata();
+        if((inp[0] & 0xE0) == 0 && inp[0] & 0x03)
+        {
+          // The genesis sent data
+          fwrite(&inp[1], 1, inp[0] & 0x03, stdout);
+        }
+      } while((inp[0] & 0xE0) == 0 && inp[0] & 0x03);
       if((inp[0] & 0xE0) != CMD_EXIT)
       {
         printf("Error : genesis did not acknowledge.\n");

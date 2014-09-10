@@ -180,26 +180,6 @@ void output_parse(const mdconfnode *n, const char *name)
     group *g = binary_parse(NULL, name);
     mainout.binaries = blsll_insert_group(mainout.binaries, g);
   }
-
-
-  if(mainout.target == target_scd) {
-    const BLSLL(section) *section = sections;
-    BLSLL_FINDSTR(section, name, "ip.asm");
-    if(section)
-      mainout.ip = section->data;
-
-    section = sections;
-    BLSLL_FINDSTR(section, name, "sp.asm");
-    if(section)
-      mainout.sp = section->data;
-  } else {
-    const BLSLL(symbol) *entry = symbols;
-    BLSLL_FINDSTR(entry, name, "MAIN");
-    if(entry)
-      mainout.entry = entry->data;
-
-    mainout.mainstack = section_parse_nosrc(NULL, "mainstack");
-  }
 }
 
 void blsconf_load(const char *file) {
@@ -388,7 +368,7 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
     {
       // Matches an existing file : represents a source
       explicitdeps = 1;
-      g = source_parse(NULL, name);
+      g = source_parse(n, name);
       if(bin->bus != bus_none && g->bus == bus_none)
       {
         g->bus = bin->bus;

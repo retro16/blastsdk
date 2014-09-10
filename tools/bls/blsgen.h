@@ -13,11 +13,16 @@
 #define CDHEADERSIZE 0x200 // Size of CD
 #define SECCODESIZE 0x584 // Size of security code
 #define SPHEADERSIZE 0x28 // Size of SP header
+#define IPOFFSET (SECCODESIZE + 0x06) // Offset of IP binary
+#define SPOFFSET (0x6000 + SPHEADERSIZE) // Offset of SP binary
 #define CDBLOCKSIZE 2048 // ISO block size
-#define CDBLOCKCNT 360000 // Number of blocks in a 80 minutes CD-ROM
+#define MAXCDBLOCKS 270000 // Maximum number of blocks in a CD-ROM
 
+#ifndef MAINSTACKSIZE
+#define MAINSTACKSIZE 0x100 // Default stack size
+#endif
 #ifndef MAINSTACK
-#define MAINSTACK 0xFFF800 // Default stack pointer
+#define MAINSTACK 0xFD00 // Default stack pointer
 #endif
 
 #ifndef BLSPREFIX
@@ -142,11 +147,13 @@ struct blsll_node_group;
 typedef struct group {
   format format;
   char *name;
+  sv physaddr; // Physical address on medium
+  sv physsize; // Size on physical medium
+  int physalign; // Alignment on physical medium
+
   int optimize; // Optimization level (used for compilation or compression level)
   bus bus;
   bankconfig banks; // Status of banks when using the source
-  sv physaddr; // Used only in scd binaries
-  sv physsize; // Used only in scd binaries
 
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
@@ -171,11 +178,11 @@ struct blsll_node_section;
 typedef struct section {
   format format;
   char *name; // Source name with segment name appended
-  char *datafile; // Data file name
-
   sv physaddr; // Physical address on medium
   sv physsize; // Size on physical medium
   int physalign; // Alignment on physical medium
+
+  char *datafile; // Data file name
 
   struct symbol *symbol; // Target address
   int align;
@@ -196,6 +203,10 @@ BLSLL_DECLARE(section, section_free)
 typedef struct element {
   format format;
   char *name;
+  sv physaddr; // Physical address on medium
+  sv physsize; // Size on physical medium
+  int physalign; // Alignment on physical medium
+
 } element;
 static inline void element_free(element *element) { (void)element; printf("Error: tried to free a generic element\n"); exit(1); }
 BLSLL_DECLARE(element, element_free)
@@ -248,7 +259,7 @@ group * binary_find_sym(const char *name);
 group * binary_find_providing(BLSLL(group) * glist, section *section);
 
 int sections_overlap(section *s1, section *s2);
-int sections_phys_overlap(section *s1, section *s2);
+int phys_overlap(element *s1, element *s2);
 
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);

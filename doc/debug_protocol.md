@@ -250,3 +250,26 @@ Only these 2 interrupts are caught by default. You must ensure that the
 interrupt vectors are set to g_int_trace and g_int_trap07 of bda.inc to make
 it work correctly.
 
+
+Receiving arbitrary data from the Genesis
+-----------------------------------------
+
+The Genesis may send small packets of arbitrary data (1-3 bytes per command) :
+The 3 most significant bits of header are 0 (like a pong), the 5 remaining bits
+specify the data length (1 to 3) and data is in the address field.
+
+Packet sent by the genesis to send "\n" (0A) :
+
+    01 0A 00 00
+
+Packet sent by the genesis to send "OK\n" (4F4B0A) :
+
+    03 4F 4B 0A
+
+To send more than 3 bytes, you must send as many commands as needed. This is
+inefficient, but it avoids doing complex computations when implementing the
+low level protocol in the Arduino
+
+Currently, BDB is able to display incoming data when running the program with
+the "go" command.
+

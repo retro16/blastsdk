@@ -8,6 +8,10 @@
 #include <sys/stat.h>
 #include <libgen.h>
 
+#include "scdboot_us.c"
+#include "scdboot_eu.c"
+#include "scdboot_jp.c"
+
 output mainout;
 
 void skipblanks(const char **l)
@@ -405,7 +409,31 @@ sections_overlap_same_binaries:
   return 1;
 }
 
-int sections_phys_overlap(section *s1, section *s2)
+int phys_overlap(element *s1, element *s2)
+{
+  if(s1->physaddr == -1 || s1->physsize == -1) {
+    printf("Error : undefined physical location for section %s\n", s1->name);
+    exit(1);
+  }
+
+  if(s2->physaddr == -1 || s2->physsize == -1) {
+    printf("Error : undefined physical location for section %s\n", s2->name);
+    exit(1);
+  }
+
+  sv s1addr = s1->physaddr;
+  sv s1end = s1addr + s1->physsize;
+  sv s2addr = s2->physaddr;
+  sv s2end = s2addr + s2->physsize;
+
+  if(s1addr >= s2end || s2addr >= s1end) {
+    return 0;
+  }
+
+  return 1;
+}
+
+int binaries_phys_overlap(section *s1, section *s2)
 {
   if(s1->physaddr == -1 || s1->physsize == -1) {
     printf("Error : undefined physical location for section %s\n", s1->name);
@@ -452,7 +480,9 @@ symbol *symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, secti
       s->value.chip = chip_none;
       s->value.addr = -1;
       s->section = section;
-      symbols = blsll_insert_symbol(symbols, s);
+      if(*symlist != symbols) {
+        symbols = blsll_insert_symbol(symbols, s);
+      }
     } else {
       if(symlist) {
         *symlist = blsll_insert_symbol(*symlist, s);
@@ -844,8 +874,8 @@ void bls_find_entry()
     default:
     {
       mainout.entry = symbol_find("MAIN");
-      if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
       if(!mainout.entry) mainout.entry = symbol_find("main");
+      if(!mainout.entry) mainout.entry = symbol_find("MAIN_ASM");
       if(!mainout.entry) {
         printf("Could not find MAIN entry point.\n");
         exit(1);
@@ -877,9 +907,10 @@ bls_find_entry_default_exit:
 
     case target_scd:
     {
-      mainout.ip = section_find("IP_ASM");
-      if(!mainout.ip) mainout.ip = section_find("IP_MAIN");
-      if(!mainout.ip) mainout.ip = section_find("ip_main");
+      symbol *sym;
+      sym = symbol_find("IP_MAIN");
+      if(!sym) sym = symbol_find("ip_main");
+      if(sym) mainout.ip = sym->section;
       if(!mainout.ip) {
         printf("Could not find IP entry point.\n");
         exit(1);
@@ -897,10 +928,18 @@ bls_find_entry_default_exit:
         }
       }
 bls_find_entry_scd_ip_exit:
+      // Premap IP at fixed location
+      mainout.ip->symbol->value.chip = chip_ram;
+      if(mainout.ip->symbol->value.addr == -1) {
+        mainout.ip->symbol->value.addr = IPOFFSET;
+      } else if(mainout.ip->symbol->value.addr != IPOFFSET) {
+        printf("Error : invalid offset for IP.\n");
+        exit(1);
+      }
 
-      mainout.sp = section_find("SP_ASM");
-      if(!mainout.sp) mainout.sp = section_find("SP_MAIN");
-      if(!mainout.sp) mainout.sp = section_find("sp_main");
+      sym = symbol_find("SP_MAIN");
+      if(!sym) sym = symbol_find("sp_main");
+      if(sym) mainout.sp = sym->section;
       if(!mainout.sp) {
         printf("Could not find SP entry point.\n");
         exit(1);
@@ -917,6 +956,14 @@ bls_find_entry_scd_ip_exit:
         }
       }
 bls_find_entry_scd_sp_exit:
+      // Premap SP at fixed location
+      mainout.sp->symbol->value.chip = chip_pram;
+      if(mainout.sp->symbol->value.addr == -1) {
+        mainout.sp->symbol->value.addr = SPOFFSET;
+      } else if(mainout.sp->symbol->value.addr != SPOFFSET) {
+        printf("Error : invalid offset for SP.\n");
+        exit(1);
+      }
 
       break;
     }
@@ -1183,7 +1230,7 @@ void bls_physmap_cart()
       BLSLL_FOREACH(s, sl) {
         if(s == sec || s->physsize == 0 || s->physaddr == -1) continue;
         printf("Overlaps ? %s(%06X-%06X) <-> %s(%06X-%06X)  ", sec->name, (uint32_t)sec->symbol->value.addr, (uint32_t)(sec->symbol->value.addr + sec->size - 1), s->name, (uint32_t)s->symbol->value.addr, (uint32_t)(s->symbol->value.addr + s->size - 1));
-        if(sections_phys_overlap(sec, s)) {
+        if(phys_overlap((element*)sec, (element*)s)) {
           printf("YES : %06X => ", (unsigned int)sec->physaddr);
           sec->physaddr = align_value(s->physaddr + s->physsize, 2);
           if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
@@ -1224,6 +1271,87 @@ bls_map_next_section:
 
 void bls_physmap_cd()
 {
+  if(!mainout.ip || !mainout.sp || !mainout.ipbin || !mainout.spbin || mainout.ipbin->physsize == -1 || mainout.spbin->physsize == -1)
+  {
+    printf("Error : could not find valid IP and SP binaries.\n");
+    exit(1);
+  }
+  if(mainout.ip->symbol->value.chip != chip_ram || mainout.ip->symbol->value.addr != IPOFFSET)
+  {
+    printf("Error : Invalid IP location.\n");
+    exit(1);
+  }
+  if(mainout.sp->symbol->value.chip != chip_pram || mainout.sp->symbol->value.addr != SPOFFSET)
+  {
+    printf("Error : Invalid SP location.\n");
+    exit(1);
+  }
+  
+  sv physstart = align_value(mainout.spbin->physaddr + mainout.spbin->physsize, CDBLOCKSIZE);
+  sv physend = MAXCDBLOCKS;
+
+  BLSLL(group) *binl = usedbinaries;
+  group *bin;
+  BLSLL_FOREACH(bin, binl) {
+    if(bin->physsize == -1) {
+      printf("Error : %s has unknown size.\n", bin->name);
+      exit(1);
+    }
+    if(bin->physsize == 0) {
+      bin->physaddr = -1;
+      continue;
+    }
+    if(bin->physaddr != -1) {
+      // Binary already mapped
+      continue;
+    }
+    // Find a place for this binary
+    bin->physaddr = physstart;
+    printf("Binary %s : size=%04X physstart=%06X physend=%06X\n", bin->name, (unsigned int)bin->physsize, (unsigned int)physstart, (unsigned int)physend);
+    while(bin->physaddr + bin->physsize <= physend) {
+      BLSLL(group) *sl = usedbinaries;
+      group *s;
+      BLSLL_FOREACH(s, sl) {
+        if(s == bin || s->physsize == 0 || s->physaddr == -1) continue;
+        if(phys_overlap((element*)bin, (element*)s)) {
+          printf("YES : %06X => ", (unsigned int)bin->physaddr);
+          bin->physaddr = align_value(s->physaddr + s->physsize, CDBLOCKSIZE);
+          if(bin->physaddr < physstart || bin->physaddr + bin->physsize > physend)
+          {
+            printf("Error : Physical address %06X out of range (%06X-%06X)\n", (unsigned int)bin->physaddr, (unsigned int)physstart, (unsigned int)physend);
+            exit(1);
+          }
+          printf("%06X\n", (unsigned int)bin->physaddr);
+          goto bls_map_next_binary_addr;
+        }
+      }
+      // Found
+      printf("NO\n");
+      goto bls_map_next_binary;
+bls_map_next_binary_addr:
+      continue;
+    }
+
+    if(bin->physaddr + bin->physsize >= physend) {
+      printf("Error : could not map binary %s : not enough memory in cart\n", bin->name);
+      exit(1);
+    }
+bls_map_next_binary:
+    continue;
+  }
+
+  binl = usedbinaries;
+  BLSLL_FOREACH(bin, binl) {
+    char *s = symname2(bin->name, "_SECTOR");
+    chipaddr secca = {chip_none, bin->physaddr / CDBLOCKSIZE};
+    symbol_set(NULL, s, secca, NULL);
+    free(s);
+
+    s = symname2(bin->name, "_SECCNT");
+    chipaddr szca = {chip_none, (bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE};
+    symbol_set(NULL, s, szca, NULL);
+    free(s);
+  }
 }
 
 void bls_finalize_binary_dependencies()
@@ -1305,13 +1433,31 @@ void bls_finalize_binary_dependencies()
     }
   }
 
-  if(mainout.mainstack->symbol->value.addr == -1)
+  if(mainout.target != target_scd)
   {
-    // Map stack to a default place
-    mainout.mainstack->symbol->value.chip = chip_ram;
-    mainout.mainstack->symbol->value.addr = 0xFC00;
-    mainout.mainstack->size = 0x100;
-    mainout.mainstack->format = format_empty;
+    if(!mainout.mainstack)
+    {
+      sections = blsll_create_section(sections);
+      mainout.mainstack = sections->data;
+      mainout.mainstack->name = strdup("mainstack");
+      mainout.mainstack->format = format_empty;
+    }
+
+    if(!mainout.mainstack->symbol)
+    {
+      symbols = blsll_create_symbol(symbols);
+      mainout.mainstack->symbol = symbols->data;
+      mainout.mainstack->symbol->name = strdup("MAINSTACK");
+    }
+
+    if(mainout.mainstack->symbol->value.addr == -1)
+    {
+      // Map stack to a default place
+      mainout.mainstack->symbol->value.chip = chip_ram;
+      mainout.mainstack->symbol->value.addr = MAINSTACK - MAINSTACKSIZE;
+      mainout.mainstack->size = MAINSTACKSIZE;
+      mainout.mainstack->format = format_empty;
+    }
   }
 
   // Premap all sources
@@ -1338,19 +1484,54 @@ void bls_finalize_binary_dependencies()
 
 void bls_pack_binaries()
 {
-  // Packs each binary into separate files and compress them
-  BLSLL(group) *binl = mainout.bol;
+  // Packs each section into separate files and compress them
+  BLSLL(group) *binl = usedbinaries;
   group *bin;
   BLSLL_FOREACH(bin, binl) {
-    sections_cat(bin);
+    char binname[4096];
+    snprintf(binname, 4096, BUILDDIR"/%s.binary", bin->name);
+    sections_cat(bin, binname);
+
+    if(!bin->physsize) {
+      continue;
+    }
+    printf("Packing binary %s\n", bin->name);
     switch(bin->format) {
       default:
       case format_raw:
       {
-
+        size_t fs = pack_raw(bin->name);
+        printf("Size of %s : %04X\n", bin->name, (unsigned int)fs);
+        bin->physsize = fs;
+        break;
+      }
+      case format_empty:
+      case format_zero:
+      {
+        bin->physsize = 0;
         break;
       }
     }
+  }
+
+  // Update _PHYSSIZE and _OFFSET symbols with final values
+  BLSLL(section) *secl = sections;
+  section *sec;
+  BLSLL_FOREACH(sec, secl) {
+    char s[1024];
+
+    chipaddr nullca;
+    nullca.chip = chip_none;
+    nullca.addr = sec->physsize;
+
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_PHYSSIZE");
+    symbol_set(&sec->intsym, s, nullca, sec);
+
+    nullca.addr = sec->physaddr;
+    strcpy(s, sec->symbol->name);
+    strcat(s, "_BINOFFSET");
+    symbol_set(&sec->intsym, s, nullca, sec);
   }
 }
 
@@ -1398,6 +1579,173 @@ void bls_pack_sections()
   }
 }
 
+
+void bls_build_genesis_header(FILE *f)
+{
+  if(mainout.target == target_gen)
+  {
+    if(mainout.region && mainout.region[0] == 'U')
+    {
+      fprintf(f, "SEGA GENESIS    ");
+    }
+    else
+    {
+      fprintf(f, "SEGA MEGA DRIVE ");
+    }
+  }
+  else if(mainout.target == target_ram)
+  {
+      fprintf(f, "SEGA RAM PROGRAM");
+  }
+  else if(mainout.target == target_scd)
+  {
+    fprintf(f, "SEGA CD         ");
+  }
+  // TODO : build header
+}
+
+
+void bls_build_cd_image()
+{
+  printf("Writing CD image to %s\n", mainout.file);
+
+  FILE *f = fopen(mainout.file, "w");
+
+  BLSLL(group) *binl = usedbinaries;
+  group *bin;
+  BLSLL_FOREACH(bin, binl) {
+    if(bin->physaddr == -1) continue;
+
+    char inname[4096];
+    snprintf(inname, 4096, BUILDDIR"/%s.binary.phy", bin->name);
+
+    FILE *i = fopen(inname, "r");
+    if(!i) {
+      printf("Error : cannot find physical image %s for binary %s\n", inname, bin->name);
+      exit(1);
+    }
+
+    fseek(f, bin->physaddr, SEEK_SET);
+    filecat(i, f);
+
+    fclose(i);
+  }
+
+  if(!mainout.region)
+  {
+    mainout.region = strdup("U");
+  }
+  
+  fseek(f, 0, SEEK_SET);
+
+  fprintf(f, "SEGADISCSYSTEM  ");
+  fprintf(f, "           "); // TITLE
+  fwrite("\x00\x00\x00\x00\x01", 1, 5, f);
+  fprintf(f, "           "); // AUTHOR
+  fwrite("\x00\x00\x00\x00\x00", 1, 5, f);
+
+  fputlong(mainout.ipbin->physaddr, f);
+  fputlong(mainout.ipbin->physsize, f);
+  fputlong(0, f);
+  fputlong(0, f);
+
+  fputlong(mainout.spbin->physaddr, f);
+  fputlong(mainout.spbin->physsize, f);
+  fputlong(0, f);
+  fputlong(0, f);
+
+  int i;
+  for(i = 0; i < 176; ++i) fputc(' ', f);
+
+  bls_build_genesis_header(f);
+
+  if(ftell(f) != CDHEADERSIZE) printf("Warning: genesis header does not have the correct size.\n");
+
+  // Output security code before IP
+  switch(mainout.region[0]) {
+    case 'U':
+      fwrite(scdboot_us, 1, sizeof(scdboot_us), f);
+      break;
+    case 'E':
+      fwrite(scdboot_eu, 1, sizeof(scdboot_eu), f);
+      break;
+    case 'J':
+      fwrite(scdboot_jp, 1, sizeof(scdboot_jp), f);
+      break;
+  }
+
+  sv ipmain = symbol_get_bus("IP_MAIN", bus_sub);
+  if(ipmain == -1) ipmain = symbol_get_bus("ip_main", bus_sub);
+
+  fwrite("\x4E\xF9", 1, 2, f); // JMP to the IP entry point
+  fputlong(ipmain, f);
+  if(ftell(f) < CDHEADERSIZE + IPOFFSET) {
+    for(i = ftell(f); i < CDHEADERSIZE + SECCODESIZE; ++i) {
+      fputc('\xFF', f);
+    }
+    fwrite("\x4E\xF9", 1, 2, f); // JMP to the IP entry point - This is repeated to ease region change patch
+  }
+
+  // Output SP header
+  fseek(f, mainout.spbin->physaddr - SPHEADERSIZE, SEEK_SET);
+  if(ftell(f) % 0x7FF) printf("Warning : SP header is not aligned on a sector boundary.\n");
+
+  // 0x00 program name
+  fprintf(f, "MAIN       ");
+  fputc(0, f);
+
+  // 0x0C Version
+  fputword(0, f);
+
+  // 0x0E Type
+  fputword(0, f);
+
+  // 0x10 Next header
+  fputlong(0, f);
+
+  // 0x14 Length
+  fputlong(mainout.spbin->physaddr + SPHEADERSIZE, f);
+
+  // 0x18 Entry point table offset
+  fputlong(0x20, f);
+  fputlong(0x20, f);
+
+  sv spmain = symbol_get_bus("SP_MAIN", bus_sub);
+  if(spmain == -1) spmain = symbol_get_bus("sp_main", bus_sub);
+  if(spmain == -1)
+  {
+    printf("Error : cannot find sp_main symbol\n");
+    exit(1);
+  }
+  sv spinit = symbol_get_bus("SP_INIT", bus_sub);
+  if(spinit == -1) spinit = symbol_get_bus("sp_init", bus_sub);
+  if(spinit == -1) spinit = spmain;
+  sv spl2 = symbol_get_bus("G_SUB_HWINT_LEVEL2", bus_sub);
+  if(spl2 == -1) spl2 = symbol_get_bus("G_SUB_INT_LEVEL2", bus_sub);
+  
+  if(spinit > 0x6020 + 0xFFFF) {
+    printf("SP_INIT is too far from the beginning of the SP binary file.\n");
+    exit(1);
+  }
+  if(spmain > 0x6020 + 0xFFFF) {
+    printf("SP_MAIN is too far from the beginning of the SP binary file.\n");
+    exit(1);
+  }
+  if(spl2 > 0x6020 + 0xFFFF) {
+    printf("SUB LEVEL2 interrupt is too far from the beginning of the SP binary file.\n");
+    exit(1);
+  }
+
+  // 0x20 Entry points
+  fputword(spinit - 0x6020, f);
+  fputword(spmain - 0x6020, f);
+  fputword(spl2 == -1 ? 0 : spl2 - 0x6020, f);
+  fputword(0, f);
+
+  // 0x28 : End of SP header (SPHEADERSIZE)
+}
+
+
 void bls_build_cart_image()
 {
   printf("Writing image to %s\n", mainout.file);
@@ -1405,7 +1753,7 @@ void bls_build_cart_image()
 
   // Write data
 
-  BLSLL(section) *secl = sections;
+  BLSLL(section) *secl = usedsections;
   section *sec;
   BLSLL_FOREACH(sec, secl) {
     if(sec->physaddr == -1 || sec->physsize == 0) continue;
@@ -1532,22 +1880,8 @@ void bls_build_cart_image()
 
   // Write SEGA header
   fseek(f, 0x000100, SEEK_SET);
-  if(mainout.target == target_gen)
-  {
-    if(mainout.region && mainout.region[0] == 'U')
-    {
-      fprintf(f, "SEGA GENESIS    ");
-    }
-    else
-    {
-      fprintf(f, "SEGA MEGA DRIVE ");
-    }
-  }
-  else if(mainout.target == target_ram)
-  {
-      fprintf(f, "SEGA RAM PROGRAM");
-  }
-  // TODO : build header
+
+  bls_build_genesis_header(f);
 
   // Compute checksum
   // TODO
@@ -1696,8 +2030,11 @@ int main(int argc, char **argv)
     bls_build_cart_image(); // Build the final cart image
   }
   else {
-    bls_pack_binaries(); // Final packing pass
+    bls_pack_binaries(); // Pack once to find physical size for all files
     bls_physmap_cd(); // Map physical CD
+    bls_compile(); // Compile with physical addresses
+    bls_pack_binaries(); // Final packing pass
+    bls_build_cd_image(); // Build the final CD image
   }
 }
 
