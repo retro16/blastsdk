@@ -1194,7 +1194,7 @@ void bls_map_section(section *sec)
     // Found
     goto bls_map_next_section;
 bls_map_next_section_addr:
-    return;
+    continue;
   }
 
   if(sec->symbol->value.addr + sec->size >= chipend) {
