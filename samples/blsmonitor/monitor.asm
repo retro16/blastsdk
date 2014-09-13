@@ -4,8 +4,8 @@ monitor_init	; Call this to initialize the monitor
 		VDPSETADDRREG			; Use a4/a5 for VDP macros
 
 		; Clear VRAM
-		VDPSETREG 1, VDPR01
-		VDPSETREG 15, VDPR15 | 2
+		VDPSETREG 1, VDPR01		; Disable display, disable VINT, disable DMA
+		VDPSETREG 15, VDPR15 | 2		; Set autoincrement to 2
 		VDPSETWRITE 0, VRAM
 		move.w	#$7FFF, d0
 		moveq	#0, d1
@@ -35,6 +35,13 @@ monitor_init	; Call this to initialize the monitor
 		move.l	#$00000000, value
 		move.w	#0, cursor
 		move.b	#1, mode
+
+		if SCD == 1
+		; Set vblank interrupt entry point on SCD
+		movea.l	$78, a0					; Read vector target
+		move.w	#$4EF9, (a0)+			; Write JMP
+		move.l	#g_int_vblank, (a0)		; Write target
+		endif
 
 		rts
 

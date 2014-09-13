@@ -146,6 +146,73 @@ beh_vdp_regs
 		db	VDPR22			; #22
 		db	VDPR23			; #23
 
+beh_init macro
+        if SCD != 0
+        jsr beh_init_scd_vectors
+        endif
+        endm
+
+        if SCD != 0
+beh_init_scd_vectors
+        moveq   #(beh_scd_vectors_end - beh_scd_vectors)/6 - 1, d0  ; Loop count
+        move.w  #$4EF9, d1      ; JMP instruction
+        lea beh_scd_vectors, a0 ; Vector table
+.vec_loop
+        movea.w  (a0)+, a1      ; Read vector to alter
+        move.l  (a1), a1        ; Go to vector target
+        move.w  d1, (a1)+       ; Write JMP
+        move.l  (a0)+, (a1)     ; Write JMP target address
+        dbra    d0, .vec_loop
+        rts
+
+beh_scd_vectors
+        dw  $0C
+        dl  g_int_addrerr
+        dw  $14
+        dl  g_int_zdiv
+        dw  $18
+        dl  g_int_chk
+        dw  $1C
+        dl  g_int_trapv
+        dw  $20
+        dl  g_int_priv
+        dw  $28
+        dl  g_int_linea
+        dw  $2C
+        dl  g_int_linef
+        dw  $80
+        dl  g_int_trap00
+        dw  $84
+        dl  g_int_trap01
+        dw  $88
+        dl  g_int_trap02
+        dw  $8C
+        dl  g_int_trap03
+        dw  $90
+        dl  g_int_trap04
+        dw  $94
+        dl  g_int_trap05
+        dw  $98
+        dl  g_int_trap06
+        dw  $A0
+        dl  g_int_trap08
+        dw  $A4
+        dl  g_int_trap09
+        dw  $A8
+        dl  g_int_trap10
+        dw  $AC
+        dl  g_int_trap11
+        dw  $B0
+        dl  g_int_trap12
+        dw  $B4
+        dl  g_int_trap13
+        dw  $B8
+        dl  g_int_trap14
+        dw  $BC
+        dl  g_int_trap15
+beh_scd_vectors_end
+        endif
+
 beh_font
 		hex	00000000 00000000
 		hex	3C42464A 52623C00

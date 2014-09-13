@@ -1503,6 +1503,8 @@ void bls_finalize_binary_dependencies()
       symbols = blsll_create_symbol(symbols);
       mainout.mainstack->symbol = symbols->data;
       mainout.mainstack->symbol->name = strdup("MAINSTACK");
+      mainout.mainstack->symbol->value.chip = chip_ram;
+      mainout.mainstack->symbol->value.addr = -1;
     }
 
     if(mainout.mainstack->symbol->value.addr == -1)
