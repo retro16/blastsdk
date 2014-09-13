@@ -4,7 +4,7 @@ read / write to RAM using the gamepad.
 Section font.png.img
 ====================
 
- - chip cart
+ - chip ram
 
 Binary main
 ===========
@@ -17,7 +17,7 @@ Output monitor
 
  - name **BLS MONITOR**
  - copyright **(C)2014 RETRO16**
- - file monitor.bin
+ - file monitor_ram.bin
  - region JUE
- - target gen
+ - target ram
 

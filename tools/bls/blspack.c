@@ -68,5 +68,8 @@ const char * sections_cat(group *bin, const char *binname)
     fclose(i);
   }
 
+  bin->physsize = ftell(o);
+  fclose(o);
+
   return binname;
 }

@@ -1,6 +1,6 @@
 		if SCD != 0
 		org	$FFFDBE
-bda_code	ds	$1F8			; Final code place
+		ds	$1F8			; Final code place
 		else
 		org	$FFFFB6			; On the genesis, code stays in ROM
 		endif

@@ -13,9 +13,10 @@
 #define CDHEADERSIZE 0x200 // Size of CD
 #define SECCODESIZE 0x584 // Size of security code
 #define SPHEADERSIZE 0x28 // Size of SP header
-#define IPOFFSET (SECCODESIZE + 0x06) // Offset of IP binary
-#define SPOFFSET (0x6000 + SPHEADERSIZE) // Offset of SP binary
+#define IPOFFSET (SECCODESIZE + 6) // chip address of IP binary in RAM
+#define SPOFFSET (0x6000 + SPHEADERSIZE) // chip address of SP binary in PRAM
 #define CDBLOCKSIZE 2048 // ISO block size
+#define MINCDBLOCKS 300 // Minimum number of blocks in a CD-ROM
 #define MAXCDBLOCKS 270000 // Maximum number of blocks in a CD-ROM
 
 #ifndef MAINSTACKSIZE

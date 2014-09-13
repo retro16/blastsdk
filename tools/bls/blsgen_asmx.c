@@ -11,22 +11,23 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
   (void)mdconf;
   section *s;
 
-  source->provides = blsll_insert_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".bin")));
+  source->provides = blsll_insert_unique_section(source->provides, (s = section_parse_ext(mdconf, source->name, ".bin")));
   s->source = source;
   
-  if(strstr(s->name, "_ram.bin")) {
+  if(strstr(s->name, "_ram.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_ram;
+    if(s->format == format_auto) s->format = format_empty;
     if(source->bus == bus_none) source->bus = bus_main;
   }
-  else if(strstr(s->name, "_cart.bin")) {
+  else if(strstr(s->name, "_cart.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_cart;
     if(source->bus == bus_none) source->bus = bus_main;
   }
-  else if(strstr(s->name, "_pram.bin")) {
+  else if(strstr(s->name, "_pram.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_pram;
     if(source->bus == bus_none) source->bus = bus_sub;
   }
-  else if(strstr(s->name, "_wram.bin")) {
+  else if(strstr(s->name, "_wram.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_wram;
     if(source->bus == bus_none) source->bus = bus_sub;
   }
@@ -86,6 +87,14 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       if(strncasecmp("ORG", c, 3) == 0 && c[3] <= ' ')
       {
         // first ORG declaration : map to address
+        if(src->bus == bus_none) {
+          // Guess bus based on context
+          if(mainout.target == target_scd && address < 0xA00000) {
+            src->bus = bus_sub;
+          } else {
+            src->bus = bus_main;
+          }
+        }
         busaddr ba;
         ba.bus = src->bus;
         ba.addr = address;
@@ -412,4 +421,4 @@ void source_premap_asmx(group *src)
       break;
     }
   }
-}
+printf("%s addr %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);}
