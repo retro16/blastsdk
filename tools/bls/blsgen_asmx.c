@@ -363,6 +363,8 @@ void source_get_symbols_asmx(group *s)
   snprintf(cmdline, 4096, "asmx -C 68000 -b 0x40000 -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l "BUILDDIR"/%s.lst -o /dev/null %s", include_prefixes, defs, s->bus, mainout.target, mainout.target, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
+  snprintf(cmdline, 4096, "cp "BUILDDIR"/%s.lst "BUILDDIR"/%s.lst.1", s->name, s->name);
+  system(cmdline);
 
   // Generate and parse symbols from listing
   parse_symbols_asmx(s, 0);

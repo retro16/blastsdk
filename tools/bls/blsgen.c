@@ -1157,6 +1157,7 @@ void bls_map_section(section *sec)
     exit(1);
   } else if(!sec->size) {
     // Sections with null size don't need mapping
+    printf("Section %s is empty : no mapping.\n", sec->name);
     return;
   }
   if(sec->symbol->value.chip == chip_none) {
@@ -1165,6 +1166,7 @@ void bls_map_section(section *sec)
   }
   if(sec->symbol->value.addr != -1) {
     // Section address already known
+    printf("Section %s already mapped at %06X.\n", sec->name, (uint32_t)sec->symbol->value.addr);
     return;
   }
 
@@ -1210,6 +1212,8 @@ void bls_map()
   // Do logical section mapping
   BLSLL(section) *secl;
   section *sec;
+
+  printf("Map logical addresses.\n");
 
   if(mainout.target == target_scd) {
     // Map IP and SP first, to pack them as tightly as possible in RAM
@@ -2120,6 +2124,7 @@ int main(int argc, char **argv)
   if(mainout.target != target_gen) {
     bls_cart_to_ram();
   }
+  bls_get_symbols(); // Get binary size with correct binary load
   bls_map();
   bls_get_symbol_values();
   bls_compile(); // Compile with most values to get a good approximation of file sizes

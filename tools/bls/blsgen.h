@@ -31,7 +31,7 @@
 #endif
 
 #ifndef BUILDDIR
-#define BUILDDIR "blsgen_build"
+#define BUILDDIR "build_blsgen"
 #endif
 
 extern BLSLL(group) *sources;
