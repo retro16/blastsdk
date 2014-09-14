@@ -140,6 +140,7 @@ beh_vdp_regs
 		db	VDPR16 | VDPSCRH64	; #16 - Plane size
 		db	VDPR17			; #17
 		db	VDPR18			; #18
+        align   2
 
 beh_init macro
         if SCD != 0

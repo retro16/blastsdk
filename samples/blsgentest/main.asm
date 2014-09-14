@@ -15,6 +15,7 @@ main
 		lea	Hello_World, a0
 		bsr.b	print
 
+		trap	#00
 		move.w	#$2000, sr		; Enable interrupts
 .1		bra.b	.1
 

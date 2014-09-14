@@ -57,6 +57,9 @@ bda_init					; Call at console initialization
 .3		move.w	(a1)+, (a0)+
 		dbra	d0, .3
 
+        ; Copy current level 2 exception vector to the new sub code handler
+        move.l  $020068, bda_l2_jmp + 2
+
 		; Set level 2 exception vector for sub CPU
 		move.l	#bda_sub_l2, $020068
 
@@ -388,6 +391,7 @@ bda_code_source_end
 		; Sub CPU code
 
 	if SCD == 1
+BUS     set BUS_SUB
 bdasub_d0	set	$0000C0			; Place monitor after exception vectors
 
 bdasub_sp	set	bdasub_d0 + 15*4
@@ -419,10 +423,11 @@ bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 		move.w	bdasub_sr.w, (a7)	; Restore SR in case it was changed by the monitor
 		move.l	bdasub_pc.w, 2(a7)	; Restore PC
 		btst	#7, GA_COMMFLAGS	; If voluntary interruption
-		bra.b	bda_l2_default		; Ignore exception vector call
+		bne.b	bda_l2_default		; Ignore exception vector call
 
 bda_l2_jmp	jmp	bda_l2_default.l
-bda_l2_default	rte
+bda_l2_default	
+        rte
 bda_sub_trap	bset	#7, GA_COMMFLAGS	; Indicate a voluntary interruption
 		bra.b	bda_sub_wait
 		
@@ -430,6 +435,7 @@ bda_sub_code_end
 		assert	bda_sub_code_end < $200	; Ensure subcode fits in header
 		rend
 bda_sub_code_source_end
+BUS     set BUS_MAIN
 	endif	; SCD == 1
 
 		; Sub CPU defines

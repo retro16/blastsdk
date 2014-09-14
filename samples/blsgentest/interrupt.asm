@@ -10,10 +10,10 @@ go_up
 		bra.b	upload_vscroll
 go_down
 		subi.w	#1, vscroll_a
+
+g_int_trap00
 upload_vscroll
 		VdpUseAddr
-		VDPSETBG $404
-		VDPDMAWAIT
 		VdpSetWriteVScroll 0
 		move.w	vscroll_a, VDPDATA
 		rte

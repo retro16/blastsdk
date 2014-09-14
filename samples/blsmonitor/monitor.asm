@@ -65,11 +65,7 @@ reg_init_vdp
 		db	VDPR16 | VDPSCRH64	; #16 - Plane size
 		db	VDPR17			; #17
 		db	VDPR18			; #18
-		db	VDPR19			; #19
-		db	VDPR20			; #20
-		db	VDPR21			; #21
-		db	VDPR22			; #22
-		db	VDPR23			; #23
+		align	2
 
 
 ; Screen line display example : FF0004 DEADBEEF 4

@@ -11,7 +11,7 @@ Section font.png.img
 Binary **main**
 ===============
 
- - provides main.asm scroll_ram.asm interrupt.asm font.png.img font.png.pal
+ - provides main.asm scroll.asm interrupt.asm font.png.img font.png.pal
 
 
 Output **blsgentest**
