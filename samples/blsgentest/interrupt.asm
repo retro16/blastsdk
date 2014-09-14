@@ -1,5 +1,3 @@
-		include	beh.inc
-		
 g_int_level6
 		btst	#BCUP, CDATA1		; Test up button
 		beq.b	go_up
@@ -14,6 +12,8 @@ go_down
 		subi.w	#1, vscroll_a
 upload_vscroll
 		VdpUseAddr
+		VDPSETBG $404
+		VDPDMAWAIT
 		VdpSetWriteVScroll 0
 		move.w	vscroll_a, VDPDATA
 		rte

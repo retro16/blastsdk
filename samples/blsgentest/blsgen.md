@@ -1,11 +1,17 @@
 This program is a test program for blsgen.
 Displays a scrollable hello world on screen.
 
+Section font.png.img
+====================
+
+ - chip vram
+ - addr $400
+
 
 Binary **main**
 ===============
 
- - provides main.asm ram.asm interrupt.asm font.png
+ - provides main.asm scroll_ram.asm interrupt.asm font.png.img font.png.pal
 
 
 Output **blsgentest**
@@ -18,8 +24,9 @@ Compiled binaries:
 Output properties:
 
  - name **BLSGEN Test**
+ - copyright **(C)2014 RETRO16**
  - target ram
  - region JUE
- - file blsgentest
+ - file blsgentest.bin
 
 

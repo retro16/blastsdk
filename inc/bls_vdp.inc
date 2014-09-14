@@ -27,6 +27,17 @@ oldgen\?
         endif
 		endm
 
+VDPST_EMPTY set $0200   ; VDP FIFO empty
+VDPST_FULL  set $0100   ; VDP FIFO full
+VDPST_F     set $0080   ; V interrupt happened
+VDPST_SOVR  set $0040   ; Sprite overflow
+VDPST_C     set $0020   ; Sprite collision
+VDPST_ODD   set $0010   ; Odd frame in interlace mode
+VDPST_VB    set $0008   ; 1 during vblank, 0 otherwise
+VDPST_HB    set $0004   ; 1 during hblank, 0 otherwise
+VDPST_DMA   set $0002   ; 1 if DMA is busy
+VDPST_PAL   set $0001   ; 1 if PAL display mode, 0 if NTSC
+
 		if ..UNDEF PLANE_A
 PLANE_A		set	$C000
 		endif
@@ -91,18 +102,13 @@ VDPWINRIGHT	set	$80		; Window on the right hand side
 VDPR18		set	$00		; VDP register #18
 VDPWINBOT	set	$80		; Window at the bottom of the screen
 
-VDPR19		set	$00		; VDP register #19
-VDPR20		set	$00		; VDP register #20
-VDPR21		set	$00		; VDP register #21
-VDPR22		set	$00		; VDP register #22
-VDPR23		set	$00		; VDP register #23
-
-		; Upload a byte table to VDP registers
+		; Upload a byte table to VDP registers 00-18
+        ; Does not set DMA registers.
 		; reg_table = address of the register table
 		; Destroys d0-d2/a0
 VDPSETALLREGS	macro	reg_table
 		lea	reg_table, a0
-		moveq	#23, d0
+		moveq	#18, d0
 		move.w	#$100, d1
 		move.w	#$8000, d2
 vdpsetuploop\?	move.b	(a0)+, d2
@@ -257,34 +263,45 @@ VDPPREPDMASEND	macro	src, tgt, sz, ram
 		dw	((tgt >> 14) | (ram & $FFFF) | $80)
 		endm
 
-VDPDMAFILL	macro	data, tgt, sz, ram	; Fill sz words to vram address tgt using data word
-						; DMA must be enabled beforehand and autoincrement must be set correctly
+VDPDMAFILL	macro	data, tgt, sz	; Fill sz bytes of vram at address tgt using data byte
+						; DMA must be enabled beforehand and autoincrement must be set correctl
+						; Auto increment must be set to 1
+		assert sz >= 2
+		assert tgt + sz <= $10000
 
-		VDPSETDMASIZE sz		; Set DMA size
+		VDPSETDMASIZE (sz - 1)		; Set DMA size
 
 		; Set DMA fill mode
 		VDPSETREG 23, $80
 
 		if _VDPREG
 		; Set destination address
-		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), (a5)
+		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $40000080), (a5)
 		; Set data word and start DMA
-		move.w	data, (a4)
-
+		move.b	data, (a4)
 		else
 		; Set destination address
-		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram), VDPCTRL
+		move.l  #(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $40000080), VDPCTRL
 		; Set data word and start DMA
-		move.w	data, VDPDATA
+		move.b	data, VDPDATA
 		endif
 
 		endm
 
-VDPPREPFILL	macro	data, tgt, sz, ram
-		VDPPREPDMASIZE sz
-		VDPPREPREG 23, $80
-		dl	(((tgt << 16) & $3FFF0000) | (tgt >> 14) | $80 | ram)
-		endm
+VDPDMAWAIT  macro       ; Wait until last DMA operation is finished
+        movem.l d0-d1, -(a7)
+        moveq   #VDPST_DMA, d1
+.dmawait\?
+        if _VDPREG
+        move.w  (a5), d0
+        else
+        move.w  VDPCTRL, d0
+        endif
+        and.w   d1, d0
+        bne.b   .dmawait\?
+        movem.l (a7)+, d0-d1
+        endm
+        
 
 VDPSETPALETTE	macro	data, palette		; Set a 16 color palette using data. palette is 0 to 3.
 		VDPSETREG 15, 2

@@ -68,7 +68,7 @@ beh_display_exception
 
 		VDPSETADDRREG			; Set a4 and a5 to data and control registers resp.
 
-;		VDPSETALLREGS beh_vdp_regs
+		VDPSETALLREGS beh_vdp_regs
 
 		VDPSETWRITE 0, VRAM
 
@@ -140,11 +140,6 @@ beh_vdp_regs
 		db	VDPR16 | VDPSCRH64	; #16 - Plane size
 		db	VDPR17			; #17
 		db	VDPR18			; #18
-		db	VDPR19			; #19
-		db	VDPR20			; #20
-		db	VDPR21			; #21
-		db	VDPR22			; #22
-		db	VDPR23			; #23
 
 beh_init macro
         if SCD != 0
