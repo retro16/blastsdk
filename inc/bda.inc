@@ -65,6 +65,9 @@ bda_init					; Call at console initialization
 		; Set level 2 exception vector for sub CPU
 		move.l	#bda_sub_l2, $020068
 
+		; Set TRACE exception vector for sub CPU
+		move.l	#bda_sub_trace, $020024
+
 		; Set TRAP #7 exception vector for sub CPU
 		move.l	#bda_sub_trap, $02009C
 
@@ -422,7 +425,7 @@ bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 		movem.l	d0-d7/a0-a6, -(a7)	; Push registers to bda_regs
 
 		; Enable pause flag
-		bset	#6, BDA_COMM_SUB
+		bset	#7, BDA_COMM_SUB
 
 		; Pause in monitor mode
 
@@ -433,8 +436,8 @@ bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 
 		; Execution resumed
 
-		; Clear pause and trap flags
-		andi.b	#$3F, BDA_COMM_SUB
+		; Clear pause, trace and trap flags
+		andi.b	#$1F, BDA_COMM_SUB
 
 		movem.l	(a7)+, d0-d7/a0-a6	; Pop registers
 		move.l	bdasub_sp.w, a7	; Pop SP
@@ -444,9 +447,13 @@ bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 bda_l2_default	
 		rte
 
+bda_sub_trace	; Voluntary interruption
+		bset	#5, BDA_COMM_SUB
+		jmp		bda_sub_wait
+
 bda_sub_trap	; Voluntary interruption
 		; Set trap flag
-		bset	#7, BDA_COMM_SUB
+		bset	#6, BDA_COMM_SUB
 		; Branch to monitor
 		jmp		bda_sub_wait
 		

@@ -133,6 +133,8 @@ void boot_cd(u8 *image, int imgsize)
   printf("Uploading IP (%d bytes) ...\n", ipsize);
   sendmem(0xFF0000 + seccodesize, ip_start, ipsize);
 
+  usleep(1000); // Wait to ensure that buffers are empty
+
   printf("Requesting sub CPU ...\n");
   subreq();
 
@@ -628,10 +630,12 @@ int main(int argc, char **argv)
 
     if(strcmp(token, "subreg") == 0)
     {
+      submon();
       subreq();
       subsetbank(0);
       showreg(SUBREGADDR);
       subrelease();
+      subrun();
 
       continue;
     }
@@ -788,14 +792,13 @@ int main(int argc, char **argv)
 
     if(strcmp(token, "substop") == 0)
     {
-      writebyte(0xA1200E, readbyte(0xA1200E) | 0x80); // Set COMMFLAG 15
-      writebyte(0xA12000, 0x01); // Trigger L2 interrupt on sub CPU
+      substop();
       continue;
     }
 
     if(strcmp(token, "subgo") == 0)
     {
-      writebyte(0xA1200E, readbyte(0xA1200E) & ~0x80); // Clear COMMFLAG 15
+      subgo();
       continue;
     }
 
@@ -816,6 +819,7 @@ int main(int argc, char **argv)
       {
         writelong(REGADDR + reg * 4, value);
       }
+      showreg(REGADDR);
       continue;
     }
 
@@ -827,8 +831,8 @@ int main(int argc, char **argv)
         printf("Unknown register.\n");
         continue;
       }
-      printf("[%s]\n", l);
       u32 value = parse_int(&l, 12);
+      submon();
       subreq();
       subsetbank(0);
       if(reg == 17)
@@ -838,16 +842,17 @@ int main(int argc, char **argv)
       else
       {
         writelong(SUBREGADDR + reg * 4, value);
-        printf("W %d %06X %08X\n", reg, (uint32_t)(SUBREGADDR + reg * 4), (uint32_t)value);
       }
+      showreg(SUBREGADDR);
       subrelease();
+      subrun();
       continue;
     }
 
     if(strcmp(token, "step") == 0)
     {
       int oldsr = readword(REG_SR);
-      writeword(REG_SR, 0xA700);
+      writeword(REG_SR, 0xA700 | (oldsr & 0xFF));
 
       sendcmd(CMD_EXIT, 0);
       readdata();
@@ -855,6 +860,28 @@ int main(int argc, char **argv)
 
       writeword(REG_SR, oldsr);
       showreg(REGADDR);
+      continue;
+    }
+
+    if(strcmp(token, "substep") == 0)
+    {
+      substop();
+      subreq();
+      subsetbank(0);
+      int oldsr = readword(SUBREG_SR);
+      writeword(SUBREG_SR, 0xA700 | (oldsr & 0xFF));
+      subrelease();
+      subgo();
+
+      // Wait for TRACE interrupt on sub CPU
+      while(!(readbyte(0xA1200F) & 0x20));
+
+      subreq();
+      subsetbank(0);
+      writeword(SUBREG_SR, oldsr);
+      showreg(SUBREGADDR);
+      subrelease();
+
       continue;
     }
 

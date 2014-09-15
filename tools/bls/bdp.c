@@ -52,6 +52,7 @@ int packetlen(u8 header)
 int readdata()
 {
   inpl = 0;
+  if(bdpdump) printf("<");
   do
   {
     // Read the header byte, then the whole remaining packet
@@ -78,17 +79,20 @@ int readdata()
       int b;
       if(bdpdump) for(b = 0; b < r; ++b)
       {
-        printf("<%02X", inp[inpl+b]);
+        printf("%02X", inp[inpl+b]);
       }
       inpl += r;
     }
   } while(inpl < packetlen(inp[0]));
+
+  if(bdpdump) printf("\n");
 
   return 1;
 }
 
 void senddata_ip(const u8 *data, int size)
 {
+  if(bdpdump) printf(">");
   while(size)
   {    
     ssize_t w = write(genfd, data, size);
@@ -110,19 +114,24 @@ void senddata_ip(const u8 *data, int size)
       int b;
       if(bdpdump) for(b = 0; b < w; ++b)
       {
-        printf(">%02X", data[b]);
+        printf("%02X", data[b]);
       }
       data += w;
       size -= w;
     }
   }
+  if(bdpdump) printf("\n");
 }
 
 void senddata_serial(const u8 *data, int size)
 {
 #define SERIAL_BUFFER 1
+  if(bdpdump) printf(">");
   while(size)
   {
+    // Empty buffer before sending data
+    while(tcdrain(genfd) == -1 && errno == EINTR);
+
     // Avoid buffer overflow by limiting write size to SERIAL_BUFFER bytes
     ssize_t w = write(genfd, data, size < SERIAL_BUFFER ? size : SERIAL_BUFFER);
     if(w == 0)
@@ -140,18 +149,17 @@ void senddata_serial(const u8 *data, int size)
     }
     else
     {
-      usleep(SERIAL_BUFFER * w * 1000000 / (115200/8));
-      // Wait until buffer is empty before sending data again
-      while(tcdrain(genfd) == -1 && errno == EINTR);
+//      usleep(200 + SERIAL_BUFFER * w * 1000000 / (115200/8));
       int b;
       if(bdpdump) for(b = 0; b < w; ++b)
       {
-        printf(">%02X", data[b]);
+        printf("%02X", data[b]);
       }
       data += w;
       size -= w;
     }
   }
+  if(bdpdump) printf("\n");
 }
 
 void sendcmd(u8 header, u32 address)
@@ -190,7 +198,7 @@ void subreq()
 {
   if(!reqcnt)
   {
-    substatus = readword(0xA12000);
+    substatus = readbyte(0xA12001);
     substatus |= readword(0xA12002) << 16;
     writeword(0xA12000, 0x0003);
   }
@@ -222,7 +230,7 @@ void subrelease()
   if(!--reqcnt)
   {
     if(!(substatus & 0x0002))
-      writeword(0xA12000, 0x0001); // Release busreq if bus was not taken.
+      writebyte(0xA12001, 0x01); // Release busreq if bus was not taken.
 
     writeword(0xA12002, substatus >> 16);
   }
@@ -236,11 +244,11 @@ void subreset()
     reqcnt = 0;
   }
   usleep(20000);
-  writeword(0xA12000, 0x0001); // Release reset high
+  writebyte(0xA12001, 0x01); // Release reset high
   usleep(80000);
-  writeword(0xA12000, 0x0000); // Bring reset low
+  writebyte(0xA12001, 0x00); // Bring reset low
   usleep(80000);
-  writeword(0xA12000, 0x0001); // Release reset high
+  writebyte(0xA12001, 0x01); // Release reset high
 }
 
 void readburst(u8 *target, u32 address, int length)
@@ -611,6 +619,49 @@ void subsendfile(const char *path, u32 address)
   }
 
   free(data);
+}
+
+void substop()
+{
+  writebyte(0xA1200E, readbyte(0xA1200E) | 0x80); // Set COMMFLAG 15
+  writebyte(0xA12000, 0x01); // Trigger L2 interrupt on sub CPU
+  while(!(readbyte(0xA1200F) & 0x80)); // Wait until sub CPU enters monitor mode
+}
+
+void subgo()
+{
+  if(readbyte(0xA1200F) & 0x80) // Test whether Sub CPU is in monitor mode
+  {
+    // Generate a falling edge on comm flag 15
+    u8 commflag = readbyte(0xA1200E);
+    writebyte(0xA1200E, commflag | 0x80);
+    writebyte(0xA1200E, commflag & ~0x80);
+  }
+}
+
+int submonstate = 0;
+
+void submon()
+{
+  if(readbyte(0xA1200F) & 0x80) // Test whether Sub CPU is already in monitor mode
+  {
+    printf("Sub CPU already in monitor mode\n");
+    submonstate = 1;
+  }
+  else
+  {
+    submonstate = 0;
+    substop();
+  }
+}
+
+void subrun()
+{
+  // Revert the effect of submon, if any
+  if(!submonstate)
+  {
+    subgo();
+  }
 }
 
 void open_device(const char *device)
