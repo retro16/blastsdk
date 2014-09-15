@@ -179,6 +179,11 @@ printlong
 		bra.b	printword
 
 g_int_vblank
+		if TARGET == TARGET_SCD
+		;move.b	#(GA_IFL2 | GA_IEN2)>>8, GA_RH		; Trigger L2 interrupt on the SCD
+		bset	#0, GA_RH		; Trigger L2 interrupt on the SCD
+		endif
+
 		movem.l	d0-d7/a0-a6, -(a7)
 		lea	VDPDATA, a4
 		lea	VDPCTRL, a5

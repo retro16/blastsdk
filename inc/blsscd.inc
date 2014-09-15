@@ -1,4 +1,4 @@
-		if bus == 0
+		if BUS == BUS_MAIN
 		; Genesis interrupt vector table
 G_INTV_ADDRERR	set	$FFFD80	; 0x0C
 G_INTV_ILL	set	$FFFD80	; 0x10
@@ -85,8 +85,9 @@ GA_RH		set	GATE_ARRAY + $00	; Reset and halt
 GA_NORESET	set	$0001
 GA_BUSREQ	set	$0002
 GA_VERSION	set	$00F0
-		if BUS == 0
+		if BUS == BUS_MAIN
 GA_IFL2		set	$0100
+GA_IEN2		set	$8000
 		else
 GA_LEDG		set	$0100
 GA_LEDR		set	$0200
@@ -101,7 +102,7 @@ GA_WP4		set	$1000
 GA_WP5		set	$2000
 GA_WP6		set	$4000
 GA_WP7		set	$8000
-		if BUS == 0
+		if BUS == BUS_MAIN
 GA_BK0		set	$0040
 GA_BK1		set	$0080
 		else
@@ -130,8 +131,10 @@ GA_CDCDMA	set	GATE_ARRAY + $0A	; Target address for CDC DMA
 GA_STOPWATCH	set	GATE_ARRAY + $0C	; Stopwatch (30.72 us)
 
 GA_COMMFLAGS	set	GATE_ARRAY + $0E	; MSB writable by main, LSB writable by sub
+GA_COMMFLAGS_MAIN	set	GATE_ARRAY + $0E	; Byte access
+GA_COMMFLAGS_SUB 	set	GATE_ARRAY + $0F	; Byte access
 GA_COMMWORDS	set	GATE_ARRAY + $10
-		if BUS == 0
+		if BUS == BUS_MAIN
 GA_COMMOUT	set	GA_COMMWORDS		; Read-write
 GA_COMMIN	set	GA_COMMWORDS + $10	; Read-only
 		else

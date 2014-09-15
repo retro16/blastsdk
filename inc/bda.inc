@@ -1,8 +1,6 @@
 		; Debug protocol control and data ports
 		; To use the "serial" port of the old genesis, specify CCTRL3 / CDATA3
 
-		include	bls.inc
-
 	if BUS == BUS_MAIN
 
 BDPCTRL		equ	CCTRL2
@@ -21,7 +19,7 @@ BDA_SENDCTRL    set (CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
 ; Call this to initialize the monitor and setup gamepad link
 ; Level 2 interrupts must be enabled within VDP
 bda_init					; Call at console initialization
-	if SCD != 0
+	if TARGET != TARGET_GEN
 		; Copy monitor code from source to RAM
 		lea	bda_code_source(pc), a1	; Source
 		lea	bda_code.w, a0		; Destination at the end of RAM
@@ -32,23 +30,27 @@ bda_init					; Call at console initialization
 		; Initialize main CPU interrupt vectors
 		lea	$24, a0
 		move.l	#g_int_trace, d0
-		bsr.b	bda_set_int_vector
+		jsr	    bda_set_int_vector
 		lea	$68, a0
 		move.l	#g_int_pad, d0
-		bsr.b	bda_set_int_vector
+		jsr 	bda_set_int_vector
 		lea	$9C, a0
 		move.l	#g_int_trap07, d0
-		bsr.b	bda_set_int_vector
+		jsr 	bda_set_int_vector
 
-	if SCD == 1
+	if TARGET == TARGET_SCD
 		; Disable write protection and access bank 0
-		andi.w	#$003F, GA_MM
+		move.b	#$00, GA_MM
 
 		; Get sub CPU BUSREQ
 		move.w	#GA_BUSREQ|GA_NORESET, GA_RH
+.waitbus
+        move.b  GA_RH + 1, d0
+        cmpi.b  #GA_BUSREQ|GA_NORESET, d0
+        bne.b   .waitbus
 
 		; Reset comm flags
-		move.w	#0, GA_COMMFLAGS
+		move.b	#0, GA_COMMFLAGS_MAIN
 
 		; Copy sub CPU monitor to sub CPU RAM
 		lea	bda_sub_code_source(pc), a1
@@ -58,7 +60,7 @@ bda_init					; Call at console initialization
 		dbra	d0, .3
 
         ; Copy current level 2 exception vector to the new sub code handler
-        move.l  $020068, bda_l2_jmp + 2
+        move.l  $020068, bda_l2_jmp + 2 + $20000
 
 		; Set level 2 exception vector for sub CPU
 		move.l	#bda_sub_l2, $020068
@@ -69,8 +71,8 @@ bda_init					; Call at console initialization
 		; Release BUSREQ
 		move.w	#GA_NORESET, GA_RH
 
-	endif	; SCD == 1
-	endif	; SCD != 0
+	endif	; TARGET == TARGET_SCD
+	endif	; TARGET != TARGET_GEN
 
 		; Setup gamepad port in neutral state (TR low, all other pins input, enable interrupt)
 		move.b	#BDA_NEUTRALDATA, BDPDATA		; Set all high except TR low
@@ -78,7 +80,7 @@ bda_init					; Call at console initialization
 
 		rts
 		
-	if SCD != 0
+	if TARGET != TARGET_GEN
 bda_set_int_vector
 		cmp.l	(a0), d0
 		beq.b	.vector_already_set
@@ -91,7 +93,7 @@ bda_set_int_vector
 ; From now on, this code will be run from RAM, copied by the init routine
 bda_code_source
 		rorg	$FFFDBE
-	endif	; SCD != 0
+	endif	; TARGET != TARGET_GEN
 bda_code
 
 		; Register usage during monitor operation
@@ -382,7 +384,7 @@ bda_sendbuf
 
 bda_code_end
 		assert bda_code_end <= $FFFFB6
-	if SCD != 0
+	if TARGET != TARGET_GEN
 		rend
 bda_code_source_end
 	endif
@@ -390,7 +392,7 @@ bda_code_source_end
 
 		; Sub CPU code
 
-	if SCD == 1
+	if TARGET == TARGET_SCD
 BUS     set BUS_SUB
 bdasub_d0	set	$0000C0			; Place monitor after exception vectors
 
@@ -398,12 +400,18 @@ bdasub_sp	set	bdasub_d0 + 15*4
 bdasub_pc	set	bdasub_d0 + 16*4
 bdasub_sr	set	bdasub_d0 + 17*4
 
+BDA_COMM_MAIN	set		$FF800E
+BDA_COMM_SUB	set		$FF800F
+
 bda_sub_code_source
-		rorg	bdasub_d0 + 17*4 + 2	; Place code after CPU state
+		rorg	bdasub_sr + 2	; Place code after CPU state
 bda_sub_code
-bda_sub_l2	btst	#15, GA_COMMFLAGS
-		beq.b	bda_l2_jmp		; Bit not set : call user-defined interrupt
-		bclr	#7, GA_COMMFLAGS
+
+bda_sub_l2
+		btst	#7, BDA_COMM_MAIN
+		bne.b	bda_sub_wait	; If the bit is set : go to monitor mode
+
+bda_l2_jmp	jmp	bda_l2_default.l		; The JMP target will be patched by bda_init to jump at the official L2 handler
 
 bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 		move.w	(a7), bdasub_sr.w	; Copy SR value to a fixed address
@@ -413,33 +421,41 @@ bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 		lea	bdasub_sp.w, a7		; Use monitor stack
 		movem.l	d0-d7/a0-a6, -(a7)	; Push registers to bda_regs
 
-.1		btst	#15, GA_COMMFLAGS	; Wait until main CPU produces a falling edge
+		; Enable pause flag
+		bset	#6, BDA_COMM_SUB
+
+		; Pause in monitor mode
+
+.1		btst	#7, BDA_COMM_MAIN	; Wait until main CPU produces a falling edge
 		beq.b	.1			; on bit 15 of COMMFLAGS
-.2		btst	#15, GA_COMMFLAGS	; Wait until main CPU releases pause
+.2		btst	#7, BDA_COMM_MAIN	; Wait until main CPU releases pause
 		bne.b	.2
-						; Execution resumed
-		movem.l	(a7)+, d0-d7/a0-a7	; Pop registers
+
+		; Execution resumed
+
+		; Clear pause and trap flags
+		andi.b	#$3F, BDA_COMM_SUB
+
+		movem.l	(a7)+, d0-d7/a0-a6	; Pop registers
+		move.l	bdasub_sp.w, a7	; Pop SP
 		subq.l	#6, a7			; Restore interrupt stack frame
 		move.w	bdasub_sr.w, (a7)	; Restore SR in case it was changed by the monitor
 		move.l	bdasub_pc.w, 2(a7)	; Restore PC
-		btst	#7, GA_COMMFLAGS	; If voluntary interruption
-		bne.b	bda_l2_default		; Ignore exception vector call
-
-bda_l2_jmp	jmp	bda_l2_default.l
 bda_l2_default	
-        rte
-bda_sub_trap	bset	#7, GA_COMMFLAGS	; Indicate a voluntary interruption
-		bra.b	bda_sub_wait
+		rte
+
+bda_sub_trap	; Voluntary interruption
+		; Set trap flag
+		bset	#7, BDA_COMM_SUB
+		; Branch to monitor
+		jmp		bda_sub_wait
 		
 bda_sub_code_end
 		assert	bda_sub_code_end < $200	; Ensure subcode fits in header
 		rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN
-	endif	; SCD == 1
+	endif	; TARGET == TARGET_SCD
 
-		; Sub CPU defines
-	else	; BUS == BUS_MAIN
-;G_INTV_LEVEL2	set	bda_l2_jmp + 2		; Redirect exception vector to the jump
 	endif	; BUS == BUS_MAIN
 

@@ -48,7 +48,7 @@
 #endif
 
 #ifndef SUBREGADDR
-#define SUBREGADDR BDB_SUB_RAM
+#define SUBREGADDR 0x20000 + BDB_SUB_RAM
 #endif
 
 #define QUOTE(X) #X
@@ -348,6 +348,13 @@ extern int parsedsymfile(const char *name);
 #define REG_SP REG_A(7)
 #define REG_PC REG_A(8)
 #define REG_SR REG_A(9)
+
+// Sub CPU register offsets
+#define SUBREG_D(n) (SUBREGADDR + (n) * 4)
+#define SUBREG_A(n) (SUBREG_D(8) + (n) * 4)
+#define SUBREG_SP SUBREG_A(7)
+#define SUBREG_PC SUBREG_A(8)
+#define SUBREG_SR SUBREG_A(9)
 
 // Genesis command constants
 #define CMD_HANDSHAKE   0x00

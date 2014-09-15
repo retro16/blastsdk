@@ -93,10 +93,10 @@ void parse_token(char *token, const char **line)
   skipblanks(line);
 }
 
-void showreg()
+void showreg(u32 regaddr)
 {
   u8 regs[17*4 + 2];
-  readmem(regs, REGADDR, sizeof(regs));
+  readmem(regs, regaddr, sizeof(regs));
 
   int r;
   int t;
@@ -274,7 +274,7 @@ void boot_img(const char *filename)
   }
   free(image);
 
-  showreg();
+  showreg(REGADDR);
 }
 
 void boot_sp_from_iso(const char *filename)
@@ -332,9 +332,10 @@ int parse_register(const char **line)
   ++*line;
   if(**line >= '0' && **line <= '7')
   {
+    r += **line - '0';
     ++*line;
     skipblanks(line);
-    return r + **line - '0';
+    return r;
   }
   return -1;
 }
@@ -560,7 +561,7 @@ int main(int argc, char **argv)
         // Adjust PC to point on the break instruction
         writelong(REG_PC, readlong(REG_PC) - 2);
 
-        showreg();
+        showreg(REGADDR);
       }
 
       continue;
@@ -618,12 +619,22 @@ int main(int argc, char **argv)
       continue;
     }
 
-		if(strcmp(token, "reg") == 0)
-		{
-      showreg();
+    if(strcmp(token, "reg") == 0)
+    {
+      showreg(REGADDR);
 
       continue;
-		}
+    }
+
+    if(strcmp(token, "subreg") == 0)
+    {
+      subreq();
+      subsetbank(0);
+      showreg(SUBREGADDR);
+      subrelease();
+
+      continue;
+    }
 
     if(strcmp(token, "dump") == 0)
     {
@@ -633,6 +644,36 @@ int main(int argc, char **argv)
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
       readmem(data, address, size);
+
+      skipblanks(&l);
+
+      if(*l)
+      {
+        FILE *f = fopen(l, "w");
+        if(!f)
+        {
+          printf("Cannot open file %s.\n", l);
+          continue;
+        }
+
+        fwrite(data, 1, size, f);
+        fclose(f);
+      }
+      else
+      {
+        hexdump(data, size, address);
+      }
+      continue;
+    }
+
+    if(strcmp(token, "subdump") == 0)
+    {
+      u32 address = parse_int(&l, 12);
+      skipblanks(&l);
+      u32 size = parse_int(&l, 12);
+      skipblanks(&l);
+      u8 *data = (u8 *)malloc(size);
+      subreadmem(data, address, size);
 
       skipblanks(&l);
 
@@ -730,6 +771,34 @@ int main(int argc, char **argv)
       continue;
     }
 
+    if(strcmp(token, "subd68k") == 0)
+    {
+      u32 address = parse_int(&l, 12);
+      u32 size = parse_int(&l, 12);
+      u8 *data = (u8 *)malloc(size);
+      subreadmem(data, address, size);
+
+      char out[262144];
+      int suspicious;
+      d68k(out, 262144, data, size, address, 1, 1, &suspicious);
+      printf("%s\n", out);
+
+      continue;
+    }
+
+    if(strcmp(token, "substop") == 0)
+    {
+      writebyte(0xA1200E, readbyte(0xA1200E) | 0x80); // Set COMMFLAG 15
+      writebyte(0xA12000, 0x01); // Trigger L2 interrupt on sub CPU
+      continue;
+    }
+
+    if(strcmp(token, "subgo") == 0)
+    {
+      writebyte(0xA1200E, readbyte(0xA1200E) & ~0x80); // Clear COMMFLAG 15
+      continue;
+    }
+
     if(strcmp(token, "set") == 0)
     {
       int reg = parse_register(&l);
@@ -750,6 +819,31 @@ int main(int argc, char **argv)
       continue;
     }
 
+    if(strcmp(token, "subset") == 0)
+    {
+      int reg = parse_register(&l);
+      if(reg < 0)
+      {
+        printf("Unknown register.\n");
+        continue;
+      }
+      printf("[%s]\n", l);
+      u32 value = parse_int(&l, 12);
+      subreq();
+      subsetbank(0);
+      if(reg == 17)
+      {
+        writeword(SUBREG_SR, value);
+      }
+      else
+      {
+        writelong(SUBREGADDR + reg * 4, value);
+        printf("W %d %06X %08X\n", reg, (uint32_t)(SUBREGADDR + reg * 4), (uint32_t)value);
+      }
+      subrelease();
+      continue;
+    }
+
     if(strcmp(token, "step") == 0)
     {
       int oldsr = readword(REG_SR);
@@ -760,7 +854,7 @@ int main(int argc, char **argv)
       readdata();
 
       writeword(REG_SR, oldsr);
-      showreg();
+      showreg(REGADDR);
       continue;
     }
 

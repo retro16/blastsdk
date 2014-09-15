@@ -486,6 +486,42 @@ void subsendmem_verify(u32 address, const u8 *source, int length)
   subrelease();
 }
 
+// Read data from sub PRAM
+void subreadmem(u8 *target, u32 address, int length)
+{
+  subreq();
+
+  u32 lastaddr = address + length - 1;
+  int firstbank = address / 0x20000;
+  int lastbank = lastaddr / 0x20000;
+
+  subsetbank(firstbank);
+  if(lastbank == firstbank)
+  {
+    readmem(target, (address & 0x1FFFF) + 0x20000, length);
+  }
+  else
+  {
+    // Send first bank
+    readmem(target, (address & 0x1FFFF) + 0x20000, 0x20000 - (address & 0x1FFFF));
+    target += 0x20000 - (address & 0x1FFFF);
+
+    // Send intermediate banks
+    while(++firstbank < lastbank)
+    {
+      subsetbank(firstbank);
+      readmem(target, 0x20000, 0x20000);
+      target += 0x20000;
+    }
+
+    // Send last bank
+    subsetbank(lastbank);
+    readmem(target, 0x20000, (lastaddr & 0x1FFFF) + 1);
+  }
+
+  subrelease();
+}
+
 void vdpsetreg(int reg, u8 value)
 {
   writeword(VDPCTRL, 0x8000 | ((u32)reg << 8) | value);

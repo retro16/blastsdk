@@ -27,8 +27,7 @@ CHIP_PCM	equ	11
 ; Target constants
 TARGET_GEN  equ 0
 TARGET_SCD  equ 1
-TARGET_VCART equ 2
-TARGET_RAM  equ 3
+TARGET_RAM  equ 2
 
 ; Controllers
 ; Mapping :

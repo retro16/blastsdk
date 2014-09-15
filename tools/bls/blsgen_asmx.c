@@ -360,7 +360,14 @@ void source_get_symbols_asmx(group *s)
     exit(1);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x40000 -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l "BUILDDIR"/%s.lst -o /dev/null %s", include_prefixes, defs, s->bus, mainout.target, mainout.target, s->name, srcname);
+  section *sec = section_find_ext(s->name, ".bin");
+  busaddr org = {s->bus, 0x40000, -1};
+  if(s->bus != bus_none && sec && sec->symbol && sec->symbol->value.addr != -1)
+  {
+    org = chip2bus(sec->symbol->value, s->bus);
+  }
+
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l "BUILDDIR"/%s.lst -o /dev/null %s", (unsigned int)org.addr, include_prefixes, defs, s->bus, mainout.target, mainout.target, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
   snprintf(cmdline, 4096, "cp "BUILDDIR"/%s.lst "BUILDDIR"/%s.lst.1", s->name, s->name);
