@@ -365,6 +365,7 @@ static char *target;
 static int tsize;
 static const u8 *code;
 static int size;
+static int instructions;
 static u32 address;
 static int labels;
 static int showcycles;
@@ -847,7 +848,7 @@ static void compute_base_cycles()
 
 static void d68k_pass()
 {
-  while(size && tsize)
+  while(size && tsize && instructions)
   {
     lsize = 0;
     if(labels)
@@ -858,6 +859,7 @@ static void d68k_pass()
     }
     TALIGN(8);
 
+    --instructions;
     opcode = fetch(2);
     baseaddr = address;
     
@@ -916,12 +918,13 @@ static void d68k_pass()
   }
 }
 
-int d68k(char *_target, int _tsize, const u8 *_code, int _size, sv_t _address, int _labels, int _showcycles, int *_suspicious)
+sv_t d68k(char *_target, int _tsize, const u8 *_code, int _size, int _instructions, sv_t _address, int _labels, int _showcycles, int *_suspicious)
 {
   target = _target;
   tsize = _tsize;
   code = _code;
   size = _size;
+  instructions = _instructions;
   address = _address;
   labels = _labels;
   showcycles = _showcycles;
@@ -943,13 +946,14 @@ int d68k(char *_target, int _tsize, const u8 *_code, int _size, sv_t _address, i
   if(!labels)
   {
     // One pass is enough to disassemble without labels
-    return 0;
+    return address;
   }
 
   target = _target;
   tsize = _tsize;
   code = _code;
   size = _size;
+  instructions = _instructions;
   address = _address;
   labels = _labels;
   suspicious = _suspicious;
@@ -958,5 +962,5 @@ int d68k(char *_target, int _tsize, const u8 *_code, int _size, sv_t _address, i
 
   d68k_pass();
 
-  return 0;
+  return address;
 }

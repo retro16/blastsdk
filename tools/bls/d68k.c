@@ -80,7 +80,7 @@ int main(int argc, char **argv)
   char *dasm = malloc(size * 40);
 
   int suspicious;
-  int r = d68k(dasm, size * 40, data, size, address, labels, cycles, &suspicious);
+  int r = d68k(dasm, size * 40, data, size, -1, address, labels, cycles, &suspicious);
 
   printf("%s", dasm);
   free(data);

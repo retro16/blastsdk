@@ -105,19 +105,18 @@ VDPWINBOT	set	$80		; Window at the bottom of the screen
 		; Upload a byte table to VDP registers 00-18
         ; Does not set DMA registers.
 		; reg_table = address of the register table
-		; Destroys d0-d2/a0
+		; Destroys d0-d1/a0
 VDPSETALLREGS	macro	reg_table
 		lea	reg_table, a0
 		moveq	#18, d0
-		move.w	#$100, d1
-		move.w	#$8000, d2
-vdpsetuploop\?	move.b	(a0)+, d2
+		move.w	#$8000, d1
+vdpsetuploop\?	move.b	(a0)+, d1
 		if _VDPREG
-		move.w	d2, (a5)
+		move.w	d1, (a5)
 		else
-		move.w	d2, VDPCTRL
+		move.w	d1, VDPCTRL
 		endif
-		add.w	d1, d2
+		addi.w	#$100, d1
 		dbra	d0, vdpsetuploop\?
 		endm
 
@@ -289,7 +288,6 @@ VDPDMAFILL	macro	data, tgt, sz	; Fill sz bytes of vram at address tgt using data
 		endm
 
 VDPDMAWAIT  macro       ; Wait until last DMA operation is finished
-        movem.l d0-d1, -(a7)
         moveq   #VDPST_DMA, d1
 .dmawait\?
         if _VDPREG
@@ -299,7 +297,6 @@ VDPDMAWAIT  macro       ; Wait until last DMA operation is finished
         endif
         and.w   d1, d0
         bne.b   .dmawait\?
-        movem.l (a7)+, d0-d1
         endm
         
 

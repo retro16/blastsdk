@@ -376,6 +376,41 @@ u32 asmfile(const char *filename, u8 *target, u32 org)
   return codesize;
 }
 
+void d68k_instr(int sub)
+{
+  u32 address = readlong(sub ? SUBREG_PC : REG_PC);
+  u8 data[10];
+  if(sub)
+    subreadmem(data, address, 10);
+  else
+    readmem(data, address, 10);
+
+  char out[256];
+  int suspicious;
+  d68k(out, 256, data, 10, 1, address, 0, 1, &suspicious);
+  printf("(next) %s", out);
+}
+
+void d68k_skip_instr(int sub)
+{
+  if(sub) subsetbank(0);
+  u32 address = readlong(sub ? SUBREG_PC : REG_PC);
+  u8 data[10];
+  if(sub)
+    subreadmem(data, address, 10);
+  else
+    readmem(data, address, 10);
+
+  char out[256];
+  int suspicious;
+  address = d68k(out, 256, data, 10, 1, address, 0, 1, &suspicious);
+  printf("(skip) %s", out);
+  if(sub) subsetbank(0);
+  writelong(sub ? SUBREG_PC : REG_PC, address);
+  showreg(sub ? SUBREGADDR : REGADDR);
+  d68k_instr(sub);
+}
+
 int main(int argc, char **argv)
 {
   if(argc < 2)
@@ -871,13 +906,19 @@ int main(int argc, char **argv)
     {
       u32 address = parse_int(&l, 12);
       u32 size = parse_int(&l, 12);
+      int instructions = -1;
+      if(!address) { address = readlong(REG_PC); size = 0; printf("Starting at PC (%08X)\n", address); }
+      if(!size) {
+        size = 10;
+        instructions = 1;
+      }
       u8 *data = (u8 *)malloc(size);
       readmem(data, address, size);
 
       char out[262144];
       int suspicious;
-      d68k(out, 262144, data, size, address, 1, 1, &suspicious);
-      printf("%s\n", out);
+      d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
+      printf("%s", out);
 
       continue;
     }
@@ -886,13 +927,23 @@ int main(int argc, char **argv)
     {
       u32 address = parse_int(&l, 12);
       u32 size = parse_int(&l, 12);
+      int instructions = -1;
       u8 *data = (u8 *)malloc(size);
+
+      subreq();
+      subsetbank(0);
+      if(!address) { address = subreadlong(SUBREG_PC); size = 0; printf("Starting at PC (%08X)\n", address); }
+      if(!size) {
+        size = 10;
+        instructions = 1;
+      }
       subreadmem(data, address, size);
+      subrelease();
 
       char out[262144];
       int suspicious;
-      d68k(out, 262144, data, size, address, 1, 1, &suspicious);
-      printf("%s\n", out);
+      d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
+      printf("%s", out);
 
       continue;
     }
@@ -956,7 +1007,7 @@ int main(int argc, char **argv)
       continue;
     }
 
-    if(strcmp(token, "step") == 0)
+    if(strcmp(token, "step") == 0 || strcmp(token, "s") == 0)
     {
       int oldsr = readword(REG_SR);
       writeword(REG_SR, 0xA700 | (oldsr & 0xFF));
@@ -967,10 +1018,17 @@ int main(int argc, char **argv)
 
       writeword(REG_SR, oldsr);
       showreg(REGADDR);
+      d68k_instr(0);
       continue;
     }
 
-    if(strcmp(token, "substep") == 0)
+    if(strcmp(token, "skip") == 0)
+    {
+      d68k_skip_instr(0);
+      continue;
+    }
+
+    if(strcmp(token, "substep") == 0 || strcmp(token, "ss") == 0)
     {
       substop();
       subreq();
@@ -988,8 +1046,19 @@ int main(int argc, char **argv)
       subsetbank(0);
       writeword(SUBREG_SR, oldsr);
       showreg(SUBREGADDR);
+      d68k_instr(1);
       subrelease();
 
+      continue;
+    }
+
+    if(strcmp(token, "subskip") == 0)
+    {
+      submon();
+      subreq();
+      d68k_skip_instr(1);
+      subrelease();
+      subrun();
       continue;
     }
 

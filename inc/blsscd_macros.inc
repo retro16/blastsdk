@@ -2,23 +2,27 @@ SYNC_MAIN_SUB	macro
 
 	if BUS == BUS_MAIN
 
-		move.b	#1, GA_COMMOUT
-.1m\?		tst.b	GA_COMMIN
-		beq.b	.1m\?
-
-		move.b	#0, GA_COMMOUT
-.2m\?		tst.b	GA_COMMIN
-		beq.b	.2m\?
+        lea GA_COMMFLAGS + 1, a0
+        bset    #4, -1(a0)
+.1m\?
+        btst    #4, (a0)
+        beq.b   .1m\?
+        bclr    #4, -1(a0)
+.2m\?
+        btst    #4, (a0)
+        bne.b   .2m\?
 
 	else
 
-.1s\?		tst.b	GA_COMMIN
-		beq.b	.1s\?
-		move.b	#1, GA_COMMOUT
-
-.2s\?		tst.b	GA_COMMIN
-		bne.b	.2s\?
-		move.b	#0, GA_COMMOUT
+        lea GA_COMMFLAGS, a0
+        bset    #4, 1(a0)
+.1s\?
+        btst    #4, (a0)
+        beq.b   .1s\?
+        bclr    #4, 1(a0)
+.2s\?
+        btst    #4, (a0)
+        bne.b   .2s\?
 
 	endif
 
@@ -42,8 +46,6 @@ SUB_RESET	macro
 		endm
 
 SUB_ACCESS_BANK	macro b
-		move.w	d0, -(sp)
-
 		; Check current mode
 		move.w	GA_MM, d0
 		btst	#2, d0
@@ -58,7 +60,27 @@ SUB_ACCESS_BANK	macro b
 		; Other modes : leave 0 in DMNA to avoid bank switch
 .1\?		move.w	#(b<<6), GA_MM
 
-.2\?		move.w	(sp)+, d0
+.2\?
 		endm
 
 	endif
+
+SUB_INTERRUPT	macro
+		bset	#0, GA_RH
+		endm
+
+SUB_INT_ENABLE	macro
+		move.b	#GA_IM_L1|GA_IM_L2|GA_IM_L3|GA_IM_L4|GA_IM_L5|GA_IM_L6, GA_IMASK + 1
+		move	#$2000, SR
+		endm
+
+SUB_INT_DISABLE	macro
+		move	#$2700, SR
+		move.b	#0, GA_IMASK + 1
+		endm
+
+SET_INT_HANDLER	macro	vector, target
+		movea.l	vector, a0
+		move.w	#$4EF9, (a0)+
+		move.l	#target, (a0)
+		endm
