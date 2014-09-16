@@ -29,13 +29,13 @@ bda_init					; Call at console initialization
 
 		; Initialize main CPU interrupt vectors
 		lea	$24, a0
-		move.l	#g_int_trace, d0
+		move.l	#int_trace, d0
 		jsr	    bda_set_int_vector
 		lea	$68, a0
-		move.l	#g_int_pad, d0
+		move.l	#int_pad, d0
 		jsr 	bda_set_int_vector
 		lea	$9C, a0
-		move.l	#g_int_trap07, d0
+		move.l	#int_trap07, d0
 		jsr 	bda_set_int_vector
 
 	if TARGET == TARGET_SCD
@@ -215,14 +215,14 @@ bda_writebytes
 
 
 ; Gamepad interrupt
-g_int_pad
+int_pad
 		clr.l	bda_pkt_header.w	; No command callback
 		bra.b	bda_enter
 ; Breakpoint interrupt
-g_int_trace
+int_trace
 		move.l	#$09, bda_pkt_header.w
 		bra.b	bda_enter
-g_int_trap07
+int_trap07
 		move.l	#$27, bda_pkt_header.w  ; Send TRAP 7 code once entered monitor
 bda_enter
 		move.w	#$2700, sr		; Disable all interrupts

@@ -82,7 +82,7 @@ sv parse_int_skip(const char **cp)
       ++(*cp);
     }
   if(neg == 1) {
-    val = neg_int(val);
+    val = neint(val);
   } else if(neg == 2) {
     val = not_int(val);
   }
@@ -1922,9 +1922,9 @@ void bls_build_cart_image()
 
   // Write interrupt vectors
   sv addr;
-#define INTVECT(name) if((addr = symbol_get_bus("G_HWINT_"#name, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("G_INT_"#name, bus_main)) != -1) fputlong(addr, f); else fputaddr(mainout.entry->value, bus_main, f);
-#define INTVECT2(name,name2) if((addr = symbol_get_bus("G_HWINT_"#name, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("G_INT_"#name, bus_main)) != -1) fputlong(addr, f); else \
-                             if((addr = symbol_get_bus("G_HWINT_"#name2, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("G_INT_"#name2, bus_main)) != -1) fputlong(addr, f); else fputaddr(mainout.entry->value, bus_main, f);
+#define INTVECT(name) if((addr = symbol_get_bus("HWINT_"#name, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("INT_"#name, bus_main)) != -1) fputlong(addr, f); else fputaddr(mainout.entry->value, bus_main, f);
+#define INTVECT2(name,name2) if((addr = symbol_get_bus("HWINT_"#name, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("INT_"#name, bus_main)) != -1) fputlong(addr, f); else \
+                             if((addr = symbol_get_bus("HWINT_"#name2, bus_main)) != -1) fputlong(addr, f); else if((addr = symbol_get_bus("INT_"#name2, bus_main)) != -1) fputlong(addr, f); else fputaddr(mainout.entry->value, bus_main, f);
 
   INTVECT(BUSERR) // 0x08
   INTVECT(ADDRERR) // 0x0C

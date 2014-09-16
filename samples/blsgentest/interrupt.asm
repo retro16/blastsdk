@@ -1,9 +1,9 @@
-g_int_level6
+int_level6
 		btst	#BCUP, CDATA1		; Test up button
 		beq.b	go_up
 		btst	#BCDOWN, CDATA1
 		beq.b	go_down
-g_interrupt	rte
+interrupt	rte
 
 go_up
 		addi.w	#1, vscroll_a
@@ -11,7 +11,7 @@ go_up
 go_down
 		subi.w	#1, vscroll_a
 
-g_int_trap00
+int_trap00
 upload_vscroll
 		VdpUseAddr
 		VdpSetWriteVScroll 0

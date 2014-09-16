@@ -247,7 +247,7 @@ Data sent by the genesis when TRAP 7 triggered :
     00 00 00 27
 
 Only these 2 interrupts are caught by default. You must ensure that the
-interrupt vectors are set to g_int_trace and g_int_trap07 of bda.inc to make
+interrupt vectors are set to int_trace and int_trap07 of bda.inc to make
 it work correctly.
 
 

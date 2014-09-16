@@ -40,7 +40,7 @@ monitor_init	; Call this to initialize the monitor
 		; Set vblank interrupt entry point on SCD
 		movea.l	$78, a0					; Read vector target
 		move.w	#$4EF9, (a0)+			; Write JMP
-		move.l	#g_int_vblank, (a0)		; Write target
+		move.l	#int_vblank, (a0)		; Write target
 		endif
 
 		rts
@@ -178,7 +178,7 @@ printlong
 		movem.w	(a7)+, d0
 		bra.b	printword
 
-g_int_vblank
+int_vblank
 		if TARGET == TARGET_SCD
 		;move.b	#(GA_IFL2 | GA_IEN2)>>8, GA_RH		; Trigger L2 interrupt on the SCD
 		bset	#0, GA_RH		; Trigger L2 interrupt on the SCD

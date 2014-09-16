@@ -37,29 +37,29 @@ relocated\?	set	symbol ## _ROM
 
 BLS_INTTABLE_JUMP macro target
 
-	if ..DEF g_int_##target
-g_hwint_##target jmp g_int_##target.l
+	if ..DEF int_##target
+hwint_##target jmp int_##target.l
 	elsif ..DEF interrupt
-g_hwint_##target jmp interrupt.l
+hwint_##target jmp interrupt.l
 	else
-g_hwint_##target jmp $200.l
+hwint_##target jmp $200.l
 	endif
-g_intv_##target	set	g_hwint_##target + 2
+intv_##target	set	hwint_##target + 2
 
 		endm
 
 BLS_INTTABLE_JUMP2 macro target, alttarget
 
-	if ..DEF g_int_##target
-g_hwint_##target jmp g_int_##target.l
-	elsif ..DEF g_int_##alttarget
-g_hwint_##target jmp g_int_##alttarget.l
+	if ..DEF int_##target
+hwint_##target jmp int_##target.l
+	elsif ..DEF int_##alttarget
+hwint_##target jmp int_##alttarget.l
 	elsif ..DEF interrupt
-g_hwint_##target jmp interrupt.l
+hwint_##target jmp interrupt.l
 	else
-g_hwint_##target jmp $200.l
+hwint_##target jmp $200.l
 	endif
-g_intv_##target	set	g_hwint_##target + 2
+intv_##target	set	hwint_##target + 2
 
 		endm
 
@@ -209,36 +209,36 @@ BLS_SETVECTORS	macro
 
 .vectortargets
 	if SCD == 0
-		bls__vectortarget g_int_buserr
-		bls__vectortarget g_int_ill
-		bls__vectortarget g_int_spurious
-		bls__vectortarget2 g_int_level4, g_int_hblank
-		bls__vectortarget2 g_int_level6, g_int_vblank
+		bls__vectortarget int_buserr
+		bls__vectortarget int_ill
+		bls__vectortarget int_spurious
+		bls__vectortarget2 int_level4, int_hblank
+		bls__vectortarget2 int_level6, int_vblank
 	endif
 
-		bls__vectortarget g_int_addrerr
-		bls__vectortarget g_int_zdiv
-		bls__vectortarget g_int_chk
-		bls__vectortarget g_int_trapv
-		bls__vectortarget g_int_priv
-		bls__vectortarget g_int_linea
-		bls__vectortarget g_int_linef
+		bls__vectortarget int_addrerr
+		bls__vectortarget int_zdiv
+		bls__vectortarget int_chk
+		bls__vectortarget int_trapv
+		bls__vectortarget int_priv
+		bls__vectortarget int_linea
+		bls__vectortarget int_linef
 
-		bls__vectortarget g_int_trap00
-		bls__vectortarget g_int_trap01
-		bls__vectortarget g_int_trap02
-		bls__vectortarget g_int_trap03
-		bls__vectortarget g_int_trap04
-		bls__vectortarget g_int_trap05
-		bls__vectortarget g_int_trap06
-		bls__vectortarget g_int_trap08
-		bls__vectortarget g_int_trap09
-		bls__vectortarget g_int_trap10
-		bls__vectortarget g_int_trap11
-		bls__vectortarget g_int_trap12
-		bls__vectortarget g_int_trap13
-		bls__vectortarget g_int_trap14
-		bls__vectortarget g_int_trap15
+		bls__vectortarget int_trap00
+		bls__vectortarget int_trap01
+		bls__vectortarget int_trap02
+		bls__vectortarget int_trap03
+		bls__vectortarget int_trap04
+		bls__vectortarget int_trap05
+		bls__vectortarget int_trap06
+		bls__vectortarget int_trap08
+		bls__vectortarget int_trap09
+		bls__vectortarget int_trap10
+		bls__vectortarget int_trap11
+		bls__vectortarget int_trap12
+		bls__vectortarget int_trap13
+		bls__vectortarget int_trap14
+		bls__vectortarget int_trap15
 .setvector_end
 	endif
 		endm

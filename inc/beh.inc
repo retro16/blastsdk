@@ -1,64 +1,64 @@
 		include bls.inc
 
         if SCD == 0
-g_int_buserr	move.w	#$0008, -(a7)
+int_buserr	move.w	#$0008, -(a7)
 		bra.w	beh_display_exception
 		endif
-g_int_addrerr	move.w	#$000C, -(a7)
+int_addrerr	move.w	#$000C, -(a7)
 		if SCD == 0
 		bra.w	beh_display_exception
 		else
 		bra.b	beh_display_exception
 		endif
 		if SCD == 0
-g_int_ill		move.w	#$0010, -(a7)
+int_ill		move.w	#$0010, -(a7)
 		bra.w	beh_display_exception
 		endif
-g_int_zdiv	move.w	#$0014, -(a7)
+int_zdiv	move.w	#$0014, -(a7)
 		bra.b	beh_display_exception
-g_int_chk		move.w	#$0018, -(a7)
+int_chk		move.w	#$0018, -(a7)
 		bra.b	beh_display_exception
-g_int_trapv	move.w	#$001C, -(a7)
+int_trapv	move.w	#$001C, -(a7)
 		bra.b	beh_display_exception
-g_int_priv	move.w	#$0020, -(a7)
+int_priv	move.w	#$0020, -(a7)
 		bra.b	beh_display_exception
-g_int_linea	move.w	#$0028, -(a7)
+int_linea	move.w	#$0028, -(a7)
 		bra.b	beh_display_exception
-g_int_linef	move.w	#$002C, -(a7)
+int_linef	move.w	#$002C, -(a7)
 		bra.b	beh_display_exception
 		if SCD == 0
-g_int_spurious	move.w	#$0060, -(a7)
+int_spurious	move.w	#$0060, -(a7)
 		bra.b	beh_display_exception
 		endif
-g_int_trap00	move.w	#$0080, -(a7)
+int_trap00	move.w	#$0080, -(a7)
 		bra.b	beh_display_exception
-g_int_trap01	move.w	#$0084, -(a7)
+int_trap01	move.w	#$0084, -(a7)
 		bra.b	beh_display_exception
-g_int_trap02	move.w	#$0088, -(a7)
+int_trap02	move.w	#$0088, -(a7)
 		bra.b	beh_display_exception
-g_int_trap03	move.w	#$008C, -(a7)
+int_trap03	move.w	#$008C, -(a7)
 		bra.b	beh_display_exception
-g_int_trap04	move.w	#$0090, -(a7)
+int_trap04	move.w	#$0090, -(a7)
 		bra.b	beh_display_exception
-g_int_trap05	move.w	#$0094, -(a7)
+int_trap05	move.w	#$0094, -(a7)
 		bra.b	beh_display_exception
-g_int_trap06	move.w	#$0098, -(a7)
+int_trap06	move.w	#$0098, -(a7)
 		bra.b	beh_display_exception
-g_int_trap08	move.w	#$00A0, -(a7)
+int_trap08	move.w	#$00A0, -(a7)
 		bra.b	beh_display_exception
-g_int_trap09	move.w	#$00A4, -(a7)
+int_trap09	move.w	#$00A4, -(a7)
 		bra.b	beh_display_exception
-g_int_trap10	move.w	#$00A8, -(a7)
+int_trap10	move.w	#$00A8, -(a7)
 		bra.b	beh_display_exception
-g_int_trap11	move.w	#$00AC, -(a7)
+int_trap11	move.w	#$00AC, -(a7)
 		bra.b	beh_display_exception
-g_int_trap12	move.w	#$00B0, -(a7)
+int_trap12	move.w	#$00B0, -(a7)
 		bra.b	beh_display_exception
-g_int_trap13	move.w	#$00B4, -(a7)
+int_trap13	move.w	#$00B4, -(a7)
 		bra.b	beh_display_exception
-g_int_trap14	move.w	#$00B8, -(a7)
+int_trap14	move.w	#$00B8, -(a7)
 		bra.b	beh_display_exception
-g_int_trap15	move.w	#$00BC, -(a7)
+int_trap15	move.w	#$00BC, -(a7)
 
 ; Displays the stack, one element per line
 ; Contains in order D0-D7, A0-A7, vector, exception stack frame, top of program stack
@@ -163,49 +163,49 @@ beh_init_scd_vectors
 
 beh_scd_vectors
         dw  $0C
-        dl  g_int_addrerr
+        dl  int_addrerr
         dw  $14
-        dl  g_int_zdiv
+        dl  int_zdiv
         dw  $18
-        dl  g_int_chk
+        dl  int_chk
         dw  $1C
-        dl  g_int_trapv
+        dl  int_trapv
         dw  $20
-        dl  g_int_priv
+        dl  int_priv
         dw  $28
-        dl  g_int_linea
+        dl  int_linea
         dw  $2C
-        dl  g_int_linef
+        dl  int_linef
         dw  $80
-        dl  g_int_trap00
+        dl  int_trap00
         dw  $84
-        dl  g_int_trap01
+        dl  int_trap01
         dw  $88
-        dl  g_int_trap02
+        dl  int_trap02
         dw  $8C
-        dl  g_int_trap03
+        dl  int_trap03
         dw  $90
-        dl  g_int_trap04
+        dl  int_trap04
         dw  $94
-        dl  g_int_trap05
+        dl  int_trap05
         dw  $98
-        dl  g_int_trap06
+        dl  int_trap06
         dw  $A0
-        dl  g_int_trap08
+        dl  int_trap08
         dw  $A4
-        dl  g_int_trap09
+        dl  int_trap09
         dw  $A8
-        dl  g_int_trap10
+        dl  int_trap10
         dw  $AC
-        dl  g_int_trap11
+        dl  int_trap11
         dw  $B0
-        dl  g_int_trap12
+        dl  int_trap12
         dw  $B4
-        dl  g_int_trap13
+        dl  int_trap13
         dw  $B8
-        dl  g_int_trap14
+        dl  int_trap14
         dw  $BC
-        dl  g_int_trap15
+        dl  int_trap15
 beh_scd_vectors_end
         endif
 

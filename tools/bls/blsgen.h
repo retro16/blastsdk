@@ -267,7 +267,7 @@ symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, s
 
 void *merge_lists(void *target, void *source);
 
-static inline sv neg_int(sv v) {
+static inline sv neint(sv v) {
   if(v < 0) return v;
   return (-v) & 0xFFFFFFFF;
 }

@@ -374,12 +374,12 @@ void out_genheader()
     }
   }
 
-  interrupt = sym_get_addr("G_INTERRUPT", bus_main);
+  interrupt = sym_get_addr("INTERRUPT", bus_main);
   if(interrupt.addr == -1) {
     interrupt = sym_get_addr("INTERRUPT", bus_main);
   }
   if(interrupt.addr == -1) {
-    printf("Warning: Could not find G_INTERRUPT entry point, using MAIN(0x%06X) as default entry point. Unknown interrupts will reset the program with wrong SP value.\n", (u32)pc.addr);
+    printf("Warning: Could not find INTERRUPT entry point, using MAIN(0x%06X) as default entry point. Unknown interrupts will reset the program with wrong SP value.\n", (u32)pc.addr);
     interrupt = pc;
   }
 
@@ -387,10 +387,10 @@ void out_genheader()
   out_u32(sp.addr); // 0x00
   out_u32(pc.addr); // 0x04
   
-#define INTVECT(name) if((v = sym_get_addr("G_HWINT_"#name, bus_main)).addr != -1) out_u32(v.addr); else \
-                      if((v = sym_get_addr("G_INT_"#name, bus_main)).addr != -1) out_u32(v.addr); else out_u32(interrupt.addr);
-#define INTVECT2(name, name2) if((v = sym_get_addr("G_HWINT_"#name, bus_main)).addr != -1) out_u32(v.addr); else if((v = sym_get_addr("G_HWINT_"#name2, bus_main)).addr != -1) out_u32(v.addr); else \
-                              if((v = sym_get_addr("G_INT_"#name, bus_main)).addr != -1) out_u32(v.addr); else if((v = sym_get_addr("G_INT_"#name2, bus_main)).addr != -1) out_u32(v.addr); else out_u32(interrupt.addr);
+#define INTVECT(name) if((v = sym_get_addr("HWINT_"#name, bus_main)).addr != -1) out_u32(v.addr); else \
+                      if((v = sym_get_addr("INT_"#name, bus_main)).addr != -1) out_u32(v.addr); else out_u32(interrupt.addr);
+#define INTVECT2(name, name2) if((v = sym_get_addr("HWINT_"#name, bus_main)).addr != -1) out_u32(v.addr); else if((v = sym_get_addr("HWINT_"#name2, bus_main)).addr != -1) out_u32(v.addr); else \
+                              if((v = sym_get_addr("INT_"#name, bus_main)).addr != -1) out_u32(v.addr); else if((v = sym_get_addr("INT_"#name2, bus_main)).addr != -1) out_u32(v.addr); else out_u32(interrupt.addr);
   INTVECT(BUSERR) // 0x08
   INTVECT(ADDRERR) // 0x0C
   INTVECT(ILL) // 0x10
