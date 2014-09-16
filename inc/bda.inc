@@ -458,7 +458,7 @@ bda_sub_trap	; Voluntary interruption
 		jmp		bda_sub_wait
 		
 bda_sub_code_end
-		assert	bda_sub_code_end < $200	; Ensure subcode fits in header
+		assert	bda_sub_code_end < $200	; Ensure subcode fits in header, before comm buffer
 		rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN

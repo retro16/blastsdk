@@ -1,53 +1,45 @@
+BDB commands :
+
 q                        quit
+asmx <file> [addr]       Assemble a file, send it to addr and point PC at it.
+subasmx <file> [addr]    Assemble a file, send it to addr of the sub CPU and point sub CPU PC at it.
 flush                    flush genesis input
-r <b|w|l>[len] <addr>    read len bytes/words/longs at addr. N is in bytes. If
-                         ommited, reads one.
+
+r <b|w|l>[len] <addr>    read len bytes/words/longs at addr. N is in bytes. If ommited, reads one.
 w <b|w|l> <addr> <val>   writes val at specified address.
+
+sr <b|w|l> <addr>        read 1 byte/word/long at addr from the sub CPU
+sw <b|w|l> <addr> <val>  write 1 byte/word/long at addr from the sub CPU
 
 sendfile <addr> <file>   writes a file in RAM
 go                       resumes execution
 ping                     handshake with the monitor
-regaddr                  sets the address of the CPU register table
+test                     handshake with the bridge (no data is sent to the Genesis)
 reg                      display value of all registers
-
+subreg                   display value of all sub CPU registers
+dump <addr> <len> [file] dump <len> bytes of memory at <addr> (optionally writing to [file])
+subdump <addr> <len> [file] dump <len> bytes of PRAM at <addr> (optionally writing to [file])
+showchr <index>          show character data from VRAM in ASCII art.
+vdump <addr> <len> [file] dump <len> bytes of VRAM at <addr> (optionally writing to [file])
+blsgen                   run blsgen
+d68k <address> <len>     disassemble memory at <address> for <len> bytes
+subd68k <address> <len>  disassemble PRAM at <address> for <len> bytes
+substop                  make the sub CPU enter monitor mode
+subgo                    resume sub CPU execution
+set <register> <value>   set the value of a register
+subset <register> <value> set the value of a register in the sub CPU
+step                     execute one instruction
+substep                  execute one instruction on the sub CPU
+boot <file>              boot a RAM program or a CD image (runs its IP and SP)
+bootsp <file>            boot SP from a CD image
+break <address>          place a breakpoint at <address>. If <address> is omitted, show a list of breakpoints.
+delete <address>         delete a breakpoint at <address>
+bdpdump <0|1>            set to 1 to enable bdp low level dump
 
 Naming conventions :
 
 BDB (debugger) : the debugger (the interactive program running on the PC)
 BDP (protocol) : the protocol and its API (sendmem, readword, ...)
-BDA (agent) : protocol implementation on the main CPU - triggered by exceptions and sub CPU comm bit
-BDS (sub agent) : protocol implementation on the sub CPU - triggered by exceptions, level2 + main CPU comm bit
-BDE (bios emulator) : program loaded at $200-$5E00 simulating BIOS calls
+BDA (agent) : protocol implementation on the main CPU - triggered by L2, TRACE and TRAP07 exceptions
 bridge : the arduino program that translates USB/serial/ethernet streams from/to genesis gamepad signals.
-
-How it works :
-
-Compilation can generate images with or without BDA. BDA must be inserted in IP for SCD and in ROM for cart images.
-
-On boot, bda_init will copy all required parts to correct locations, then its own RAM can be freed. It means that IP can be overwritten without problems once bda_init has returned.
-
-There are many kinds of images that can be built using Blast SDK :
-
- 1. Raw cart images
-These images have no debugging facilities. Use this to generate "masters" for the genesis. To generate them, just generate a cart with blsbuild and never include "bda.inc".
-
- 2. Raw CD images
-These images are ISO ready to be burnt for CD. They have no debugging facilities. To generate them, just generate a CD image with blsbuild and never include "bda.inc".
-
- 3. Debugging cart images
-These images can be debugged using BDB. To generate them, include bda.inc in any resource and call bda_init at boot. RAM after $FFFFA0 cannot be used but blsbuild should automatically take that into account while building.
-
- 4. Debugging CD images
-These images can be debugged using BDB. To generate them, include bda.inc at the end of your IP and call bda_init at boot.
-
- 5. Virtual cart images
-This is a special kind of cartridge image : the aim of this kind of images is to run genesis programs on Sega CD RAM.
-
-There are limitations :
-
- * upper genesis RAM (>$FFFD00) is reserved
- * the image cannot be larger than 256KB
- * addresses are translated to Sega CD WRAM ($200000)
- * Interrupts are slower due to an extra level of indirection
-Since these images are not in the cartridge address space, they cannot be flashed on real cartridges.
 

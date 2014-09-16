@@ -383,45 +383,6 @@ void writebyte(u32 address, u32 b)
   senddata(&d, 1);
 }
 
-
-void subwritelong(u32 address, u32 l)
-{
-  subreq();
-
-  subsetbank(address / 0x20000);
-  sendcmd(CMD_WRITE | CMD_LONG | 4, (address & 0x1FFFF) + 0x20000);
-  u8 d[4];
-  setint(l, d, 4);
-  senddata(d, 4);
-
-  subrelease();
-}
-
-void subwriteword(u32 address, u32 w)
-{
-  subreq();
-
-  subsetbank(address / 0x20000);
-  sendcmd(CMD_WRITE | CMD_WORD | 2, (address & 0x1FFFF) + 0x20000);
-  u8 d[2];
-  setint(w, d, 2);
-  senddata(d, 2);
-
-  subrelease();
-}
-
-void subwritebyte(u32 address, u32 b)
-{
-  subreq();
-
-  subsetbank(address / 0x20000);
-  sendcmd(CMD_WRITE | CMD_BYTE | 1, (address & 0x1FFFF) + 0x20000);
-  u8 d = b;
-  senddata(&d, 1);
-
-  subrelease();
-}
-
 // Send data into sub PRAM
 void subsendmem(u32 address, const u8 *source, int length)
 {
@@ -662,6 +623,311 @@ void subrun()
   {
     subgo();
   }
+}
+
+void subwritebyte(u32 address, u32 val)
+{
+  // Generate the move instruction
+  u8 program[8];
+  program[0] = 0x13;
+  program[1] = 0xFC;
+  program[2] = 0;
+  program[3] = val & 0xFF;
+  program[4] = 0;
+  program[5] = (address >> 16) & 0xFF;
+  program[6] = (address >> 8) & 0xFF;
+  program[7] = address & 0xFF;
+  
+  submon();
+  subreq();
+  subsetbank(0);
+  // Put program in the reserved interrupt area
+  sendmem(0x020030, program, 8);
+
+  // Put the sub CPU in trace mode
+  u32 oldpc = readlong(SUBREG_PC);
+  writelong(SUBREG_PC, 0x30);
+  u32 oldsr = readword(SUBREG_SR);
+  writeword(SUBREG_SR, 0xA700);
+
+  subrelease();
+
+  // Run the instruction
+  subgo();
+  // Wait for TRACE interrupt on sub CPU
+  usleep(50);
+  while(!(readbyte(0xA1200F) & 0x20));
+
+  subreq();
+  subsetbank(0);
+
+  if(readlong(SUBREG_PC) != 0x38) {
+    printf("Warning: write operation failed.\n");
+  }
+
+  // Restore sub CPU status
+  writelong(SUBREG_PC, oldpc);
+  writeword(SUBREG_SR, oldsr);
+  subrelease();
+
+  subrun();
+}
+
+void subwriteword(u32 address, u32 val)
+{
+  // Generate the move instruction
+  u8 program[8];
+  program[0] = 0x33;
+  program[1] = 0xFC;
+  program[2] = (val >> 8) & 0xFF;
+  program[3] = val & 0xFF;
+  program[4] = 0;
+  program[5] = (address >> 16) & 0xFF;
+  program[6] = (address >> 8) & 0xFF;
+  program[7] = address & 0xFF;
+  
+  submon();
+  subreq();
+  subsetbank(0);
+  // Put program in the reserved interrupt area
+  sendmem(0x020030, program, 8);
+
+  // Put the sub CPU in trace mode
+  u32 oldpc = readlong(SUBREG_PC);
+  writelong(SUBREG_PC, 0x30);
+  u32 oldsr = readword(SUBREG_SR);
+  writeword(SUBREG_SR, 0xA700);
+
+  subrelease();
+
+  // Run the instruction
+  subgo();
+  // Wait for TRACE interrupt on sub CPU
+  usleep(50);
+  while(!(readbyte(0xA1200F) & 0x20));
+
+  subreq();
+  subsetbank(0);
+
+  if(readlong(SUBREG_PC) != 0x38) {
+    printf("Warning: write operation failed.\n");
+  }
+
+  // Restore sub CPU status
+  writelong(SUBREG_PC, oldpc);
+  writeword(SUBREG_SR, oldsr);
+  subrelease();
+
+  subrun();
+}
+
+void subwritelong(u32 address, u32 val)
+{
+  // Generate the move instruction
+  u8 program[10];
+  program[0] = 0x23;
+  program[1] = 0xFC;
+  program[2] = (val >> 24) & 0xFF;
+  program[3] = (val >> 16) & 0xFF;
+  program[4] = (val >> 8) & 0xFF;
+  program[5] = val & 0xFF;
+  program[6] = (address >> 24) & 0xFF;
+  program[7] = (address >> 16) & 0xFF;
+  program[8] = (address >> 8) & 0xFF;
+  program[9] = address & 0xFF;
+  
+  submon();
+  subreq();
+  subsetbank(0);
+  // Put program in the reserved interrupt area
+  sendmem(0x020030, program, 10);
+
+  // Put the sub CPU in trace mode
+  u32 oldpc = readlong(SUBREG_PC);
+  writelong(SUBREG_PC, 0x30);
+  u32 oldsr = readword(SUBREG_SR);
+  writeword(SUBREG_SR, 0xA700);
+
+  subrelease();
+
+  // Run the instruction
+  subgo();
+  // Wait for TRACE interrupt on sub CPU
+  usleep(50);
+  while(!(readbyte(0xA1200F) & 0x20));
+
+  subreq();
+  subsetbank(0);
+
+  if(readlong(SUBREG_PC) != 0x3A) {
+    printf("Warning: write operation failed.\n");
+  }
+
+  // Restore sub CPU status
+  writelong(SUBREG_PC, oldpc);
+  writeword(SUBREG_SR, oldsr);
+  subrelease();
+
+  subrun();
+}
+
+u32 subreadbyte(u32 address)
+{
+  // Generate the move instruction
+  u8 program[8];
+  program[0] = 0x11;
+  program[1] = 0xF9;
+  program[2] = (address >> 24) & 0xFF;
+  program[3] = (address >> 16) & 0xFF;
+  program[4] = (address >> 8) & 0xFF;
+  program[5] = address & 0xFF;
+  program[6] = 0x00; // Data will be written at 0x00005C (reserved interrupt area)
+  program[7] = 0x5C;
+  
+  submon();
+  subreq();
+  subsetbank(0);
+  // Put program in the reserved interrupt area
+  sendmem(0x020030, program, 8);
+
+  // Put the sub CPU in trace mode
+  u32 oldpc = readlong(SUBREG_PC);
+  writelong(SUBREG_PC, 0x30);
+  u32 oldsr = readword(SUBREG_SR);
+  writeword(SUBREG_SR, 0xA700);
+
+  subrelease();
+
+  // Run the instruction
+  subgo();
+  // Wait for TRACE interrupt on sub CPU
+  usleep(50);
+  while(!(readbyte(0xA1200F) & 0x20));
+
+  subreq();
+  subsetbank(0);
+
+  if(readlong(SUBREG_PC) != 0x38) {
+    printf("Warning: read operation failed.\n");
+  }
+
+  // Restore sub CPU status
+  writelong(SUBREG_PC, oldpc);
+  writeword(SUBREG_SR, oldsr);
+
+  // Read result
+  u32 result = readbyte(0x02005C);
+  subrelease();
+
+  subrun();
+
+  return result;
+}
+
+u32 subreadword(u32 address)
+{
+  // Generate the move instruction
+  u8 program[8];
+  program[0] = 0x31;
+  program[1] = 0xF9;
+  program[2] = (address >> 24) & 0xFF;
+  program[3] = (address >> 16) & 0xFF;
+  program[4] = (address >> 8) & 0xFF;
+  program[5] = address & 0xFF;
+  program[6] = 0x00; // Data will be written at 0x00005C (reserved interrupt area)
+  program[7] = 0x5C;
+  
+  submon();
+  subreq();
+  subsetbank(0);
+  // Put program in the reserved interrupt area
+  sendmem(0x020030, program, 8);
+
+  // Put the sub CPU in trace mode
+  u32 oldpc = readlong(SUBREG_PC);
+  writelong(SUBREG_PC, 0x30);
+  u32 oldsr = readword(SUBREG_SR);
+  writeword(SUBREG_SR, 0xA700);
+
+  subrelease();
+
+  // Run the instruction
+  subgo();
+  // Wait for TRACE interrupt on sub CPU
+  usleep(50);
+  while(!(readbyte(0xA1200F) & 0x20));
+
+  subreq();
+  subsetbank(0);
+
+  if(readlong(SUBREG_PC) != 0x38) {
+    printf("Warning: read operation failed.\n");
+  }
+
+  // Restore sub CPU status
+  writelong(SUBREG_PC, oldpc);
+  writeword(SUBREG_SR, oldsr);
+
+  // Read result
+  u32 result = readword(0x02005C);
+  subrelease();
+
+  subrun();
+
+  return result;
+}
+
+u32 subreadlong(u32 address)
+{
+  // Generate the move instruction
+  u8 program[8];
+  program[0] = 0x21;
+  program[1] = 0xF9;
+  program[2] = (address >> 24) & 0xFF;
+  program[3] = (address >> 16) & 0xFF;
+  program[4] = (address >> 8) & 0xFF;
+  program[5] = address & 0xFF;
+  program[6] = 0x00; // Data will be written at 0x00005C (reserved interrupt area)
+  program[7] = 0x5C;
+  
+  submon();
+  subreq();
+  subsetbank(0);
+  // Put program in the reserved interrupt area
+  sendmem(0x020030, program, 8);
+
+  // Put the sub CPU in trace mode
+  u32 oldpc = readlong(SUBREG_PC);
+  writelong(SUBREG_PC, 0x30);
+  u32 oldsr = readword(SUBREG_SR);
+  writeword(SUBREG_SR, 0xA700);
+
+  subrelease();
+
+  // Run the instruction
+  subgo();
+  // Wait for TRACE interrupt on sub CPU
+  usleep(50);
+  while(!(readbyte(0xA1200F) & 0x20));
+
+  subreq();
+  subsetbank(0);
+
+  if(readlong(SUBREG_PC) != 0x38) {
+    printf("Warning: read operation failed.\n");
+  }
+
+  // Restore sub CPU status
+  writelong(SUBREG_PC, oldpc);
+  writeword(SUBREG_SR, oldsr);
+
+  // Read result
+  u32 result = readlong(0x02005C);
+  subrelease();
+
+  subrun();
+
+  return result;
 }
 
 void open_device(const char *device)

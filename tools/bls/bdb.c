@@ -77,6 +77,19 @@ void breakpoint_interrupt(int sig)
   goto_mainloop(sig);
 }
 
+void parse_word(char *token, const char **line)
+{
+  skipblanks(line);
+  while(**line > ' ')
+  {
+    *token = **line;
+    ++token;
+    ++*line;
+  }
+  *token = '\0';
+  skipblanks(line);
+}
+
 void parse_token(char *token, const char **line)
 {
   skipblanks(line);
@@ -141,7 +154,8 @@ void boot_cd(u8 *image, int imgsize)
   printf("Uploading SP (%d bytes) ...\n", spsize);
   subsendmem(0x6000 + SPHEADERSIZE, sp_start, spsize);
   printf("Set sub CPU reset vector to beginning of sub code.\n");
-  subwritelong(0x000004, 0x6000 + SPHEADERSIZE);
+  subsetbank(0);
+  writelong(0x020004, 0x6000 + SPHEADERSIZE);
   printf("Set main CPU registers.\n%06X PC=%08X\n%06X SP=%08X\n%06X SR=%04X\n", REG_PC, 0xFF0000 + seccodesize, REG_SP, 0xFFD000, REG_SR, 0x2700);
   writelong(REG_PC, 0xFF0000 + seccodesize);
   writelong(REG_SP, 0xFFD000);
@@ -169,7 +183,8 @@ void boot_sp(u8 *image, int imgsize)
   printf("Uploading SP (%d bytes) ...\n", spsize);
   subsendmem(0x6000 + SPHEADERSIZE, sp_start, spsize);
   printf("Set sub CPU reset vector to beginning of sub code.\n");
-  subwritelong(0x000004, 0x6000 + SPHEADERSIZE);
+  subsetbank(0);
+  writelong(0x020004, 0x6000 + SPHEADERSIZE);
 
   printf("Resetting sub CPU.\n");
   subreset();
@@ -342,17 +357,23 @@ int parse_register(const char **line)
   return -1;
 }
 
-void parse_word(char *token, const char **line)
+// Assemble a file and send it to a memory buffer
+u32 asmfile(const char *filename, u8 *target, u32 org)
 {
-  skipblanks(line);
-  while(**line > ' ')
+  char cmdline[4096];
+  snprintf(cmdline, 4096, "asmx -w -e -b 0x%08X -l /dev/stderr -o /dev/stdout -C 68000 %s", org, filename);
+  printf("%s\n", cmdline);
+  FILE *a = popen(cmdline, "r");
+  u32 codesize = 0;
+  while(!feof(a))
   {
-    *token = **line;
-    ++token;
-    ++*line;
+    u32 readsize = fread(target, 1, 4096, a);
+    codesize += readsize;
+    target += readsize;
   }
-  *token = '\0';
-  skipblanks(line);
+  if(pclose(a))
+    printf("Warning : asmx returned an error\n");
+  return codesize;
 }
 
 int main(int argc, char **argv)
@@ -421,6 +442,93 @@ int main(int argc, char **argv)
       continue;
     }
 
+    if(strcmp(token, "asmx") == 0)
+    {
+      parse_word(token, &l);
+      u32 address = parse_int(&l, 8);
+
+      if(!address) address = 0xFF0000;
+
+      u8 obj[65536];
+      u32 osize = asmfile(token, obj, address);
+
+      sendmem(address, obj, osize);
+      writelong(REG_PC, address);
+      showreg(REGADDR);
+
+      continue;
+    }
+
+    if(strcmp(token, "subasmx") == 0)
+    {
+      parse_word(token, &l);
+      u32 address = parse_int(&l, 8);
+
+      if(!address) address = 0x006028;
+
+      u8 obj[65536];
+      u32 osize = asmfile(token, obj, address);
+
+      substop();
+      subreq();
+      subsendmem(address, obj, osize);
+      subsetbank(0);
+      writelong(SUBREG_PC, address);
+      showreg(SUBREGADDR);
+      subrelease();
+
+      continue;
+    }
+
+    if(strcmp(token, "flush") == 0)
+    {
+      readdata();
+      hexdump(inp, inpl, 0);
+
+      continue;
+    }
+
+    if(strcmp(token, "sr") == 0)
+    {
+      parse_token(token, &l);
+      u32 address = parse_int(&l, 8);
+      u32 value;
+      switch(token[0])
+      {
+        case 'b':
+          value = subreadbyte(address);
+          break;
+        case 'w':
+          value = subreadword(address);
+          break;
+        case 'l':
+          value = subreadlong(address);
+          break;
+      }
+      printf("%06X: %08X\n", address, value);
+      continue;
+    }
+
+    if(strcmp(token, "sw") == 0)
+    {
+      parse_token(token, &l);
+      u32 address = parse_int(&l, 8);
+      u32 value = parse_int(&l, 8);
+      switch(token[0])
+      {
+        case 'b':
+          subwritebyte(address, value);
+          break;
+        case 'w':
+          subwriteword(address, value);
+          break;
+        case 'l':
+          subwritelong(address, value);
+          break;
+      }
+      continue;
+    }
+
     if(strcmp(token, "r") == 0)
     {
       u8 cmd = CMD_READ;
@@ -450,7 +558,6 @@ int main(int argc, char **argv)
         } else {
           cmd |= 2;
         }
-        printf("cmd=%02X\n", cmd);
         break;
 
         case 'l':
@@ -754,9 +861,9 @@ int main(int argc, char **argv)
       continue;
     }
 
-    if(strcmp(token, "blsbuild") == 0)
+    if(strcmp(token, "blsgen") == 0)
     {
-      system("blsbuild");
+      system("blsgen");
       continue;
     }
 
@@ -874,6 +981,7 @@ int main(int argc, char **argv)
       subgo();
 
       // Wait for TRACE interrupt on sub CPU
+      usleep(50);
       while(!(readbyte(0xA1200F) & 0x20));
 
       subreq();
