@@ -34,6 +34,7 @@ boot <file>              boot a RAM program or a CD image (runs its IP and SP)
 bootsp <file>            boot SP from a CD image
 break <address>          place a breakpoint at <address>. If <address> is omitted, show a list of breakpoints.
 delete <address>         delete a breakpoint at <address>
+subreset                 reset sub CPU
 bdpdump <0|1>            set to 1 to enable bdp low level dump
 
 Naming conventions :

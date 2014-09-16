@@ -1066,6 +1066,12 @@ int main(int argc, char **argv)
       continue;
     }
 
+    if(strcmp(token, "subreset") == 0)
+    {
+      subreset();
+      continue;
+    }
+
     if(strcmp(token, "bdpdump") == 0)
     {
       bdpdump = parse_int(&l, 12);
