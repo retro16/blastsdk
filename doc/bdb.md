@@ -28,8 +28,10 @@ substop                  make the sub CPU enter monitor mode
 subgo                    resume sub CPU execution
 set <register> <value>   set the value of a register
 subset <register> <value> set the value of a register in the sub CPU
-step                     execute one instruction
-substep                  execute one instruction on the sub CPU
+step / s                 execute one instruction
+skip                     skip one instruction
+substep / ss             execute one instruction on the sub CPU
+subskip                  skip one instruction on the sub CPU
 boot <file>              boot a RAM program or a CD image (runs its IP and SP)
 bootsp <file>            boot SP from a CD image
 break <address>          place a breakpoint at <address>. If <address> is omitted, show a list of breakpoints.
