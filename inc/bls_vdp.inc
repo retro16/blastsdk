@@ -21,7 +21,7 @@ VDPSECURITY	macro
 		move.b	$A10001, d0
 		andi.b	#$0F, d0
 		beq.b	oldgen\?
-		move.l	$100.l, $A14000
+		move.l	$100.w, $A14000
 oldgen\?
 		move.b	(a7)+, d0
         endif

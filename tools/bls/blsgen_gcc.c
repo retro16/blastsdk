@@ -154,7 +154,7 @@ static section * extract_section_elf(const group *src, const char *name, unsigne
   }
   fclose(script);
 
-  snprintf(cmdline, 4096, "%s -r -T %s -o "BUILDDIR"/%s.elf "BUILDDIR"/%s.o", ld, linkerscript, s->name, src->name);
+  snprintf(cmdline, 4096, "%s -r -T %s -o "BUILDDIR"/%s.elf "BUILDDIR"/%s.elf", ld, linkerscript, s->name, src->name);
   printf("Extracting section %s\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -196,7 +196,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
       symbol *sym;
       if((sym = symbol_find(symname)))
       {
-        s->extsym = blsll_insert_symbol(s->extsym, sym);
+        s->extsym = blsll_insert_unique_symbol(s->extsym, sym);
         printf("%s extern\n", symname);
       }
       else
@@ -212,7 +212,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
     if(strncmp(line + 17, sname, strlen(sname)) != 0) continue;
 
     symbol_set_bus(&s->intsym, symname, busaddr, s);
-    s->extsym = blsll_insert_symbol(s->extsym, symbol_find(symname));
+    s->extsym = blsll_insert_unique_symbol(s->extsym, symbol_find(symname));
     printf("%s = %08X\n", symname, (unsigned int)addr);
   }
 }
@@ -429,7 +429,7 @@ void source_get_symbols_gcc(group *s)
   find_binary_load(s, f);
   pclose(f);
 
-  snprintf(cmdline, 4096, "%s %s %s -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, defs, srcname, object);
+  snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->bus, mainout.target, defs, srcname, object);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -460,7 +460,7 @@ void source_get_symbol_values_gcc(group *s)
 
   const char *defs = gen_load_defines();
 
-  snprintf(cmdline, 1024, "%s %s -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, defs, cflags, srcname, object);
+  snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
   printf("Compile %s with load defines :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -497,7 +497,7 @@ void source_compile_gcc(group *s)
 
   const char *defs = gen_load_defines();
 
-  snprintf(cmdline, 4096, "%s %s -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, defs, cflags, srcname, object);
+  snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
   printf("Final compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -516,6 +516,9 @@ void source_compile_gcc(group *s)
   system(cmdline);
 
   // Extract sections from final ELF
+  extract_section_elf(s, ".text", (unsigned int)textba.addr);
+  extract_section_elf(s, ".data", (unsigned int)databa.addr);
+  extract_section_elf(s, ".bss", (unsigned int)bssba.addr);
   extract_section(text);
   extract_section(data);
   extract_section(bss);

@@ -1,5 +1,5 @@
-The Blast ! Debugger protocol
-=============================
+The Blast ! Debugger protocol v2
+================================
 
 Electrical specification.
 -------------------------
@@ -213,18 +213,19 @@ Testing intermediate connectivity
 ---------------------------------
 
 A special handshake allows to test communication between the PC and the
-Arduino. This command never reaches the Genesis.
+Arduino. This command never reaches the Genesis. It allows to query version
+and revision of the bridge. This packet has 
 
-Send a test request :
+Send a version request :
 
-    00 FF FF FF
+    20 56 51 0A    " VQ\n"
 
-The Arduino board should reply
+The Arduino board will reply with a version and revision number
 
-    00 FF FF FE
+    20 32 31 30    " 210" (protocol v2, implementation v1.0)
 
 The current arduino board also supports connectivity tests from the genesis
-side (the genesis can send 00FFFFF), but no genesis code make use of it.
+side (the genesis can send 2056510A), but no genesis code make use of it.
 
 If you enabled LED in the arduino code, this test also blinks the LED, so it
 may be a bit slow to respond.
@@ -240,7 +241,6 @@ set to the exception vector and enters monitor mode :
 Data sent by the genesis when TRACE triggered :
 
     00 00 00 09
-
 
 Data sent by the genesis when TRAP 7 triggered :
 
@@ -273,3 +273,18 @@ low level protocol in the Arduino
 Currently, BDB is able to display incoming data when running the program with
 the "go" command.
 
+
+Flow control in serial mode
+---------------------------
+
+Since most arduino boards have no flow control, an acknowledge byte is sent
+after each packet successfully sent to the genesis.
+
+The acknowledge is a single byte with the value : 0x3F.
+
+The PC should not send another packet before receiving the ack.
+
+Example reading a long word at 0x000200 on the serial port :
+
+    84 00 02 00
+    3F A4 00 02 00 53 45 47 41

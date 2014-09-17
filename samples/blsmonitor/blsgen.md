@@ -1,5 +1,17 @@
-Displays a RAM dump on screen and allow to
-read / write to RAM using the gamepad.
+Displays a RAM dump on screen and allow to access RAM using the gamepad.
+It also embeds BDA to enable debugger.
+This is the standalone genesis cart version.
+
+Instructions to build and run
+=============================
+
+ - Build the binary image
+
+    blsgen
+
+ - Burn monitor.bin on a cart or load it from your linker
+
+See README.md for usage
 
 Section font.png.img
 ====================

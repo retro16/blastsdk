@@ -17,6 +17,7 @@
 #include <netdb.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <sys/ioctl.h>
 
 #include "bls.h"
 
@@ -48,7 +49,10 @@ void usage()
 void goto_mainloop(int sig)
 {
   (void)sig;
-
+  printf("SIGINT\n");
+  rl_free_line_state();
+  rl_reset_after_signal();
+  
   // Go back to main loop
   siglongjmp(mainloop_jmp, 0);
 }
@@ -66,6 +70,45 @@ void cleanup_breakpoints()
     // Write original instruction
     writeword(breakpoints[b][0], breakpoints[b][1]);
   }
+}
+
+void print_incoming()
+{
+  // The genesis sent data : print it to stdout
+  readdata();
+  if(inpl < 4)
+  {
+    printf("Received partial data from the genesis\n");
+  }
+  else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] == 0x00 && inp[3] >= 0x20 && inp[3] < 0x2F)
+  {
+    printf("TRAP #%02d\n", inp[3] - 0x20);
+  }
+  else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] == 0x00 && inp[3] < 0x20)
+  {
+    printf("Exception %02X triggered\n", (unsigned int)(unsigned char)(inp[3]));
+  }
+  else if(inp[0] <= 3)
+  {
+    fwrite(&inp[1], 1, inp[0] & 0x03, stdout);
+  }
+  else
+  {
+    printf("(extra) ");
+    hexdump(inp, inpl, 0);
+  }
+}
+
+void incoming_packet()
+{
+  char *lb = rl_line_buffer;
+  while(*(lb++)) { usleep(1000000); printf("\b \b\b"); } // Erase readline line
+  printf("\b\b\b\b\b\b      \b\b\b\b\b\b"); // Erase "bdb > " prompt
+
+  print_incoming();
+
+  printf("bdb > %s", rl_line_buffer); // Restore readline line display
+  fflush(stdout);
 }
 
 void breakpoint_interrupt(int sig)
@@ -411,6 +454,9 @@ void d68k_skip_instr(int sub)
   d68k_instr(sub);
 }
 
+char lastline[1024] = "";
+void on_line_input(char *l);
+
 int main(int argc, char **argv)
 {
   if(argc < 2)
@@ -422,29 +468,49 @@ int main(int argc, char **argv)
 
   open_debugger(argv[1]);
 
-	printf("Blast ! debugger. Connected to %s", argv[1]);
+	printf("Blast ! debugger. Connected to %s\n", argv[1]);
 
   if(argc >= 3)
   {
     printf("\n");
     boot_img(argv[2]);
     sendcmd(CMD_EXIT, 0);
+    waitack();
     readdata();
   }
 
-  char lastline[1024] = "";
-  for(;;)
-  {
-    const char *l;
-    char token[1024];
+  sigsetjmp(mainloop_jmp, 1);
+  signal(SIGINT, SIG_DFL);
+  rl_callback_handler_install("bdb > ", on_line_input);
+  
+  for(;;) {
+    fd_set readset;
+    int selectresult;
 
-    sigsetjmp(mainloop_jmp, 1);
-    signal(SIGINT, SIG_DFL);
-
-    if(!(l = readline("\nbdb > ")))
-    {
-      break;
+    FD_ZERO(&readset);
+    FD_SET(0, &readset);
+    FD_SET(genfd, &readset);
+    
+    selectresult = select(genfd + 1, &readset, NULL, NULL, NULL);
+    
+    if(selectresult > 0) {
+      if(FD_ISSET(0, &readset)) {
+        rl_callback_read_char();
+      } else if(FD_ISSET(genfd, &readset)) {
+        incoming_packet();
+      }
     }
+  }
+}
+
+void on_line_input(char *line)
+{
+  char token[1024] = "";
+  const char *l = line;
+  
+  rl_callback_handler_remove();
+  
+  do {
     if(*l)
     {
       strcpy(lastline, l);
@@ -466,7 +532,7 @@ int main(int argc, char **argv)
 
     if(strcmp(token, "q") == 0)
     {
-      return 0;
+      exit(0);
     }
 
     if(strcmp(token, "flush") == 0)
@@ -610,6 +676,7 @@ int main(int argc, char **argv)
 
       u32 address = parse_int(&l, 8);
       sendcmd(cmd, address);
+      waitack();
 
       readdata();
       if(inpl <= 4)
@@ -674,14 +741,17 @@ int main(int argc, char **argv)
         signal(SIGINT, breakpoint_interrupt);
       }
       sendcmd(CMD_EXIT, 0);
+      waitack();
+      
       do {
         readdata();
         if((inp[0] & 0xE0) == 0 && inp[0] & 0x03)
         {
           // The genesis sent data
           fwrite(&inp[1], 1, inp[0] & 0x03, stdout);
+          fflush(stdout);
         }
-      } while((inp[0] & 0xE0) == 0 && inp[0] & 0x03);
+      } while((inp[0] & 0xE0) == 0 && (inp[0] & 0x03));
       if((inp[0] & 0xE0) != CMD_EXIT)
       {
         printf("Error : genesis did not acknowledge.\n");
@@ -717,8 +787,10 @@ int main(int argc, char **argv)
       fflush(stdout);
 
       sendcmd(CMD_HANDSHAKE, 0);
-
-      printf(" ... ");
+      printf(" ..");
+      fflush(stdout);
+      waitack();
+      printf(". ");
       fflush(stdout);
 
       readdata();
@@ -742,13 +814,18 @@ int main(int argc, char **argv)
       printf("Test");
       fflush(stdout);
 
-      sendcmd(CMD_HANDSHAKE, 0xFFFFFF);
+      sendcmd(CMD_EXIT, 0x56510A);
+      waitack();
 
       printf(" ... ");
       fflush(stdout);
 
       readdata();
-      if(inpl != 4 || inp[1] != 0xFF || inp[2] != 0xFF || inp[3] != 0xFE)
+      if(inpl != 4
+      || inp[0] != 0x20
+      || inp[1] < '0' || inp[1] > '9'
+      || inp[2] < '0' || inp[2] > '9'
+      || inp[3] < '0' || inp[3] > '9')
       {
         printf("crash !\n");
         hexdump(inp, inpl, 0);
@@ -756,8 +833,7 @@ int main(int argc, char **argv)
       }
       else
       {
-        printf("OK !\n");
-        hexdump(inp, inpl, 0);
+        printf("OK !\n\n Protocol v%c\n Implementation v%c.%c\n", inp[1], inp[2], inp[3]);
       }
 
       continue;
@@ -918,7 +994,7 @@ int main(int argc, char **argv)
       char out[262144];
       int suspicious;
       d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
-      printf("%s", out);
+      printf("%s\n", out);
 
       continue;
     }
@@ -943,7 +1019,7 @@ int main(int argc, char **argv)
       char out[262144];
       int suspicious;
       d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
-      printf("%s", out);
+      printf("%s\n", out);
 
       continue;
     }
@@ -1010,13 +1086,15 @@ int main(int argc, char **argv)
     if(strcmp(token, "step") == 0 || strcmp(token, "s") == 0)
     {
       int oldsr = readword(REG_SR);
-      writeword(REG_SR, 0xA700 | (oldsr & 0xFF));
+printf("oldsr=%04X\n", oldsr);
+      writeword(REG_SR, 0x8700 | oldsr); // Set trace bit and mask interrupts
 
       sendcmd(CMD_EXIT, 0);
+      waitack();
       readdata();
       readdata();
-
-      writeword(REG_SR, oldsr);
+printf("SR=%04X\n", readword(REG_SR));
+      writeword(REG_SR, (readword(REG_SR) & 0x00FF) | (oldsr & 0xFF00));
       showreg(REGADDR);
       d68k_instr(0);
       continue;
@@ -1034,7 +1112,7 @@ int main(int argc, char **argv)
       subreq();
       subsetbank(0);
       int oldsr = readword(SUBREG_SR);
-      writeword(SUBREG_SR, 0xA700 | (oldsr & 0xFF));
+      writeword(SUBREG_SR, 0x8700 | oldsr); // Set trace bit and mask interrupts
       subrelease();
       subgo();
 
@@ -1044,7 +1122,7 @@ int main(int argc, char **argv)
 
       subreq();
       subsetbank(0);
-      writeword(SUBREG_SR, oldsr);
+      writeword(SUBREG_SR, (readword(SUBREG_SR) & 0x00FF) | (oldsr & 0xFF00));
       showreg(SUBREGADDR);
       d68k_instr(1);
       subrelease();
@@ -1147,10 +1225,9 @@ int main(int argc, char **argv)
       printf("bdp debug trace %sabled.\n", bdpdump ? "en" : "dis");
       continue;
     }
-  }
-    
-  printf("\n");
-
-  return 0;
+  } while(0);
+  
+  signal(SIGINT, SIG_DFL);
+  rl_callback_handler_install("bdb > ", on_line_input);
 }
 

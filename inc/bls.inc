@@ -29,6 +29,7 @@ TARGET_GEN  equ 0
 TARGET_SCD  equ 1
 TARGET_RAM  equ 2
 
+		if BUS == BUS_MAIN
 ; Controllers
 ; Mapping :
 ; Bit 7  6  5  4  3  2  1  0
@@ -100,7 +101,8 @@ SC4800		equ	$00
 ZBUSREQ		equ	$A11100
 ZRESET		equ	$A11200
 ZREQ		equ	$0100			; Value to be written to ZBUSREQ or ZRESET
-
+		endif
+		
 ; Interrupt vector offsets
 INTV_BUSERR	set	$08
 INTV_ADDRERR	set	$0C
@@ -157,11 +159,15 @@ FM2REG		equ	$A04002
 FM2DATA		equ	$A04003
 PSG		equ	$C00011
 		endif
-
-        include bls_routines.inc
+		
+		include bls_macros.inc
+		include bls_routines.inc
+		
+		if BUS == BUS_MAIN
 		include	bls_vdp.inc
+		endif
 
-		if SCD != 0
+		if TARGET != TARGET_GEN
 		include	blsscd.inc
 		endif
 

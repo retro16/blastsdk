@@ -1,10 +1,9 @@
-		; Debug protocol control and data ports
-		; To use the "serial" port of the old genesis, specify CCTRL3 / CDATA3
-
 	if BUS == BUS_MAIN
 
-BDPCTRL		equ	CCTRL2
-BDPDATA		equ	CDATA2
+		; Debug protocol control and data ports
+		; To use the "serial" port of the old genesis, specify CCTRL3 / CDATA3
+BDACTRL		equ	CCTRL2
+BDADATA		equ	CDATA2
 
 BDA_NEUTRALDATA	set	(CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
 BDA_NEUTRALCTRL	set	(CTHINT|CTR)
@@ -78,8 +77,8 @@ bda_init					; Call at console initialization
 	endif	; TARGET != TARGET_GEN
 
 		; Setup gamepad port in neutral state (TR low, all other pins input, enable interrupt)
-		move.b	#BDA_NEUTRALDATA, BDPDATA		; Set all high except TR low
-		move.b	#BDA_NEUTRALCTRL, BDPCTRL	; Enable level 2 interrupts and set TL+TR as output
+		move.b	#BDA_NEUTRALDATA, BDADATA		; Set all high except TR low
+		move.b	#BDA_NEUTRALCTRL, BDACTRL	; Enable level 2 interrupts and set TL+TR as output
 
 		rts
 		
@@ -241,8 +240,8 @@ bda_enter
 		moveq.l	#$0000000F, d7	        ; Words per packet
 		lea	bda_recvbyte(pc), a2
 		lea	bda_sendhead(pc), a3
-		lea	BDPDATA, a5
-		lea	BDPCTRL, a6
+		lea	BDADATA, a5
+		lea	BDACTRL, a6
 
 		tst.l	(a7)			; Test if a message was pre-buffered
 		beq.b	bda_readcmd

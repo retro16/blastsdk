@@ -1179,7 +1179,7 @@ void bls_map_section(section *sec)
     BLSLL(section) *sl = usedsections;
     section *s;
     BLSLL_FOREACH(s, sl) {
-      if(s == sec || s->size == 0 || s->symbol->value.addr == -1) return;
+      if(s == sec || s->size == 0 || s->symbol->value.addr == -1) continue;
       printf("Overlaps ? %s(%06X-%06X) <-> %s(%06X-%06X)  ", sec->name, (uint32_t)sec->symbol->value.addr, (uint32_t)(sec->symbol->value.addr + sec->size - 1), s->name, (uint32_t)s->symbol->value.addr, (uint32_t)(s->symbol->value.addr + s->size - 1));
       if(sections_overlap(sec, s)) {
         printf("YES : %06X => ", (unsigned int)sec->symbol->value.addr);

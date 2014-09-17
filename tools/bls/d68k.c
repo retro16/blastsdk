@@ -7,18 +7,31 @@
 
 void help()
 {
-  fprintf(stderr, "Usage: d68k [-acl] FILE ADDRESS [SYMFILE]\nDisassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n    -a assemble FILE before disassembling\n    -c shows cycles for each instruction.\n    -l shows labels.\n");
+  fprintf(stderr, "Usage: d68k [-acl] [-o offset] [-s size] [-i instructions] FILE ADDRESS [SYMFILE]\n"
+  "Disassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n"
+  "    -a assemble FILE before disassembling\n"
+  "    -c shows cycles for each instruction.\n"
+  "    -l shows labels.\n"
+  "    -o offset in file.\n"
+  "    -s max number of bytes to dissasemble.\n"
+  "    -i max number of instructions to dissasemble.\n"
+  );
   exit(1);
 }
+
 
 int main(int argc, char **argv)
 {
   int cycles = 0;
   int labels = 0;
   int assemble = 0;
+  int instructions = -1;
+  sv_t size = 0xFFFFFFF;
+  sv_t offset = 0;
+  const char *oa;
 
   int c;  
-  while((c = getopt (argc, argv, "acl")) != -1)
+  while((c = getopt (argc, argv, "aclo:s:i:")) != -1)
   {
     switch(c)
     {
@@ -32,6 +45,21 @@ int main(int argc, char **argv)
 
       case 'a':
       assemble = 1;
+      break;
+      
+      case 'o':
+      oa = optarg;
+      offset = parse_int(&oa, 8);
+      break;
+      
+      case 's':
+      oa = optarg;
+      size = parse_int(&oa, 8);
+      break;
+      
+      case 'i':
+      oa = optarg;
+      instructions = parse_int(&oa, 8);
       break;
       
       default:
@@ -70,7 +98,16 @@ int main(int argc, char **argv)
   }
 
   u8 *data;
-  int size = readfile(infilename, &data);
+  int realsize = readfile(infilename, &data);
+  if(offset >= realsize)
+  {
+    fprintf(stderr, "Offset out of bounds.\n");
+    exit(1);
+  }
+  if(offset + size > realsize)
+  {
+    size = realsize - offset;
+  }
 
   if(assemble)
   {
@@ -80,7 +117,7 @@ int main(int argc, char **argv)
   char *dasm = malloc(size * 40);
 
   int suspicious;
-  int r = d68k(dasm, size * 40, data, size, -1, address, labels, cycles, &suspicious);
+  int r = d68k(dasm, size * 40, data + offset, size, instructions, address, labels, cycles, &suspicious);
 
   printf("%s", dasm);
   free(data);

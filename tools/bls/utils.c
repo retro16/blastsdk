@@ -412,9 +412,24 @@ void hexdump(const u8 *data, int size, u32 offset)
   {
     // Print line
     printf("%06X: ", offset);
+    const u8 *asciidata = data;
+    int asciisize = 0;
     for(c = 0; c < 16 && size; ++c, ++data, ++offset, --size)
     {
       printf("%02X ", *data);
+      ++asciisize;
+    }
+    printf("  ");
+    for(c = 0; c < asciisize; ++c)
+    {
+      if(asciidata[c] >= 0x20 && asciidata[c] < 0x80)
+      {
+        printf("%c", asciidata[c]);
+      }
+      else
+      {
+        printf(".");
+      }
     }
     printf("\n");
   }

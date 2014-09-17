@@ -21,14 +21,18 @@
 
 ////// Globals
 
+#define SERIAL_BUFFER 4
+#define SERIAL_BAUDRATE B1000000
+
 int genfd;
 u8 inp[40];
 int inpl;
 int bdpdump = 0;
 
-void senddata_ip(const u8 *data, int size);
-void senddata_serial(const u8 *data, int size);
-void (*senddata)(const u8 *data, int size);
+void senddata(const u8 *data, int size);
+void waitack_tcp();
+void waitack_serial();
+void (*waitack)();
 
 
 // Return total packet length based on header value
@@ -52,7 +56,7 @@ int packetlen(u8 header)
 int readdata()
 {
   inpl = 0;
-  if(bdpdump) printf("<");
+  if(bdpdump) { printf("<"); fflush(stdout); }
   do
   {
     // Read the header byte, then the whole remaining packet
@@ -66,9 +70,9 @@ int readdata()
     {
       if(errno == EAGAIN)
       {
-        return 0;
+        usleep(100);
       }
-      if(errno != EINTR)
+      else if(errno != EINTR)
       {
         fprintf(stderr, "Could not read from genesis : %s\n", strerror(errno));
         exit(2);
@@ -80,6 +84,7 @@ int readdata()
       if(bdpdump) for(b = 0; b < r; ++b)
       {
         printf("%02X", inp[inpl+b]);
+        fflush(stdout);
       }
       inpl += r;
     }
@@ -90,9 +95,9 @@ int readdata()
   return 1;
 }
 
-void senddata_ip(const u8 *data, int size)
+void senddata(const u8 *data, int size)
 {
-  if(bdpdump) printf(">");
+  if(bdpdump) { printf(">"); fflush(stdout); }
   while(size)
   {    
     ssize_t w = write(genfd, data, size);
@@ -115,6 +120,7 @@ void senddata_ip(const u8 *data, int size)
       if(bdpdump) for(b = 0; b < w; ++b)
       {
         printf("%02X", data[b]);
+        fflush(stdout);
       }
       data += w;
       size -= w;
@@ -123,43 +129,46 @@ void senddata_ip(const u8 *data, int size)
   if(bdpdump) printf("\n");
 }
 
-void senddata_serial(const u8 *data, int size)
+void waitack_tcp()
 {
-#define SERIAL_BUFFER 1
-  if(bdpdump) printf(">");
-  while(size)
-  {
-    // Empty buffer before sending data
-    while(tcdrain(genfd) == -1 && errno == EINTR);
+  // No need for ACK in TCP mode
+}
 
-    // Avoid buffer overflow by limiting write size to SERIAL_BUFFER bytes
-    ssize_t w = write(genfd, data, size < SERIAL_BUFFER ? size : SERIAL_BUFFER);
-    if(w == 0)
+void waitack_serial()
+{
+  for(;;)
+  {
+    // Read the header byte, then the whole remaining packet
+    char c;
+    ssize_t r = read(genfd, &c, 1);
+    if(r == 0)
     {
-      fprintf(stderr, "Could not send to genesis : connection closed.\n");
+      fprintf(stderr, "Could not read from genesis : connection closed.\n");
       exit(2);
     }
-    if(w == -1)
+    if(r == -1)
     {
-      if(errno != EINTR)
+      if(errno == EAGAIN)
       {
-        fprintf(stderr, "Could not send to genesis : %s\n", strerror(errno));
+        printf(" EAGAIN\n");
+        usleep(100);
+      }
+      else if(errno != EINTR)
+      {
+        fprintf(stderr, "Could not read from genesis : %s\n", strerror(errno));
         exit(2);
       }
     }
     else
     {
-//      usleep(200 + SERIAL_BUFFER * w * 1000000 / (115200/8));
-      int b;
-      if(bdpdump) for(b = 0; b < w; ++b)
+      if(c != 0x3F)
       {
-        printf("%02X", data[b]);
+        printf("Acknowledge not received. Received %02X instead.\n", (unsigned int)(unsigned char)c);
+        exit(2);
       }
-      data += w;
-      size -= w;
+      return;
     }
   }
-  if(bdpdump) printf("\n");
 }
 
 void sendcmd(u8 header, u32 address)
@@ -254,6 +263,7 @@ void subreset()
 void readburst(u8 *target, u32 address, int length)
 {
   sendcmd(CMD_READ | CMD_BYTE | (CMD_LEN & length), address);
+  waitack();
   readdata();
   if(inp[0] != (CMD_WRITE | CMD_BYTE | (CMD_LEN & length)))
   {
@@ -266,6 +276,7 @@ void readburst(u8 *target, u32 address, int length)
 u32 readlong(u32 address)
 {
   sendcmd(CMD_READ | CMD_LONG | 4, address);
+  waitack();
   readdata();
   if(inp[0] != (CMD_WRITE | CMD_LONG | 4))
   {
@@ -278,6 +289,7 @@ u32 readlong(u32 address)
 u32 readword(u32 address)
 {
   sendcmd(CMD_READ | CMD_WORD | 2, address);
+  waitack();
   readdata();
   if(inp[0] != (CMD_WRITE | CMD_WORD | 2))
   {
@@ -290,6 +302,7 @@ u32 readword(u32 address)
 u32 readbyte(u32 address)
 {
   sendcmd(CMD_READ | CMD_BYTE | 1, address);
+  waitack();
   readdata();
   if(inp[0] != (CMD_WRITE | CMD_BYTE | 1))
   {
@@ -316,6 +329,7 @@ void sendburst(u32 address, const u8 *source, int length)
 {
   sendcmd(CMD_WRITE | CMD_BYTE | (CMD_LEN & length), address);
   senddata(source, length);
+  waitack();
 }
 
 // Send data into RAM as fast as possible
@@ -366,6 +380,7 @@ void writelong(u32 address, u32 l)
   u8 d[4];
   setint(l, d, 4);
   senddata(d, 4);
+  waitack();
 }
 
 void writeword(u32 address, u32 w)
@@ -374,6 +389,7 @@ void writeword(u32 address, u32 w)
   u8 d[2];
   setint(w, d, 2);
   senddata(d, 2);
+  waitack();
 }
 
 void writebyte(u32 address, u32 b)
@@ -381,6 +397,7 @@ void writebyte(u32 address, u32 b)
   sendcmd(CMD_WRITE | CMD_BYTE | 1, address);
   u8 d = b;
   senddata(&d, 1);
+  waitack();
 }
 
 // Send data into sub PRAM
@@ -506,11 +523,13 @@ void vramsendmem(u32 address, const u8 *source, int length)
   {
     sendcmd(CMD_WRITE | CMD_LONG | 4, VDPDATA);
     senddata(&source[c], 4);
+    waitack();
   }
   if(c <= length - 2)
   {
     sendcmd(CMD_WRITE | CMD_WORD | 2, VDPDATA);
     senddata(&source[c], 2);
+    waitack();
   }
 }
 
@@ -523,6 +542,7 @@ void vramreadmem(u8 *target, u32 address, int length)
   for(c = 0; c < length; c += 4)
   {
     sendcmd(CMD_READ | CMD_LONG | 4, VDPDATA);
+    waitack();
     readdata();
     if(inp[0] != (CMD_WRITE | CMD_LONG | 4))
     {
@@ -534,6 +554,7 @@ void vramreadmem(u8 *target, u32 address, int length)
   if(c <= length - 2)
   {
     sendcmd(CMD_READ | CMD_WORD | 2, VDPDATA);
+    waitack();
     readdata();
     if(inp[0] != (CMD_WRITE | CMD_WORD | 2))
     {
@@ -934,7 +955,7 @@ void open_device(const char *device)
 {
   struct termios oldtio,newtio;
 
-  senddata = senddata_ip;
+  waitack = waitack_serial;
 
   genfd = open(device, O_RDWR | O_NOCTTY); 
   if(genfd < 0)
@@ -946,10 +967,9 @@ void open_device(const char *device)
   tcgetattr(genfd, &oldtio);
 
   bzero(&newtio, sizeof(newtio));
-  newtio.c_cflag = B115200 | CS8 | CLOCAL;
-  newtio.c_iflag = IGNPAR;
-  newtio.c_oflag = 0;
-  newtio.c_lflag = 0; 
+  cfmakeraw(&newtio);
+  cfsetispeed(&newtio, SERIAL_BAUDRATE);
+  cfsetospeed(&newtio, SERIAL_BAUDRATE);
   newtio.c_cc[VTIME] = 0;
   newtio.c_cc[VMIN] = 1;
 
@@ -963,7 +983,7 @@ void open_network(const char *host)
   struct sockaddr_in server;
   struct hostent *hp;
  
-  senddata = senddata_ip;
+  waitack = waitack_tcp;
 
   genfd = socket(AF_INET, SOCK_STREAM, 0);
   server.sin_family = AF_INET;

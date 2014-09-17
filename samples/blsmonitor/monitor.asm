@@ -337,7 +337,7 @@ pressright
 		bra.w	int_vblank_end
 
 pressread
-		VDPSETBG $020			; Green background = read
+		VDPSETBG $0C0			; Green background = read
 		move.l	addr, d2
 		move.b	mode, d1
 		btst	#1, d1
@@ -347,7 +347,10 @@ pressread
 
 		; mode == 0 : byte
 		move.l	d2, a0
-		move.b	(a0), value
+		move.b	(a0), d1
+		ext.w		d1
+		ext.l		d1
+		move.l	d1, value
 		bra.w	int_vblank_end
 
 ; XXX to be optimized
@@ -356,7 +359,9 @@ pressread
 		andi.l	#$00FFFFFE, d2
 		move.l	d2, addr
 		move.l	d2, a0
-		move.w	(a0), value
+		move.w	(a0), d1
+		ext.l		d1
+		move.l	d1, value
 		bra.w	int_vblank_end
 
 .2		btst	#0, d1
@@ -379,7 +384,7 @@ pressread
 		bra.w	int_vblank_end
 
 presswrite
-		VDPSETBG $002			; Red background = write
+		VDPSETBG $00C			; Red background = write
 		move.l	addr, d2
 		move.b	mode, d1
 		btst	#1, d1
@@ -389,14 +394,16 @@ presswrite
 
 		; mode == 0 : byte
 		move.l	d2, a0
-		move.b	value, (a0)
+		move.l	value, d1
+		move.b	d1, (a0)
 		bra.w	int_vblank_end
 
 .1		; mode == 1 : word
 		andi.l	#$00FFFFFE, d2
 		move.l	d2, addr
 		move.l	d2, a0
-		move.w	value, (a0)
+		move.l	value, d1
+		move.w	d1, (a0)
 		bra.w	int_vblank_end
 
 .2		btst	#0, d1

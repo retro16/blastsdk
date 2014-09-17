@@ -14,6 +14,8 @@
 #define TCPBRIDGE   // Uncomment to enable TCP server (ethernet shield)
 #define BLINKLED 13 // Set to the pin of the led to blink it while running. Undefine to disable blink.
 
+#define SERIAL_BAUDRATE 1000000
+
 #if defined (__AVR_ATmega168__) || defined (__AVR_ATmega328P__)
 #if GEND0 == 4 && GEND1 == 5 && GEND2 == 6 && GEND3 == 7
 // In direct AVR port mode, data lines are on port D 4..7 (pin 4 = D0 .. pin 7 = D3)
@@ -37,7 +39,6 @@ EthernetClient client;
 #define LEDON() do { digitalWrite(BLINKLED, HIGH); } while(0)
 #define LEDOFF() do { digitalWrite(BLINKLED, LOW); } while(0)
 #else
-#define ledblink(c,d) do {} while(0)
 #define LEDON() do {} while(0)
 #define LEDOFF() do {} while(0)
 #endif
@@ -384,9 +385,17 @@ void forwardPacket(Stream *in, Stream *out)
   // Read address and payload
   in->readBytes((char*)&(packet[1]), packetLen - 1);
 
-  if(header == 0x00 && packet[1] == 0xFF && packet[2] == 0xFF && packet[3] == 0xFF) {
+  if(in == &Serial)
+  {
+    // Send acknowledge
+    Serial.write(0x3F);
+  }
+
+  if(header == 0x20 && packet[1] == 'V' && packet[2] == 'Q' && packet[3] == '\n') {
     // Handle communication test
-    packet[3] = 0xFE;
+    packet[1] = '2'; // Protocol version (0..F)
+    packet[2] = '1'; // Implementation version
+    packet[3] = '0'; // Implementation revision
     in->write(packet, packetLen);
     return;
   }
@@ -405,7 +414,7 @@ void setup()
   pinMode(BLINKLED, OUTPUT); 
 #endif
 
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUDRATE);
   pc = &Serial; // By default, use serial port
 
   LEDON();
