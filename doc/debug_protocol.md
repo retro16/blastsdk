@@ -4,9 +4,9 @@ The Blast ! Debugger protocol v2
 Electrical specification.
 -------------------------
 
-Connected receiver must be open collector, with no pull-up. For output, pull
-the pin to low or release it for high. For input, just read logic value.  This
-will avoid problems when switching direction.
+The genesis uses 5V logic : 5V for logic high and 0V for logic low.
+The genesis has an internal pull-up on input pins, and output pins
+are regular outputs (not open collector).
 
 Port mapping / pinout
 
@@ -44,7 +44,7 @@ indicates whether the arduino is allowed to set D0..D3 as outputs or not.
 When TR is high (genesis sends data), TL is the clock and TH is the ack pulse.
 When TR is low (arduino sends data), TH is the clock and TL is the ack pulse.
 
-When transmission is inactive, TH must be set to pull-up input, in case the
+When transmission is inactive, TH must be set to pull-up input in case the
 genesis polls the gamepad on that port, which could cause a short-circuit.
 
 Byte transmission format
@@ -53,7 +53,7 @@ Byte transmission format
 The debug mode communicates via D-Pad data lines, passing 4 bits per clock.
 Format is big nybble first. For example, to pass 0xA3, digit A would be passed
 first, then 3. Each nybble is acknowledged by a transition. 5V pull-up is logic
-high and 0V is logic low. When unused, pins should be high.
+high (bit set) and 0V is logic low (bit clear). When unused, pins should be high.
 
 Example transmitting 0xA4 to the genesis :
 
