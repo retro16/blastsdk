@@ -5,11 +5,11 @@ This is the standalone genesis cart version.
 Instructions to build and run
 =============================
 
- - Build the binary image
+Build the binary image
 
     blsgen
 
- - Burn monitor.bin on a cart or load it from your linker
+Burn monitor.bin on a cart or load it from your linker
 
 See README.md for usage
 

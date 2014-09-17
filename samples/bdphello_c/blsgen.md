@@ -7,17 +7,17 @@ Instructions to build and run
 Run from a cartridge/linker
 ---------------------------
 
- - Build the binary image
+Build the binary image
 
     blsgen
 
- - Burn bdphello_c.bin on a cart or load it from your linker
+Burn bdphello_c.bin on a cart or load it from your linker
 
- - Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
+Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
 
     bdb /dev/ttyUSB0
 
- - Run the program
+Run the program
 
     bdb > go
     Hello C world
@@ -29,17 +29,17 @@ This is caused by the ENTER_MONITOR macro call.
 Run from blsmonitor
 -------------------
 
- - Build the binary image
+Build the binary image
 
     blsgen
 
- - Start blsmonitor on the genesis / sega cd
+Start blsmonitor on the genesis / sega cd
 
- - Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
+Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
 
     bdb /dev/ttyUSB0
 
- - Upload the binary image (this takes a long time)
+Upload the binary image (this takes a long time)
 
     bdb > boot bdphello_c.bin
     Ready to boot
@@ -47,7 +47,7 @@ Run from blsmonitor
     a0:00FF002B a1:00FF0896 a2:00FF002A a3:00000000 a4:00C00000 a5:00C00004 a6:FFFFD400 a7:00FFFD00
     pc:00FF0000 sr:2700
 
- - Run the program
+Run the program
 
     bdb > go
     Hello C world

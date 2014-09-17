@@ -9,13 +9,13 @@ Instructions to build and run
 Run from a CD-ROM
 -----------------
 
- - Build the binary image
+Build the binary image
 
     blsgen blsgen_scd_eu.md
 
- - Burn monitor_scd_us.iso on a non-rewritable CD-ROM
+Burn monitor_scd_us.iso on a non-rewritable CD-ROM
 
- - Boot the CD on your Sega CD
+Boot the CD on your Sega CD
 
 See README.md for how to use
 
@@ -26,21 +26,21 @@ Run from blsmonitor
 Since this program does not access the CD drive, it can be run from
 the debugger without burning it to a CD.
 
- - Build the binary image
+Build the binary image
 
     blsgen monitor_scd_us.md
 
- - Start blsmonitor on the genesis / sega cd
+Start blsmonitor on the genesis / sega cd
 
- - Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
+Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
 
     bdb /dev/ttyUSB0
 
- - Upload the binary image (this takes a long time)
+Upload the binary image (this takes a long time)
 
     bdb > boot monitor_scd_us.iso
 
- - Run the program
+Run the program
 
     bdb > go
 

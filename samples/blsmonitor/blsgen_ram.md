@@ -9,11 +9,11 @@ Instructions to build and run
 Run from a cartridge/linker
 ---------------------------
 
- - Build the binary image
+Build the binary image
 
     blsgen blsgen_ram.md
 
- - Burn monitor_ram.bin on a cart or load it from your linker
+Burn monitor_ram.bin on a cart or load it from your linker
 
 See README.md for how to use
 
@@ -21,21 +21,21 @@ See README.md for how to use
 Run from blsmonitor
 -------------------
 
- - Build the binary image
+Build the binary image
 
     blsgen blsgen_ram.md
 
- - Start blsmonitor on the genesis / sega cd
+Start blsmonitor on the genesis / sega cd
 
- - Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
+Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
 
     bdb /dev/ttyUSB0
 
- - Upload the binary image (this takes a long time)
+Upload the binary image (this takes a long time)
 
     bdb > boot monitor_ram.bin
 
- - Run the program
+Run the program
 
     bdb > go
 
