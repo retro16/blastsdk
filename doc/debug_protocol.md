@@ -280,7 +280,8 @@ Flow control in serial mode
 Since most arduino boards have no flow control, an acknowledge byte is sent
 after each packet successfully sent to the genesis.
 
-The acknowledge is a single byte with the value : 0x3F.
+The acknowledge is a single byte with the value : 0x3F. It is sent by the
+arduino board, NOT by the genesis.
 
 The PC should not send another packet before receiving the ack.
 
@@ -288,3 +289,8 @@ Example reading a long word at 0x000200 on the serial port :
 
     84 00 02 00
     3F A4 00 02 00 53 45 47 41
+
+This is what is seen on the genesis side :
+
+    84 00 02 00
+    A4 00 02 00 53 45 47 41
