@@ -34,6 +34,7 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
 const char *compiler = "m68k-elf-gcc";
 const char *precompiler = "m68k-elf-cpp";
 const char *cflags = " -Dextern='extern __attribute__((weak))' -fno-common -Os -pipe -fomit-frame-pointer -fno-builtin-memset -fno-builtin-memcpy";
+const char *sflags = " -fno-common -pipe ";
 
 const char *ld = "m68k-elf-ld";
 const char *ldflags = "";
@@ -62,6 +63,16 @@ static void gen_symtable_section(FILE *out, const section *s, bus bus)
     fprintf(out, "%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
     printf("%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
   }
+}
+
+static int is_asm(const void *elt)
+{
+  const element *s = (const element *)elt;
+  if(strcasecmp(s->name + strlen(s->name) - 2, ".s") == 0)
+  {
+    return 1;
+  }
+  return 0;
 }
 
 static void gen_symtable(const group *s)
@@ -429,7 +440,11 @@ void source_get_symbols_gcc(group *s)
   find_binary_load(s, f);
   pclose(f);
 
-  snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->bus, mainout.target, defs, srcname, object);
+  if(is_asm(s)) {
+    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, srcname, object);
+  } else {
+    snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->bus, mainout.target, defs, srcname, object);
+  }
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -460,7 +475,11 @@ void source_get_symbol_values_gcc(group *s)
 
   const char *defs = gen_load_defines();
 
-  snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
+  if(is_asm(s)) {
+    snprintf(cmdline, 1024, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->bus, mainout.target, srcname, object);
+  } else {
+    snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
+  }
   printf("Compile %s with load defines :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -497,7 +516,11 @@ void source_compile_gcc(group *s)
 
   const char *defs = gen_load_defines();
 
-  snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
+  if(is_asm(s)) {
+    snprintf(cmdline, 4096, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->bus, mainout.target, srcname, object);
+  } else {
+    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
+  }
   printf("Final compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
