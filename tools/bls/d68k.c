@@ -6,6 +6,8 @@
 #include <string.h>
 #include "bls.h"
 #include "blsparse.h"
+#include "blsfile.h"
+#include "d68k_mod.h"
 
 void help()
 {
@@ -30,7 +32,6 @@ int main(int argc, char **argv)
   int instructions = -1;
   u32 size = 0xFFFFFFF;
   u32 offset = 0;
-  const char *oa;
 
   int c;
   while((c = getopt (argc, argv, "aclo:s:i:")) != -1)
@@ -96,7 +97,7 @@ int main(int argc, char **argv)
   }
 
   u8 *data;
-  int realsize = readfile(infilename, &data);
+  u32 realsize = readfile(infilename, &data);
   if(offset >= realsize)
   {
     fprintf(stderr, "Offset out of bounds.\n");

@@ -1,4 +1,5 @@
 #include "blspack.h"
+#include "blsfile.h"
 
 static void pack_open(const char *filename, FILE **i, FILE **o)
 {

@@ -80,7 +80,7 @@ void readvram(u8 *target, u32 address, int length);
 static void writeburst(u32 address, const u8 *source, int length);
 void writemem_verify(int cpu, u32 address, const u8 *source, int length);
 void writemem(int cpu, u32 address, const u8 *source, int length);
-void writefile(int cpu, const char *filename, u32 address);
+void sendfile(int cpu, const char *filename, u32 address);
 void writewram(int mode, u32 address, const u8 *source, int length);
 void writevram(u32 address, const u8 *source, int length);
 

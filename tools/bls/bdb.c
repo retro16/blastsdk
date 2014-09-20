@@ -20,6 +20,9 @@
 #include <sys/ioctl.h>
 
 #include "bls.h"
+#include "blsparse.h"
+#include "blsfile.h"
+#include "bdp.h"
 
 ////// Globals
 
@@ -29,7 +32,12 @@ sigjmp_buf mainloop_jmp;
 int cpu; // Current CPU
 char regname[][3] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "pc", "sr"};
 
-void usage()
+static void usage();
+static void goto_mainloop(int sig);
+static void erase_prompt();
+static void restore_prompt();
+
+static void usage()
 {
   fprintf(stderr, "Usage: bdb DEVICE\n"
                   "The Blast ! debugger.\n"
@@ -41,7 +49,7 @@ void usage()
   );
 }
 
-void goto_mainloop(int sig)
+static void goto_mainloop(int sig)
 {
   (void)sig;
   printf("SIGINT\n");
@@ -79,14 +87,14 @@ void on_exception(int cpu, int ex)
   restore_prompt();
 }
 
-void erase_prompt()
+static void erase_prompt()
 {
   char *lb = rl_line_buffer;
   while(*(lb++)) { printf("\b \b\b"); } // Erase readline line
   printf("\b\b\b\b\b\b\b       \b\b\b\b\b\b\b"); // Erase "bdb > " prompt
 }
 
-void restore_prompt()
+static void restore_prompt()
 {
   printf("bdb %c> %s", cpu ? 's' : 'm', rl_line_buffer); // Restore readline line display
   fflush(stdout);
@@ -578,7 +586,7 @@ void on_line_input(char *line)
     {
       u32 address = parse_int(&l, 8);
       parse_word(token, &l);
-      writefile(cpu, token, address);
+      sendfile(cpu, token, address);
       continue;
     }
 

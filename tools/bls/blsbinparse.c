@@ -1,4 +1,6 @@
 #include "bls.h"
+#include <string.h>
+#include <stdio.h>
 
 int getimgtype(const u8 *img, int size);
 u32 getipoffset(const u8 *img, const u8 **out_ip_start);

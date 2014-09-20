@@ -191,7 +191,7 @@ export BLAST_LD="$(which m68k-elf-ld 2>/dev/null)"
 export BLAST_NM="$(which m68k-elf-nm 2>/dev/null)"
 export BLAST_OBJCOPY="$(which m68k-elf-objcopy 2>/dev/null)"
 export BLAST_ASMX="$(which asmx 2>/dev/null)"
-make -C tools/bls -j7 install
+make -C tools/bls install
 if ! "$BLSPREFIX/bin/d68ktest"; then
 echo "d68k self-test failed"
 exit 1

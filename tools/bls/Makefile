@@ -1,4 +1,4 @@
-TARGETS = d68k bdb scdupload blsgen
+TARGETS = d68k bdb blsgen
 
 INSTALL_DIR ?= $(HOME)/bin
 INSTALL_TARGETS = $(TARGETS) d68ktest
@@ -28,10 +28,10 @@ BLAST_ASMX ?= asmx
 BLSPREFIX ?= $(shell dirname $$(dirname $$(which $(BLAST_CC) ) ) )
 
 # Per-source rules
+d68k: d68k.o d68k_mod.o blsbinparse.o blsfile.o blsparse.o
+bdb: bdb.o bdp.o d68k_mod.o utils.o blsbinparse.o
 blsgen: blsgen.o blsgen_gcc.o blsgen_png.o blsgen_img.o blsgen_asmx.o blsconf.o mdconf.o blsaddress.o blspack.o blswrite.o
-bdb: bdb.o bdp.o d68k_mod.o utils.o binparse.o
-d68k: d68k.o d68k_mod.o symtable.o utils.o
-scdupload: scdupload.o bdp.o utils.o
+#scdupload: scdupload.o bdp.o utils.o
 d68ktest:
 
 

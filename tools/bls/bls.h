@@ -2,6 +2,7 @@
 #define BLS_H
 
 #include <stdint.h>
+#include "blsll.h"
 
 #ifndef BDB_RAM
 #define BDB_RAM 0xFFFDC0 // RAM address of bdb
@@ -35,8 +36,80 @@
 #define VDPCTRL 0xC00004
 #define VDPR_AUTOINC 15
 
+// Format defines
+#define ROMHEADERSIZE 0x200
+#define MAXCARTSIZE 0x400000
+#define CDHEADERSIZE 0x200 // Size of CD
+#define SECCODESIZE 0x584 // Size of security code
+#define SPHEADERSIZE 0x28 // Size of SP header
+#define IPOFFSET (SECCODESIZE + 6) // chip address of IP binary in RAM
+#define SPOFFSET (0x6000 + SPHEADERSIZE) // chip address of SP binary in PRAM
+#define CDBLOCKSIZE 2048 // ISO block size
+#define MINCDBLOCKS 300 // Minimum number of blocks in a CD-ROM
+#define MAXCDBLOCKS 270000 // Maximum number of blocks in a CD-ROM
+
+#ifndef MAINSTACKSIZE
+#define MAINSTACKSIZE 0x100 // Default stack size
+#endif
+#ifndef MAINSTACK
+#define MAINSTACK 0xFD00 // Default stack pointer
+#endif
+
+#ifndef BLSPREFIX
+#error BLSPREFIX not defined
+#endif
+
+#ifndef BUILDDIR
+#define BUILDDIR "build_blsgen"
+#endif
+
 // Types
 typedef uint32_t u32;
 typedef uint8_t u8;
+typedef int64_t sv;
+
+// Static inlines
+
+static inline u32 getint(const u8 *data, int size)
+{
+  u32 d = 0;
+  int i;
+  for(i = 0; i < size; ++i)
+  {
+    d |= data[i] << ((size - 1 - i) * 8);
+  }
+  return d;
+}
+
+static inline void signext(int *v, int bits)
+{
+  if(*v & (1<<(bits-1)))
+  {
+    *v |= (-1) << bits;
+  }
+  else
+  {
+    *v &= (1L << bits) - 1;
+  }
+}
+
+static inline void setint(u32 value, u8 *target, int size)
+{
+  int i;
+  for(i = 0; i < size; ++i)
+  {
+    target[i] = value >> ((size - 1 - i) * 8);
+  }
+}
+
+static inline sv neint(sv v) {
+  if(v < 0) return v;
+  return (-v) & 0xFFFFFFFF;
+}
+
+static inline sv not_int(sv v) {
+  if(v < 0) return v;
+  return (~v) & 0xFFFFFFFF;
+}
 
 #endif//BLS_H

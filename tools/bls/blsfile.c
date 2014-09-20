@@ -106,9 +106,9 @@ size_t filesize(const char *file)
 }
 
 // Returns 1 if file exists
-int fileexists(const char *f)
+int fileexists(const char *filename)
 {
-  FILE *f = fopen(f, "rb");
+  FILE *f = fopen(filename, "rb");
   if(!f) {
     return 0;
   }

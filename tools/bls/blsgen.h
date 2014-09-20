@@ -4,35 +4,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include "bls.h"
 #include "mdconf.h"
-#include "blsll.h"
-
-#define ROMHEADERSIZE 0x200
-#define MAXCARTSIZE 0x400000
-
-#define CDHEADERSIZE 0x200 // Size of CD
-#define SECCODESIZE 0x584 // Size of security code
-#define SPHEADERSIZE 0x28 // Size of SP header
-#define IPOFFSET (SECCODESIZE + 6) // chip address of IP binary in RAM
-#define SPOFFSET (0x6000 + SPHEADERSIZE) // chip address of SP binary in PRAM
-#define CDBLOCKSIZE 2048 // ISO block size
-#define MINCDBLOCKS 300 // Minimum number of blocks in a CD-ROM
-#define MAXCDBLOCKS 270000 // Maximum number of blocks in a CD-ROM
-
-#ifndef MAINSTACKSIZE
-#define MAINSTACKSIZE 0x100 // Default stack size
-#endif
-#ifndef MAINSTACK
-#define MAINSTACK 0xFD00 // Default stack pointer
-#endif
-
-#ifndef BLSPREFIX
-#error BLSPREFIX not defined
-#endif
-
-#ifndef BUILDDIR
-#define BUILDDIR "build_blsgen"
-#endif
 
 extern BLSLL(group) *sources;
 extern BLSLL(section) *sections;
@@ -266,16 +239,6 @@ symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, sect
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
 
 void *merge_lists(void *target, void *source);
-
-static inline sv neint(sv v) {
-  if(v < 0) return v;
-  return (-v) & 0xFFFFFFFF;
-}
-
-static inline sv not_int(sv v) {
-  if(v < 0) return v;
-  return (~v) & 0xFFFFFFFF;
-}
 
 extern char path_prefixes[][4096];
 extern char include_prefixes[4096];

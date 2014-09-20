@@ -19,7 +19,7 @@ extern void readvram(u8 *target, u32 address, int length);
 // Memory write
 extern void writemem(int cpu, u32 address, const u8 *source, int length);
 extern void writemem_verify(int cpu, u32 address, const u8 *source, int length);
-extern void writefile(int cpu, const char *filename, u32 address);
+extern void sendfile(int cpu, const char *filename, u32 address);
 extern void writewram(int mode, u32 address, const u8 *source, int length);
 extern void writevram(u32 address, const u8 *source, int length);
 
