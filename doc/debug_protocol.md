@@ -70,7 +70,7 @@ Example transmitting 0xA4 to the genesis :
     TH ---      \_______________/             ------ output
           ___________                 ________
     TL ---           \_______________/        ------ input
-                                              
+
     TR ---____________________________________------ input
 
 
@@ -89,7 +89,7 @@ Example receiving 0xE0 from the genesis :
     TH ---           \________________/       ------ output
           ________               _____________
     TL ---        \_____________/             ------ input
-             ______________________________   
+             ______________________________
     TR ---__/                              \__------ input
 
 Notes :
@@ -214,7 +214,7 @@ Testing intermediate connectivity
 
 A special handshake allows to test communication between the PC and the
 Arduino. This command never reaches the Genesis. It allows to query version
-and revision of the bridge. This packet has 
+and revision of the bridge. This packet has
 
 Send a version request :
 
@@ -310,7 +310,7 @@ Main-sub cpu communication
 --------------------------
 
 The sub cpu cannot access the pad port, nor it can interrupt the main cpu. Communication between the sub cpu and the debugger is
-done by setting bits.
+done by setting communication flags.
 
 Communication flags (gate array + $0E) :
 
@@ -322,10 +322,10 @@ Communication flags (gate array + $0E) :
 Main -> sub flags :
 
  - REQ: The main cpu requests the sub cpu to enter monitor mode. This flag is checked by the sub cpu in its level 2 exception routine.
- 
+
  - CDR: CD read request. commwords 14-15 contain sector, commword 13 contains sector count.
    The sub cpu will read the specified sectors from cd and put them at the beginning of word ram. The sub cpu will release word ram once data is ready. This mechanism is used by blsgen binary loader.
- 
+
  - SYN: main-sub synchronization
 
 Sub -> main flags :

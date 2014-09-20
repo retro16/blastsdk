@@ -427,7 +427,50 @@ void readburst(u8 *target, u32 address, u32 length)
 void readmem(int cpu, u8 *target, u32 address, u32 length)
 {
   if(cpu) {
-    // TODO readmem sub cpu
+    cpumonitor(0);
+    if(address + length < 0x80000) {
+      while(length > 0) {
+        u32 burstaddr = address & 0x1FFFF;
+        u32 burstlen = 32;
+        if(burstaddr > 0x1FFFE0 && burstaddr + length > 0x20000) {
+          // Split over 2 banks
+          burstlen = burstaddr & 0x1F;
+        }
+        if(burstlen > length) {
+          // Remainder
+          burstlen = length;
+        }
+        busreq(1, address);
+        // Write data to PRAM window
+        readburst(target, burstaddr + 0x20000, burstlen);
+        target += burstlen;
+        address += burstlen;
+        length -= burstlen;
+      }
+    } else {
+      // source is not PRAM, use ultra slow copy !
+      while(length > 0) {
+        u32 burstlen;
+        u32 v;
+        if(length >= 4) {
+          v = readlong(cpu, address);
+          setint(v, target, 4);
+          burstlen = 4;
+        } else if(length >= 2) {
+          v = readword(cpu, address);
+          setint(v, target, 2);
+          burstlen = 2;
+        } else {
+          v = readbyte(cpu, address);
+          setint(v, target, 1);
+          burstlen = 1;
+        }
+        target += burstlen;
+        address += burstlen;
+        length -= burstlen;
+      }
+    }
+    cpurelease(0);
   } else {
     while(length > 32)
     {
@@ -449,34 +492,29 @@ void readwram(int mode, const u8 *source, u32 length) // Mode : 0 = 2M, 1 = 1M b
 
 void readvram(u8 *target, u32 address, u32 length)
 {
-  // Extremely slow. Should use VRAM buffering
+  // Extremely slow. Should use DMA in a temporary buffer.
+  cpumonitor(0);
   vdpsetreg(VDPR_AUTOINC, 2);
   writelong(0, VDPCTRL, ((address & 0x3FFF) << 16) | (address >> 14));
   u32 c;
   for(c = 0; c < length; c += 4)
   {
-    sendcmd(CMD_READ | CMD_LONG | 4, VDPDATA);
-    waitack();
-    readdata();
-    if(inp[0] != (CMD_WRITE | CMD_LONG | 4))
-    {
-      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_LONG | 4));
-      exit(2);
+    readlong(0, VDPDATA);
+    if(inpl != 8 || inp[0] != (CMD_WRITE | CMD_LONG | 4)) {
+      on_unknown(inp, inpl);
     }
     memcpy(&target[c], &inp[4], 4);
   }
-  if(c <= length - 2)
+  c -= 4;
+  if(c == length - 2)
   {
-    sendcmd(CMD_READ | CMD_WORD | 2, VDPDATA);
-    waitack();
-    readdata();
-    if(inp[0] != (CMD_WRITE | CMD_WORD | 2))
-    {
-      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_WORD | 2));
-      exit(2);
+    readword(0, VDPDATA);
+    if(inpl != 8 || inp[0] != (CMD_WRITE | CMD_LONG | 4)) {
+      on_unknown(inp, inpl);
     }
-    memcpy(&target[c], &inp[2], 2);
+    memcpy(&target[c], &inp[4], 2);
   }
+  cpurelease(0);
 }
 
 
@@ -579,6 +617,7 @@ writemem_verify_retry_last:
       goto writemem_verify_retry_last;
     }
   }
+  cpurelease(cpu);
 }
 
 void sendfile(int cpu, const char *token, u32 address)
@@ -587,7 +626,7 @@ void sendfile(int cpu, const char *token, u32 address)
   if(cpu) {
     // TODO
   } else {
-    FILE *f = fopen(token, "r");
+    FILE *f = fopen(token, "rb");
     if(!f)
     {
       printf("Cannot open %s\n", token);
@@ -604,6 +643,7 @@ void sendfile(int cpu, const char *token, u32 address)
     }
     fclose(f);
   }
+  cpurelease(cpu);
 }
 
 /*
@@ -622,16 +662,16 @@ void writevram(u32 address, const u8 *source, u32 length)
   u32 c;
   for(c = 0; c < length; c += 4)
   {
-    sendcmd(CMD_WRITE | CMD_LONG | 4, VDPDATA);
-    senddata(&source[c], 4);
-    waitack();
+    u32 v = getint(&source[c], 4);
+    writelong(0, VDPDATA, v);
   }
+  c -= 4;
   if(c <= length - 2)
   {
-    sendcmd(CMD_WRITE | CMD_WORD | 2, VDPDATA);
-    senddata(&source[c], 2);
-    waitack();
+    u32 v = getint(&source[c], 2);
+    writeword(0, VDPDATA, v);
   }
+  cpurelease(0);
 }
 
 
@@ -918,7 +958,9 @@ void stepcpu(int cpu)
 
 void resetcpu(int cpu)
 {
+  cpumonitor(cpu);
   if(cpu) {
+    setup_breakpoints(cpu);
     subreset();
     cpustate[cpu] = 0;
   } else {

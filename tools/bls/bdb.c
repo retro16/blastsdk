@@ -315,7 +315,7 @@ void boot_img(const char *filename)
   }
   free(image);
 
-  showreg(REGADDR);
+  showreg(0);
 }
 
 void boot_sp_from_iso(const char *filename)
@@ -509,8 +509,8 @@ void on_line_input(char *line)
       l += 4;
     }
 
-    if(strncmp(l, "sub", 4) == 0) {
-      if(cpu != 1) printf("Switch to main cpu\n");
+    if(strncmp(l, "sub", 3) == 0) {
+      if(cpu != 1) printf("Switch to sub cpu\n");
       cpu = 1;
       l += 3;
     }
