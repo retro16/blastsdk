@@ -21,8 +21,10 @@
 
 #include "bls.h"
 #include "blsparse.h"
+#include "blsbinparse.h"
 #include "blsfile.h"
 #include "bdp.h"
+#include "d68k_mod.h"
 
 ////// Globals
 
@@ -167,13 +169,11 @@ void boot_cd(u8 *image, int imgsize)
 
   printf("CD-ROM image. IP=%04X-%04X (%d bytes). SP=%04X-%04X (%d bytes).\n", (u32)(ip_start-image), (u32)(ip_start - image + ipsize - 1), ipsize, (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
+  stopcpu(0);
+  stopcpu(1);
+
   printf("Uploading IP (%d bytes) ...\n", ipsize);
   writemem(0, 0xFF0000 + seccodesize, ip_start, ipsize);
-
-  usleep(1000); // Wait to ensure that buffers are empty
-
-  printf("Requesting sub CPU ...\n");
-  subreq();
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
   writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
@@ -201,7 +201,7 @@ void boot_sp(u8 *image, int imgsize)
   printf("CD-ROM image. SP=%04X-%04X (%d bytes).\n", (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
   printf("Requesting sub CPU ...\n");
-  subreq();
+  stopcpu(1);
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
   writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
@@ -258,6 +258,8 @@ void boot_ram(u8 *image, int imgsize)
     return;
   }
 
+  stopcpu(0);
+
   u32 sp = getint(image, 4);
   u32 pc = getint(image + 0xFC, 4);
 
@@ -276,7 +278,7 @@ void boot_ram(u8 *image, int imgsize)
   }
 
   // Upload RAM program
-  sendmem(0xFF0000, image + 0x200, imgsize - 0x200);
+  writemem(0, 0xFF0000, image + 0x200, imgsize - 0x200);
 
   // Set SR, SP and PC
   setreg(0, REG_SP, sp);
@@ -421,7 +423,7 @@ void d68k_skip_instr(int cpu)
   address = d68k(out, 256, data, 10, 1, address, 0, 1, &suspicious);
   printf("(skip) %s", out);
   setreg(cpu, REG_PC, address);
-  d68k_instr(sub);
+  d68k_instr(cpu);
 }
 
 
@@ -451,7 +453,10 @@ int main(int argc, char **argv)
 
   sigsetjmp(mainloop_jmp, 1);
   signal(SIGINT, SIG_DFL);
-  rl_callback_handler_install("bdb > ", on_line_input);
+
+  char prompt[16];
+  snprintf(prompt, 16, "bdb %c> ", cpu ? 's' : 'm');
+  rl_callback_handler_install(prompt, on_line_input);
 
   for(;;) {
     fd_set readset;
@@ -467,7 +472,7 @@ int main(int argc, char **argv)
       if(FD_ISSET(0, &readset)) {
         rl_callback_read_char();
       } else if(FD_ISSET(genfd, &readset)) {
-        bls_readdata();
+        bdp_readdata();
       }
     }
   }
@@ -519,21 +524,21 @@ void on_line_input(char *line)
 
     if(strcmp(token, "cpu") == 0)
     {
-      printf("Working on %s cpu", cpu ? "sub" : "main";
+      printf("Working on %s cpu", cpu ? "sub" : "main");
       continue;
     }
 
     if(strcmp(token, "asmx") == 0)
     {
       parse_word(token, &l);
-      u32 address = parse_int(&l, 8);
+      u32 address = parse_int_skip(&l);
 
       if(!address) address = cpu ? 0x006000 : 0xFF0000;
 
       u8 obj[65536];
       u32 osize = asmfile(token, obj, address);
 
-      sendmem(cpu, address, obj, osize);
+      writemem(cpu, address, obj, osize);
       setreg(cpu, REG_PC, address);
       showreg(cpu);
 
@@ -543,7 +548,7 @@ void on_line_input(char *line)
     if(strcmp(token, "r") == 0)
     {
       parse_token(token, &l);
-      u32 address = parse_int(&l, 8);
+      u32 address = parse_int_skip(&l);
       u32 value;
       switch(token[0])
       {
@@ -564,8 +569,8 @@ void on_line_input(char *line)
     if(strcmp(token, "w") == 0)
     {
       parse_token(token, &l);
-      u32 address = parse_int(&l, 8);
-      u32 value = parse_int(&l, 8);
+      u32 address = parse_int_skip(&l);
+      u32 value = parse_int_skip(&l);
       switch(token[0])
       {
         case 'b':
@@ -584,7 +589,7 @@ void on_line_input(char *line)
 
     if(strcmp(token, "sendfile") == 0)
     {
-      u32 address = parse_int(&l, 8);
+      u32 address = parse_int_skip(&l);
       parse_word(token, &l);
       sendfile(cpu, token, address);
       continue;
@@ -618,9 +623,9 @@ void on_line_input(char *line)
 
     if(strcmp(token, "dump") == 0)
     {
-      u32 address = parse_int(&l, 12);
+      u32 address = parse_int_skip(&l);
       skipblanks(&l);
-      u32 size = parse_int(&l, 12);
+      u32 size = parse_int_skip(&l);
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
       readmem(cpu, data, address, size);
@@ -648,7 +653,7 @@ void on_line_input(char *line)
 
     if(strcmp(token, "showchr") == 0)
     {
-      u32 address = parse_int(&l, 12) * 32;
+      u32 address = parse_int_skip(&l) * 32;
       u8 data[32];
       readvram(data, address, 32);
       int c, x, y;
@@ -672,9 +677,9 @@ void on_line_input(char *line)
 
     if(strcmp(token, "vdump") == 0)
     {
-      u32 address = parse_int(&l, 12);
+      u32 address = parse_int_skip(&l);
       skipblanks(&l);
-      u32 size = parse_int(&l, 12);
+      u32 size = parse_int_skip(&l);
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
       readvram(data, address, size);
@@ -708,10 +713,14 @@ void on_line_input(char *line)
 
     if(strcmp(token, "d68k") == 0)
     {
-      u32 address = parse_int(&l, 12);
-      u32 size = parse_int(&l, 12);
+      u32 address = parse_int_skip(&l);
+      u32 size = parse_int_skip(&l);
       int instructions = -1;
-      if(!address) { address = readlong(REG_PC); size = 0; printf("Starting at PC (%08X)\n", address); }
+      if(!address) {
+        address = readlong(cpu, REG_PC);
+        size = 0;
+        printf("Starting at PC (%08X)\n", address);
+       }
       if(!size) {
         size = 10;
         instructions = 1;
@@ -735,7 +744,7 @@ void on_line_input(char *line)
         printf("Unknown register.\n");
         continue;
       }
-      u32 value = parse_int(&l, 12);
+      u32 value = parse_int_skip(&l);
       setreg(cpu, reg, value);
       showreg(cpu);
       continue;
@@ -771,20 +780,19 @@ void on_line_input(char *line)
 
     if(strcmp(token, "break") == 0)
     {
-      int b;
       if(!*l)
       {
         list_breakpoints(cpu);
         continue;
       }
-      u32 address = parse_int(&l, 12);
+      u32 address = parse_int_skip(&l);
       set_breakpoint(cpu, address);
       continue;
     }
 
     if(strcmp(token, "delete") == 0)
     {
-      u32 address = parse_int(&l, 12);
+      u32 address = parse_int_skip(&l);
       if(delete_breakpoint(cpu, address)) printf("Deleted a breakpoint at $%06X\n", address);
       continue;
     }
@@ -797,7 +805,7 @@ void on_line_input(char *line)
 
     if(strcmp(token, "bdpdump") == 0)
     {
-      int bdpdump = parse_int(&l, 12);
+      int bdpdump = parse_int_skip(&l);
       printf("bdp debug trace %sabled.\n", bdpdump ? "en" : "dis");
       bdp_set_dump(bdpdump);
       continue;
@@ -805,6 +813,8 @@ void on_line_input(char *line)
   } while(0);
 
   signal(SIGINT, SIG_DFL);
-  rl_callback_handler_install("bdb %c> ", cpu ? 's' : 'm', on_line_input);
+  char prompt[16];
+  snprintf(prompt, 16, "bdb %c> ", cpu ? 's' : 'm');
+  rl_callback_handler_install(prompt, on_line_input);
 }
 

@@ -12,16 +12,16 @@ extern int bdp_readdata();
 extern int bridgequery(u8 *data);
 
 // Memory read
-extern void readmem(int cpu, u8 *target, u32 address, int length);
-extern void readwram(int mode, const u8 *source, int length); // Mode : 0 = 2M, 1 = 1M bank 0, 2 = 1M bank 1
-extern void readvram(u8 *target, u32 address, int length);
+extern void readmem(int cpu, u8 *target, u32 address, u32 length);
+extern void readwram(int mode, const u8 *source, u32 length); // Mode : 0 = 2M, 1 = 1M bank 0, 2 = 1M bank 1
+extern void readvram(u8 *target, u32 address, u32 length);
 
 // Memory write
-extern void writemem(int cpu, u32 address, const u8 *source, int length);
-extern void writemem_verify(int cpu, u32 address, const u8 *source, int length);
+extern void writemem(int cpu, u32 address, const u8 *source, u32 length);
+extern void writemem_verify(int cpu, u32 address, const u8 *source, u32 length);
 extern void sendfile(int cpu, const char *filename, u32 address);
-extern void writewram(int mode, u32 address, const u8 *source, int length);
-extern void writevram(u32 address, const u8 *source, int length);
+extern void writewram(int mode, u32 address, const u8 *source, u32 length);
+extern void writevram(u32 address, const u8 *source, u32 length);
 
 // Bus access
 extern u32 readlong(int cpu, u32 address);
