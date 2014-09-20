@@ -1,5 +1,3 @@
-// The Blast ! debugger
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,27 +14,244 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
-
 #include "bls.h"
 
-////// Globals
-
-#define SERIAL_BUFFER 4
 #define SERIAL_BAUDRATE B1000000
+#define MAX_BREAKPOINTS 255
 
-int genfd;
-u8 inp[40];
-int inpl;
-int bdpdump = 0;
+// Genesis command constants
+#define CMD_HANDSHAKE   0x00
+#define CMD_EXIT        0x20
+#define CMD_READ        0x00
+#define CMD_WRITE       0x20
+#define CMD_BYTE        0x40
+#define CMD_WORD        0xC0
+#define CMD_LONG        0x80
+#define CMD_LEN         0x1F
 
-void senddata(const u8 *data, int size);
-void waitack_tcp();
-void waitack_serial();
-void (*waitack)();
+// 1M flag in ga_status
+#define SCD_1M 0x00040000
+
+// Globals
+int genfd = -1;
+static u8 inp[36];
+static int inpl;
+static int bdpdump = 0;
+static int cpustate[3] = {0,0,0};
+static int busstate[3] = {0,0,0};
+static u32 regaddr[3] = {REGADDR, SUBREGADDR, 0};
+static unknown_handler_ptr on_unknown = NULL;
+static breakpoint_handler_ptr on_breakpoint = NULL;
+static exception_handler_ptr on_exception = NULL;
+
+static u32 ga_status = 0; // Gate array status before entering subreq / wram
+static int breakpoints[2][MAX_BREAKPOINTS + 1][2];
+
+// Device access
+void open_debugger(const char *path, unknown_handler_ptr on_unknown, breakpoint_handler_ptr on_breakpoint, exception_handler_ptr on_exception);
+static void open_device(const char *device);
+static void open_network(const char *host);
+void close_debugger();
+void bdp_set_dump(int newdump);
+int bdp_readdata();
+int bridgequery(u8 *data);
+
+// Low level packet reading
+static int packetlen(u8 header);
+static int readdata();
+
+// Low level packet sending
+static void senddata(const u8 *data, int size);
+static void waitack_tcp();
+static void waitack_serial();
+static void (*waitack)();
+static void sendcmd(u8 header, u32 address);
+static void sendbyte(u32 value);
+static void sendword(u32 value);
+static void sendlong(u32 value);
+
+// Memory read
+static void readburst(u8 *target, u32 address, int length);
+void readmem(int cpu, u8 *target, u32 address, int length);
+void readwram(int mode, const u8 *source, int length); // Mode : 0 = 2M, 1 = 1M bank 0, 2 = 1M bank 1
+void readvram(u8 *target, u32 address, int length);
+
+// Memory write
+static void writeburst(u32 address, const u8 *source, int length);
+void writemem_verify(int cpu, u32 address, const u8 *source, int length);
+void writemem(int cpu, u32 address, const u8 *source, int length);
+void writefile(int cpu, const char *filename, u32 address);
+void writewram(int mode, u32 address, const u8 *source, int length);
+void writevram(u32 address, const u8 *source, int length);
+
+// Bus access
+u32 readlong(int cpu, u32 address);
+u32 readword(int cpu, u32 address);
+u32 readbyte(int cpu, u32 address);
+void writebyte(int cpu, u32 address, u32 b);
+void writeword(int cpu, u32 address, u32 w);
+void writelong(int cpu, u32 address, u32 l);
+static void subreq();
+static void subsetbank(int bank);
+static void subrelease();
+static void subreset();
+static void busreq(int cpu, u32 address);
+static void busrelease(int cpu);
+
+// CPU access
+u32 readreg(int cpu, int reg); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
+void readregs(int cpu, u32 *regs);
+void setreg(int cpu, int reg, u32 value);
+void setregs(int cpu, u32 *regs);
+void startcpu(int cpu); // Enter run mode
+void stopcpu(int cpu); // Enter monitor mode
+void stepcpu(int cpu);
+void resetcpu(int cpu);
+static void subexec(u32 opcode, u32 op1, int op1size, u32 op2, int op2size);
+int is_running(int cpu);
+
+static void setcpustate(int cpu, int newstate);
+static void cpumonitor(int cpu);
+static void cpurelease(int cpu);
+
+// Breakpoints
+void setup_breakpoints(int cpu);
+void cleanup_breakpoints(int cpu);
+void list_breakpoints(int cpu);
+void set_breakpoint(int cpu, u32 address);
+int delete_breakpoint(int cpu, u32 address);
+static u32 breakpoint_reached(int cpu);
+
+
+
+void open_debugger(const char *path, unknown_handler_ptr on_unknown_callback, breakpoint_handler_ptr on_breakpoint_callback, exception_handler_ptr on_exception_callback);
+{
+  struct stat s;
+  if(!stat(path, &s))
+  {
+    // Serial device found
+    open_device(path);
+  }
+  else
+  {
+    // Fallback to network connection
+    open_network(path);
+  }
+  on_unknown = on_unknown_callback;
+  on_breakpoint = on_breakpoint_callback;
+  on_exception = on_exception_callback;
+}
+
+
+static void open_device(const char *device)
+{
+  struct termios oldtio,newtio;
+  waitack = waitack_serial;
+  genfd = open(device, O_RDWR | O_NOCTTY);
+  if(genfd < 0)
+  {
+    fprintf(stderr, "Cannot open %s : %s\n", device, strerror(errno));
+    exit(3);
+  }
+  tcgetattr(genfd, &oldtio);
+  bzero(&newtio, sizeof(newtio));
+  cfmakeraw(&newtio);
+  cfsetispeed(&newtio, SERIAL_BAUDRATE);
+  cfsetospeed(&newtio, SERIAL_BAUDRATE);
+  newtio.c_cc[VTIME] = 0;
+  newtio.c_cc[VMIN] = 1;
+  tcflush(genfd, TCIOFLUSH);
+  tcsetattr(genfd,TCSANOW,&newtio);
+}
+
+
+static void open_network(const char *host)
+{
+  int res;
+  struct sockaddr_in server;
+  struct hostent *hp;
+  waitack = waitack_tcp;
+  genfd = socket(AF_INET, SOCK_STREAM, 0);
+  server.sin_family = AF_INET;
+  hp = gethostbyname(host);
+  if(!hp)
+  {
+    fprintf(stderr, "Cannot find IP address for host %s\n", host);
+    exit(3);
+  }
+  bcopy(hp->h_addr, &(server.sin_addr.s_addr), hp->h_length);
+  server.sin_port = htons(2612);
+  res = connect(genfd, (struct sockaddr *) &server, sizeof(server));
+  if(res == -1)
+  {
+    fprintf(stderr, "Cannot connect to %s : %s\n", host, strerror(errno));
+    exit(3);
+  }
+}
+
+
+void close_debugger()
+{
+  if(genfd == -1) { return; }
+  close(genfd);
+  genfd = -1;
+}
+
+
+void bdp_set_dump(int value)
+{
+  bdpdump = value;
+}
+
+
+// Call this when data is available on the file descriptor
+int bdp_readdata()
+{
+  readdata();
+  if(inpl < 4) {
+    fprintf(stderr, "Received partial data from the genesis\n");
+    return 0;
+  }
+  else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] == 0x27) {
+    u32 bpaddress;
+    if((bpaddress = breakpoint_reached(inp[2]))) {
+      on_breakpoint(inp[2], bpaddress);
+    } else {
+      on_unknown(inp, inpl);
+    }
+  }
+  else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] < 0x30) {
+    on_exception(inp[2], inp[3]);
+  }
+  else {
+    on_unknown(inp, inpl);
+  }
+}
+
+
+int bridgequery(u8 *data)
+{
+  sendcmd(CMD_EXIT, 0x56510A);
+  waitack();
+  readdata();
+  if(inpl != 4
+  || inp[0] != 0x20
+  || inp[1] < '0' || inp[1] > '9'
+  || inp[2] < '0' || inp[2] > '9'
+  || inp[3] < '0' || inp[3] > '9')
+  {
+    on_unknown(inp, inpl);
+    return 0;
+  }
+  data[0] = inp[1];
+  data[1] = inp[2];
+  data[2] = inp[3];
+  return 1;
+}
 
 
 // Return total packet length based on header value
-int packetlen(u8 header)
+static int packetlen(u8 header)
 {
   if((header & 0xC0) && (header & CMD_WRITE))
   {
@@ -51,12 +266,14 @@ int packetlen(u8 header)
 }
 
 
-
-// TODO : make this compatible with non-blocking mode
-int readdata()
+// Put data in inp[] and inpl
+static int readdata()
 {
   inpl = 0;
-  if(bdpdump) { printf("<"); fflush(stdout); }
+  if(bdpdump) {
+    printf("<");
+    fflush(stdout);
+  }
   do
   {
     // Read the header byte, then the whole remaining packet
@@ -82,24 +299,26 @@ int readdata()
     {
       int b;
       if(bdpdump) for(b = 0; b < r; ++b)
-      {
-        printf("%02X", inp[inpl+b]);
-        fflush(stdout);
-      }
+        {
+          printf("%02X", inp[inpl+b]);
+          fflush(stdout);
+        }
       inpl += r;
     }
   } while(inpl < packetlen(inp[0]));
-
-  if(bdpdump) printf("\n");
-
+  if(bdpdump) { printf("\n"); }
   return 1;
 }
 
+
 void senddata(const u8 *data, int size)
 {
-  if(bdpdump) { printf(">"); fflush(stdout); }
+  if(bdpdump) {
+    printf(">");
+    fflush(stdout);
+  }
   while(size)
-  {    
+  {
     ssize_t w = write(genfd, data, size);
     if(w == 0)
     {
@@ -118,21 +337,23 @@ void senddata(const u8 *data, int size)
     {
       int b;
       if(bdpdump) for(b = 0; b < w; ++b)
-      {
-        printf("%02X", data[b]);
-        fflush(stdout);
-      }
+        {
+          printf("%02X", data[b]);
+          fflush(stdout);
+        }
       data += w;
       size -= w;
     }
   }
-  if(bdpdump) printf("\n");
+  if(bdpdump) { printf("\n"); }
 }
+
 
 void waitack_tcp()
 {
   // No need for ACK in TCP mode
 }
+
 
 void waitack_serial()
 {
@@ -171,6 +392,7 @@ void waitack_serial()
   }
 }
 
+
 void sendcmd(u8 header, u32 address)
 {
   u8 packet[4];
@@ -179,11 +401,13 @@ void sendcmd(u8 header, u32 address)
   senddata(packet, 4);
 }
 
+
 void sendbyte(u32 value)
 {
   u8 d = value;
   senddata(&d, 1);
 }
+
 
 void sendword(u32 value)
 {
@@ -192,6 +416,7 @@ void sendword(u32 value)
   senddata(d, 2);
 }
 
+
 void sendlong(u32 value)
 {
   u8 d[4];
@@ -199,66 +424,6 @@ void sendlong(u32 value)
   senddata(d, 4);
 }
 
-#define SCD_1M 0x00040000
-#define SCD_2M_SUB 0x00020000
-static u32 substatus;
-static int reqcnt = 0; // Counter used to support recursive subreq
-void subreq()
-{
-  if(!reqcnt)
-  {
-    substatus = readbyte(0xA12001);
-    substatus |= readword(0xA12002) << 16;
-    writeword(0xA12000, 0x0003);
-  }
-  ++reqcnt;
-}
-
-void subsetbank(int bank)
-{
-  if(substatus & SCD_1M)
-  {
-    writeword(0xA12002, bank << 6);
-  }
-  else
-  {
-    // 2M mode
-    if(substatus & SCD_2M_SUB)
-    {
-      writeword(0xA12002, (bank << 6) | 0x0002);
-    }
-    else
-    {
-      writeword(0xA12002, bank << 6);
-    }
-  }
-}
-
-void subrelease()
-{
-  if(!--reqcnt)
-  {
-    if(!(substatus & 0x0002))
-      writebyte(0xA12001, 0x01); // Release busreq if bus was not taken.
-
-    writeword(0xA12002, substatus >> 16);
-  }
-}
-
-void subreset()
-{
-  if(reqcnt)
-  {
-    writeword(0xA12002, substatus >> 16);
-    reqcnt = 0;
-  }
-  usleep(20000);
-  writebyte(0xA12001, 0x01); // Release reset high
-  usleep(80000);
-  writebyte(0xA12001, 0x00); // Bring reset low
-  usleep(80000);
-  writebyte(0xA12001, 0x01); // Release reset high
-}
 
 void readburst(u8 *target, u32 address, int length)
 {
@@ -267,273 +432,38 @@ void readburst(u8 *target, u32 address, int length)
   readdata();
   if(inp[0] != (CMD_WRITE | CMD_BYTE | (CMD_LEN & length)))
   {
-    printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_BYTE | (CMD_LEN & length) ));
+    printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_BYTE | (CMD_LEN & length)));
     exit(2);
   }
   memcpy(target, &inp[4], length);
 }
 
-u32 readlong(u32 address)
-{
-  sendcmd(CMD_READ | CMD_LONG | 4, address);
-  waitack();
-  readdata();
-  if(inp[0] != (CMD_WRITE | CMD_LONG | 4))
-  {
-    printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_LONG | 4));
-    exit(2);
-  }
-  return getint(&inp[4], 4);
-}
-
-u32 readword(u32 address)
-{
-  sendcmd(CMD_READ | CMD_WORD | 2, address);
-  waitack();
-  readdata();
-  if(inp[0] != (CMD_WRITE | CMD_WORD | 2))
-  {
-    printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_WORD | 2));
-    exit(2);
-  }
-  return getint(&inp[4], 2);
-}
-
-u32 readbyte(u32 address)
-{
-  sendcmd(CMD_READ | CMD_BYTE | 1, address);
-  waitack();
-  readdata();
-  if(inp[0] != (CMD_WRITE | CMD_BYTE | 1))
-  {
-    printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_BYTE | 1));
-    exit(2);
-  }
-  return getint(&inp[4], 1);
-}
 
 // Reads memory as fast as possible
-void readmem(u8 *target, u32 address, int length)
+void readmem(int cpu, u8 *target, u32 address, int length)
 {
-  while(length > 32)
-  {
-    readburst(target, address, 32);
-    target += 32;
-    address += 32;
-    length -= 32;
-  }
-  readburst(target, address, length);
-}
-
-void sendburst(u32 address, const u8 *source, int length)
-{
-  sendcmd(CMD_WRITE | CMD_BYTE | (CMD_LEN & length), address);
-  senddata(source, length);
-  waitack();
-}
-
-// Send data into RAM as fast as possible
-void sendmem(u32 address, const u8 *source, int length)
-{
-  while(length > 32)
-  {
-    sendburst(address, source, 32);
-    source += 32;
-    address += 32;
-    length -= 32;
-  }
-  sendburst(address, source, length);
-}
-
-// Send data into RAM and verify data integrity
-void sendmem_verify(u32 address, const u8 *source, int length)
-{
-  u8 verify[32];
-  while(length > 32)
-  {
-sendmem_verify_retry:
-    sendburst(address, source, 32);
-    readburst(verify, address, 32);
-    if(memcmp(source, verify, 32) != 0)
+  if(cpu) {
+    // TODO readmem sub cpu
+  } else {
+    while(length > 32)
     {
-      printf("Corrupt data at %06X. Retrying.\n", address);
-      goto sendmem_verify_retry;
+      readburst(target, address, 32);
+      target += 32;
+      address += 32;
+      length -= 32;
     }
-    source += 32;
-    address += 32;
-    length -= 32;
-  }
-
-sendmem_verify_retry_last:
-  sendburst(address, source, length);
-  readburst(verify, address, length);
-  if(memcmp(source, verify, length) != 0)
-  {
-    printf("Corrupt data at %06X. Retrying.\n", address);
-    goto sendmem_verify_retry_last;
+    readburst(target, address, length);
   }
 }
 
-void writelong(u32 address, u32 l)
+
+void readwram(int mode, const u8 *source, int length) // Mode : 0 = 2M, 1 = 1M bank 0, 2 = 1M bank 1
 {
-  sendcmd(CMD_WRITE | CMD_LONG | 4, address);
-  u8 d[4];
-  setint(l, d, 4);
-  senddata(d, 4);
-  waitack();
+  // TODO
 }
 
-void writeword(u32 address, u32 w)
-{
-  sendcmd(CMD_WRITE | CMD_WORD | 2, address);
-  u8 d[2];
-  setint(w, d, 2);
-  senddata(d, 2);
-  waitack();
-}
 
-void writebyte(u32 address, u32 b)
-{
-  sendcmd(CMD_WRITE | CMD_BYTE | 1, address);
-  u8 d = b;
-  senddata(&d, 1);
-  waitack();
-}
-
-// Send data into sub PRAM
-void subsendmem(u32 address, const u8 *source, int length)
-{
-  subreq();
-
-  u32 lastaddr = address + length - 1;
-  int firstbank = address / 0x20000;
-  int lastbank = lastaddr / 0x20000;
-
-  subsetbank(firstbank);
-  if(lastbank == firstbank)
-  {
-    sendmem((address & 0x1FFFF) + 0x20000, source, length);
-  }
-  else
-  {
-    // Send first bank
-    sendmem((address & 0x1FFFF) + 0x20000, source, 0x20000 - (address & 0x1FFFF));
-    source += 0x20000 - (address & 0x1FFFF);
-
-    // Send intermediate banks
-    while(++firstbank < lastbank)
-    {
-      subsetbank(firstbank);
-      sendmem(0x20000, source, 0x20000);
-      source += 0x20000;
-    }
-
-    // Send last bank
-    subsetbank(lastbank);
-    sendmem(0x20000, source, (lastaddr & 0x1FFFF) + 1);
-  }
-
-  subrelease();
-}
-
-// Send data into sub PRAM with data integrity check.
-void subsendmem_verify(u32 address, const u8 *source, int length)
-{
-  subreq();
-
-  u32 lastaddr = address + length - 1;
-  int firstbank = address / 0x20000;
-  int lastbank = lastaddr / 0x20000;
-
-  subsetbank(firstbank);
-  if(lastbank == firstbank)
-  {
-    sendmem_verify((address & 0x1FFFF) + 0x20000, source, length);
-  }
-  else
-  {
-    // Send first bank
-    sendmem_verify((address & 0x1FFFF) + 0x20000, source, 0x20000 - (address & 0x1FFFF));
-    source += 0x20000 - (address & 0x1FFFF);
-
-    // Send intermediate banks
-    while(++firstbank < lastbank)
-    {
-      subsetbank(firstbank);
-      sendmem_verify(0x20000, source, 0x20000);
-      source += 0x20000;
-    }
-
-    // Send last bank
-    subsetbank(lastbank);
-    sendmem_verify(0x20000, source, (lastaddr & 0x1FFFF) + 1);
-  }
-
-  subrelease();
-}
-
-// Read data from sub PRAM
-void subreadmem(u8 *target, u32 address, int length)
-{
-  subreq();
-
-  u32 lastaddr = address + length - 1;
-  int firstbank = address / 0x20000;
-  int lastbank = lastaddr / 0x20000;
-
-  subsetbank(firstbank);
-  if(lastbank == firstbank)
-  {
-    readmem(target, (address & 0x1FFFF) + 0x20000, length);
-  }
-  else
-  {
-    // Send first bank
-    readmem(target, (address & 0x1FFFF) + 0x20000, 0x20000 - (address & 0x1FFFF));
-    target += 0x20000 - (address & 0x1FFFF);
-
-    // Send intermediate banks
-    while(++firstbank < lastbank)
-    {
-      subsetbank(firstbank);
-      readmem(target, 0x20000, 0x20000);
-      target += 0x20000;
-    }
-
-    // Send last bank
-    subsetbank(lastbank);
-    readmem(target, 0x20000, (lastaddr & 0x1FFFF) + 1);
-  }
-
-  subrelease();
-}
-
-void vdpsetreg(int reg, u8 value)
-{
-  writeword(VDPCTRL, 0x8000 | ((u32)reg << 8) | value);
-}
-
-void vramsendmem(u32 address, const u8 *source, int length)
-{
-  // Extremely slow. Should use VRAM buffering
-  vdpsetreg(VDPR_AUTOINC, 2);
-  writelong(VDPCTRL, ((address & 0x3FFF) << 16) | (address >> 14) | 0x40000000);
-  int c;
-  for(c = 0; c < length; c += 4)
-  {
-    sendcmd(CMD_WRITE | CMD_LONG | 4, VDPDATA);
-    senddata(&source[c], 4);
-    waitack();
-  }
-  if(c <= length - 2)
-  {
-    sendcmd(CMD_WRITE | CMD_WORD | 2, VDPDATA);
-    senddata(&source[c], 2);
-    waitack();
-  }
-}
-
-void vramreadmem(u8 *target, u32 address, int length)
+void readvram(u8 *target, u32 address, int length)
 {
   // Extremely slow. Should use VRAM buffering
   vdpsetreg(VDPR_AUTOINC, 2);
@@ -565,456 +495,785 @@ void vramreadmem(u8 *target, u32 address, int length)
   }
 }
 
-void sendfile(const char *token, u32 address)
+
+// Send data into RAM as fast as possible
+void writemem(int cpu, u32 address, const u8 *source, int length)
 {
-  FILE *f = fopen(token, "r");
-  if(!f)
-  {
-    printf("Cannot open %s\n", token);
-    return;
+  cpumonitor(cpu);
+  if(cpu) {
+    cpumonitor(0);
+    if(address + length < 0x80000) {
+      while(length > 0) {
+        u32 burstaddr = address & 0x1FFFF;
+        u32 burstlen = 32;
+        if(burstaddr > 0x1FFFE0 && burstaddr + length > 0x20000) {
+          // Split over 2 banks
+          burstlen = burstaddr & 0x1F;
+        }
+        if(burstlen > length) {
+          // Remainder
+          burstlen = length;
+        }
+        busreq(1, address);
+        // Write data to PRAM window
+        sendburst(burstaddr + 0x20000, source, burstlen);
+        source += burstlen;
+        address += burstlen;
+        length -= burstlen;
+      }
+    } else {
+      // target is not PRAM, use ultra slow copy !
+      while(length > 0) {
+        u32 burstlen;
+        if(length >= 4) {
+          writelong(cpu, address, ((u32)source[0] << 24) | ((u32)source[1] << 16) | ((u32)source[2] << 8) | source[3]);
+          burstlen = 4;
+        } else if(length >= 2) {
+          writeword(cpu, address, ((u32)source[0] << 8) | source[1]);
+          burstlen = 2;
+        } else {
+          writebyte(cpu, address, *source);
+          burstlen = 1;
+        }
+        source += burstlen;
+        address += burstlen;
+        length -= burstlen;
+      }
+    }
+    cpurelease(0);
+  } else {
+    while(length > 32)
+    {
+      sendburst(address, source, 32);
+      source += 32;
+      address += 32;
+      length -= 32;
+    }
+    sendburst(address, source, length);
   }
-  printf("Sending %s ...\n", token);
-  while(!feof(f))
-  {
-    u8 c[32];
-    size_t s = fread(c, 1, 32, f);
-    printf(" %06X -> %06X [%lu]\n", (u32)address, (u32)(address + s - 1), s);
-    sendburst(address, c, s);
-    address += s;
-  }
-  fclose(f);
+  cpurelease(cpu);
 }
 
-void subsendfile(const char *path, u32 address)
-{
-  u8 *data;
-  int size = readfile(path, &data);
 
-  if(size > 0)
+// Send data into RAM and verify data integrity
+void writemem_verify(int cpu, u32 address, const u8 *source, int length)
+{
+  cpumonitor(cpu);
+  if(cpu) {
+    // TODO
+  } else {
+    u8 verify[32];
+    while(length > 32)
+    {
+writemem_verify_retry:
+      sendburst(address, source, 32);
+      readburst(verify, address, 32);
+      if(memcmp(source, verify, 32) != 0)
+      {
+        printf("Corrupt data at %06X. Retrying.\n", address);
+        goto writemem_verify_retry;
+      }
+      source += 32;
+      address += 32;
+      length -= 32;
+    }
+writemem_verify_retry_last:
+    sendburst(address, source, length);
+    readburst(verify, address, length);
+    if(memcmp(source, verify, length) != 0)
+    {
+      printf("Corrupt data at %06X. Retrying.\n", address);
+      goto writemem_verify_retry_last;
+    }
+  }
+}
+
+void sendfile(int cpu, const char *token, u32 address)
+{
+  cpumonitor(cpu);
+  if(cpu) {
+    // TODO
+  } else {
+    FILE *f = fopen(token, "r");
+    if(!f)
+    {
+      printf("Cannot open %s\n", token);
+      return;
+    }
+    printf("Sending %s ...\n", token);
+    while(!feof(f))
+    {
+      u8 c[32];
+      size_t s = fread(c, 1, 32, f);
+      printf(" %06X -> %06X [%lu]\n", (u32)address, (u32)(address + s - 1), s);
+      sendburst(address, c, s);
+      address += s;
+    }
+    fclose(f);
+  }
+}
+
+
+void writewram(int mode, u32 address, const u8 *source, int length)
+{
+  // TODO
+}
+
+
+void writevram(u32 address, const u8 *source, int length)
+{
+  cpumonitor(0);
+  // Extremely slow. Should use VRAM buffering
+  vdpsetreg(VDPR_AUTOINC, 2);
+  writelong(VDPCTRL, ((address & 0x3FFF) << 16) | (address >> 14) | 0x40000000);
+  int c;
+  for(c = 0; c < length; c += 4)
   {
-    subsendmem(address, data, size);
+    sendcmd(CMD_WRITE | CMD_LONG | 4, VDPDATA);
+    senddata(&source[c], 4);
+    waitack();
+  }
+  if(c <= length - 2)
+  {
+    sendcmd(CMD_WRITE | CMD_WORD | 2, VDPDATA);
+    senddata(&source[c], 2);
+    waitack();
+  }
+}
+
+
+u32 readbyte(int cpu, u32 address)
+{
+  u32 value;
+  cpumonitor(cpu);
+  if(cpu) {
+    cpumonitor(0);
+    if(address < 0x80000) {
+      // Access PRAM from main CPU
+      busreq(cpu, address);
+      value = readbyte(0, (address & 0x1FFFF) + 0x20000);
+    } else {
+      // Execute an instruction to move the value in PRAM
+      // MOVE.B address, (SUB_SCRATCH+10).w
+      subexec(0x11F9, address, 4, SUB_SCRATCH + 10, 2);
+      value = readbyte(cpu, SUB_SCRATCH + 10);
+    }
+    cpurelease(0);
+  } else {
+    sendcmd(CMD_READ | CMD_BYTE | 1, address);
+    waitack();
+    readdata();
+    if(inp[0] != (CMD_WRITE | CMD_BYTE | 1))
+    {
+      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_BYTE | 1));
+      exit(2);
+    }
+    value = getint(&inp[4], 1);
+  }
+  cpurelease(cpu);
+  return value;
+}
+
+
+u32 readword(int cpu, u32 address)
+{
+  u32 value;
+  cpumonitor(cpu);
+  if(cpu) {
+    cpumonitor(0);
+    if(address < 0x80000) {
+      // Access PRAM from main CPU
+      busreq(cpu, address);
+      value = readword(0, (address & 0x1FFFF) + 0x20000);
+    } else {
+      // Execute an instruction to move the value in PRAM
+      // MOVE.W address, (SUB_SCRATCH+10).w
+      subexec(0x31F9, address, 4, SUB_SCRATCH + 10, 2);
+      value = readword(cpu, SUB_SCRATCH + 10);
+    }
+    cpurelease(0);
+  } else {
+    sendcmd(CMD_READ | CMD_WORD | 2, address);
+    waitack();
+    readdata();
+    if(inp[0] != (CMD_WRITE | CMD_WORD | 2))
+    {
+      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_WORD | 2));
+      exit(2);
+    }
+    value = getint(&inp[4], 2);
+  }
+  cpurelease(cpu);
+  return value;
+}
+
+
+u32 readlong(int cpu, u32 address)
+{
+  cpumonitor(cpu);
+  if(cpu) {
+    cpumonitor(0);
+    if(address < 0x7FFFFE && (address & 0x1FFFF) == ((address + 2) & 0x1FFFF)) {
+      // Access PRAM from main CPU
+      busreq(cpu, address);
+      value = readlong(0, (address & 0x1FFFF) + 0x20000);
+    } else {
+      // Execute an instruction to move the value in PRAM
+      // MOVE.W address, (SUB_SCRATCH+10).w
+      subexec(0x31F9, address, 4, SUB_SCRATCH + 10, 2);
+      value = readword(cpu, SUB_SCRATCH + 10);
+    }
+    cpurelease(0);
+  } else {
+    sendcmd(CMD_READ | CMD_LONG | 4, address);
+    waitack();
+    readdata();
+    if(inp[0] != (CMD_WRITE | CMD_LONG | 4))
+    {
+      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_LONG | 4));
+      exit(2);
+    }
+    return getint(&inp[4], 4);
+  }
+}
+
+
+void writebyte(int cpu, u32 address, u32 b)
+{
+  cpumonitor(cpu);
+  if(cpu) {
+    if(address < 0x80000) {
+      // Access PRAM from main CPU
+      cpumonitor(0);
+      busreq(cpu, address);
+      writebyte(0, (address & 0x20000) + 0x20000);
+      cpurelease(0);
+    } else {
+      // Execute an instruction to move the value in PRAM
+      // MOVE.B #b, address.l
+      subexec(0x13FC, b, 2, address, 4);
+    }
+  } else {
+    sendcmd(CMD_WRITE | CMD_BYTE | 1, address);
+    u8 d = b;
+    senddata(&d, 1);
+    waitack();
+  }
+  cpurelease(cpu);
+}
+
+void writeword(int cpu, u32 address, u32 w)
+{
+  cpumonitor(cpu);
+  if(cpu) {
+    if(address < 0x80000) {
+      // Access PRAM from main CPU
+      cpumonitor(0);
+      busreq(cpu, address);
+      writeword(0, (address & 0x20000) + 0x20000);
+      cpurelease(0);
+    } else {
+      // Execute an instruction to move the value in PRAM
+      // MOVE.W #w, address.l
+      subexec(0x33FC, w, 2, address, 4);
+    }
+  } else {
+    sendcmd(CMD_WRITE | CMD_WORD | 2, address);
+    u8 d[2];
+    setint(w, d, 2);
+    senddata(d, 2);
+    waitack();
+  }
+  cpurelease(cpu);
+}
+
+void writelong(int cpu, u32 address, u32 l)
+{
+  cpumonitor(cpu);
+  if(cpu) {
+    if(address < 0x7FFFFE && (address & 0x1FFFF) == ((address + 2) & 0x1FFFF)) {
+      // Access PRAM from main CPU
+      cpumonitor(0);
+      busreq(cpu, address);
+      writeword(0, (address & 0x20000) + 0x20000);
+      cpurelease(0);
+    } else {
+      // Execute an instruction to move the value in PRAM
+      // MOVE.L #l, address.l
+      subexec(0x23FC, l, 4, address, 4);
+    }
+  } else {
+    sendcmd(CMD_WRITE | CMD_LONG | 4, address);
+    u8 d[4];
+    setint(l, d, 4);
+    senddata(d, 4);
+    waitack();
+  }
+  cpurelease(cpu);
+}
+
+
+u32 readreg(int cpu, int reg)
+{
+  u32 address = reg * 4 + regaddr[cpu];
+  u32 value;
+  if(reg == 17) {
+    value = readword(cpu, address);
+  } else {
+    value = readlong(cpu, address);
+  }
+  return value;
+}
+
+void readregs(int cpu, u32 *regs)
+{
+  u8 data[70];
+  int r;
+  for(r = 0; r < 17; ++r) {
+    data[r * 4] = regs[r] >> 24;
+    data[r * 4 + 1] = regs[r] >> 16;
+    data[r * 4 + 2] = regs[r] >> 8;
+    data[r * 4 + 3] = regs[r];
+  }
+  data[68] = regs[17] >> 8;
+  data[69] = reg[17];
+  cpumonitor(cpu);
+  writemem(cpu, regaddr[cpu], data, 70);
+  cpurelease(cpu);
+}
+
+
+void setreg(int cpu, int reg, u32 value)
+{
+  u32 address = reg * 4 + regaddr[cpu];
+  if(reg == 17) {
+    writeword(cpu, address, value);
+  } else {
+    writelong(cpu, address, value);
+  }
+}
+
+
+void setregs(int cpu, u32 *regs)
+{
+  u8 data[70];
+  cpumonitor(cpu);
+  readmem(cpu, data, regaddr[cpu], 70);
+  cpurelease(cpu);
+  int r;
+  for(r = 0; r < 17; ++r) {
+    regs[r] = (u32)data[r * 4] << 24
+              | (u32)data[r * 4 + 1] << 16
+              | (u32)data[r * 4 + 2] << 8
+              | (u32)data[r * 4 + 3];
+  }
+  regs[17] = (u32)data[68] << 8 | data[69];
+}
+
+
+void startcpu(int cpu)
+{
+  setcpustate(cpu, 0);
+}
+
+
+void stopcpu(int cpu)
+{
+  setcpustate(cpu, 1);
+}
+
+
+void stepcpu(int cpu)
+{
+  cpumonitor(cpu);
+  u32 oldsr = readreg(cpu, REG_SR);
+  setreg(cpu, REG_SR, 0x8700 | oldsr); // Set trace bit and mask interrupts
+
+  // Run the CPU
+  int oldstate = cpustate[cpu];
+  setcpustate(cpu, 0);
+
+  if(cpu) {
+    // Wait for TRACE interrupt on sub CPU
+    do {
+      usleep(50);
+    } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+  } else {
+    // Wait for TRACE interrupt on main CPU
+    readdata();
+    if(inpl != 4
+    || inp[0] != CMD_HANDSHAKE
+    || inp[1] != 0x00
+    || inp[2] != 0x00
+    || inp[3] != 0x09)
+    {
+      on_unknown(inp, inpl);
+    }
+  }
+  // CPU returned in its previous state
+  cpustate[cpu] = curstate;
+
+  // Restore SR
+  setreg(cpu, REG_SR, (readreg(cpu, REG_SR) & 0x00FF) | (oldsr & 0xFF00));
+
+  cpurelease(cpu);
+}
+
+
+void resetcpu(int cpu)
+{
+  if(cpu) {
+    subreset();
+    cpustate[cpu] = 0;
+  } else {
+    cpumonitor(cpu);
+    // Write RESET instruction in REG_A7 (since it will be overwritten by the operation anyway)
+    setreg(cpu, REG_SP, 0x4E704E70);
+    // Execute instruction at REG_A7
+    setreg(cpu, REG_PC, regaddr[cpu] + REG_SP * 4);
+    // Ensure nothing will interrupt the process
+    setreg(cpu, REG_SR, 0x2700);
+    // Restart the CPU which will execute RESET immediately after exiting monitor mode
+    setcpustate(cpu, 0);
+  }
+}
+
+
+// Generate one instruction and execute it on the sub CPU
+static void subexec(u32 opcode, u32 op1, int op1size, u32 op2, int op2size)
+{
+  // Generate the move instruction
+  u8 program[8];
+  int i = 0;
+  program[i++] = opcode >> 8;
+  program[i++] = opcode;
+  if(op1size == 4) {
+    program[i++] = op1 >> 24;
+    program[i++] = op1 >> 16;
+    program[i++] = op1 >> 8;
+    program[i++] = op1;
+  } else if(op1size == 2) {
+    program[i++] = op1 >> 8;
+    program[i++] = op1;
+  }
+  if(op2size == 4) {
+    program[i++] = op2 >> 24;
+    program[i++] = op2 >> 16;
+    program[i++] = op2 >> 8;
+    program[i++] = op2;
+  } else if(op2size == 2) {
+    program[i++] = op2 >> 8;
+    program[i++] = op2;
+  }
+  cpumonitor(0);
+  cpumonitor(1);
+  busreq(1, SUB_SCRATCH);
+  // Put program in the reserved interrupt area
+  writemem(1, SUB_SCRATCH, program, 6 + tgtsize);
+  // Put the sub CPU in trace mode and execute scratch
+  u32 oldpc = readreg(1, REG_PC);
+  setreg(1, REG_PC, SUB_SCRATCH);
+  u32 oldsr = readreg(1, REG_SR);
+  setreg(1, REG_SR, 0xA700);
+  // Run the instruction
+  int curstate = cpustate[1];
+  setcpustate(1, 0);
+  // Wait for TRACE interrupt on sub CPU
+  do {
+    usleep(50);
+  } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+  // CPU returned in its previous state
+  cpustate[1] = curstate;
+  // Check that the instruction has been executed successfully
+  if(readreg(1, REG_PC) != SUB_SCRATCH + 2 + op1size + op2size) {
+    printf("Warning: exec failed, PC is not at the right place.\n");
+  }
+  // Restore sub CPU status
+  setreg(1, REG_PC, oldpc);
+  setreg(1, REG_SR, oldsr);
+  cpurelease(1);
+  cpurelease(0);
+}
+
+
+int is_running(cpu)
+{
+  return cpustate[cpu];
+}
+
+
+void setcpustate(int cpu, int newstate)
+{
+  if(!cpustate[cpu] != !newstate) {
+    if(newstate) {
+      if(cpu) {
+        cpumonitor(0);
+        writebyte(0, 0xA1200E, readbyte(0xA1200E) | 0x80); // Set COMMFLAG 15
+        writebyte(0, 0xA12000, 0x01); // Trigger L2 interrupt on sub CPU
+        while(!(readbyte(0, 0xA1200F) & 0x80)); // Wait until sub CPU enters monitor mode
+        cpurelease(0);
+      } else {
+        sendcmd(CMD_HANDSHAKE, 0);
+        waitack();
+      }
+      cleanup_breakpoints();
+    }
+    else
+    {
+      setup_breakpoints();
+      busrelease(cpu);
+      if(cpu) {
+        // Generate a falling edge on comm flag 15
+        cpumonitor(0);
+        u8 commflag = readbyte(0xA1200E);
+        writebyte(0, 0xA1200E, commflag | 0x80);
+        writebyte(0, 0xA1200E, commflag & ~0x80);
+        cpurelease(0);
+      } else {
+        sendcmd(CMD_EXIT, 0);
+        waitack();
+      }
+    }
+  }
+  cpustate[cpu] = newstate;
+}
+
+
+static void subreq()
+{
+  if(!reqcnt)
+  {
+    ga_status = readbyte(0xA12001);
+    ga_status |= readword(0xA12002) << 16;
+    writeword(0xA12000, 0x0003);
+  }
+}
+
+
+static void subsetbank(int bank)
+{
+  if(ga_status & SCD_1M)
+  {
+    writeword(0xA12002, (bank << 6) | 0x0002);
   }
   else
   {
-    fprintf(stderr, "Could not read file %s.\n", path);
-    exit(3);
-  }
-
-  free(data);
-}
-
-void substop()
-{
-  writebyte(0xA1200E, readbyte(0xA1200E) | 0x80); // Set COMMFLAG 15
-  writebyte(0xA12000, 0x01); // Trigger L2 interrupt on sub CPU
-  while(!(readbyte(0xA1200F) & 0x80)); // Wait until sub CPU enters monitor mode
-}
-
-void subgo()
-{
-  if(readbyte(0xA1200F) & 0x80) // Test whether Sub CPU is in monitor mode
-  {
-    // Generate a falling edge on comm flag 15
-    u8 commflag = readbyte(0xA1200E);
-    writebyte(0xA1200E, commflag | 0x80);
-    writebyte(0xA1200E, commflag & ~0x80);
+    writeword(0xA12002, bank << 6);
   }
 }
 
-int submonstate = 0;
 
-void submon()
+void subrelease()
 {
-  if(readbyte(0xA1200F) & 0x80) // Test whether Sub CPU is already in monitor mode
+  if(!(ga_status & 0x0002)) {
+    writebyte(0xA12001, 0x01);  // Release busreq if bus was not taken.
+  }
+  if(ga_status & SCD_1M)
   {
-    printf("Sub CPU already in monitor mode\n");
-    submonstate = 1;
+    writeword(0xA12002, (ga_status >> 16 & 0xFFC0) | 0x0002);
   }
   else
   {
-    submonstate = 0;
-    substop();
+    writeword(0xA12002, ga_status >> 16 & 0xFFC0);
   }
 }
 
-void subrun()
+
+void subreset()
 {
-  // Revert the effect of submon, if any
-  if(!submonstate)
-  {
-    subgo();
-  }
+  usleep(20000);
+  writebyte(0xA12001, 0x01); // Release reset high
+  usleep(80000);
+  writebyte(0xA12001, 0x00); // Bring reset low
+  usleep(80000);
+  writebyte(0xA12001, 0x01); // Release reset high
 }
 
-void subwritebyte(u32 address, u32 val)
+
+// Switch bank to access address
+void busreq(int cpu, u32 address)
 {
-  // Generate the move instruction
-  u8 program[8];
-  program[0] = 0x13;
-  program[1] = 0xFC;
-  program[2] = 0;
-  program[3] = val & 0xFF;
-  program[4] = 0;
-  program[5] = (address >> 16) & 0xFF;
-  program[6] = (address >> 8) & 0xFF;
-  program[7] = address & 0xFF;
-  
-  submon();
-  subreq();
-  subsetbank(0);
-  // Put program in the reserved interrupt area
-  sendmem(0x020030, program, 8);
-
-  // Put the sub CPU in trace mode
-  u32 oldpc = readlong(SUBREG_PC);
-  writelong(SUBREG_PC, 0x30);
-  u32 oldsr = readword(SUBREG_SR);
-  writeword(SUBREG_SR, 0xA700);
-
-  subrelease();
-
-  // Run the instruction
-  subgo();
-  // Wait for TRACE interrupt on sub CPU
-  usleep(50);
-  while(!(readbyte(0xA1200F) & 0x20));
-
-  subreq();
-  subsetbank(0);
-
-  if(readlong(SUBREG_PC) != 0x38) {
-    printf("Warning: write operation failed.\n");
-  }
-
-  // Restore sub CPU status
-  writelong(SUBREG_PC, oldpc);
-  writeword(SUBREG_SR, oldsr);
-  subrelease();
-
-  subrun();
-}
-
-void subwriteword(u32 address, u32 val)
-{
-  // Generate the move instruction
-  u8 program[8];
-  program[0] = 0x33;
-  program[1] = 0xFC;
-  program[2] = (val >> 8) & 0xFF;
-  program[3] = val & 0xFF;
-  program[4] = 0;
-  program[5] = (address >> 16) & 0xFF;
-  program[6] = (address >> 8) & 0xFF;
-  program[7] = address & 0xFF;
-  
-  submon();
-  subreq();
-  subsetbank(0);
-  // Put program in the reserved interrupt area
-  sendmem(0x020030, program, 8);
-
-  // Put the sub CPU in trace mode
-  u32 oldpc = readlong(SUBREG_PC);
-  writelong(SUBREG_PC, 0x30);
-  u32 oldsr = readword(SUBREG_SR);
-  writeword(SUBREG_SR, 0xA700);
-
-  subrelease();
-
-  // Run the instruction
-  subgo();
-  // Wait for TRACE interrupt on sub CPU
-  usleep(50);
-  while(!(readbyte(0xA1200F) & 0x20));
-
-  subreq();
-  subsetbank(0);
-
-  if(readlong(SUBREG_PC) != 0x38) {
-    printf("Warning: write operation failed.\n");
-  }
-
-  // Restore sub CPU status
-  writelong(SUBREG_PC, oldpc);
-  writeword(SUBREG_SR, oldsr);
-  subrelease();
-
-  subrun();
-}
-
-void subwritelong(u32 address, u32 val)
-{
-  // Generate the move instruction
-  u8 program[10];
-  program[0] = 0x23;
-  program[1] = 0xFC;
-  program[2] = (val >> 24) & 0xFF;
-  program[3] = (val >> 16) & 0xFF;
-  program[4] = (val >> 8) & 0xFF;
-  program[5] = val & 0xFF;
-  program[6] = (address >> 24) & 0xFF;
-  program[7] = (address >> 16) & 0xFF;
-  program[8] = (address >> 8) & 0xFF;
-  program[9] = address & 0xFF;
-  
-  submon();
-  subreq();
-  subsetbank(0);
-  // Put program in the reserved interrupt area
-  sendmem(0x020030, program, 10);
-
-  // Put the sub CPU in trace mode
-  u32 oldpc = readlong(SUBREG_PC);
-  writelong(SUBREG_PC, 0x30);
-  u32 oldsr = readword(SUBREG_SR);
-  writeword(SUBREG_SR, 0xA700);
-
-  subrelease();
-
-  // Run the instruction
-  subgo();
-  // Wait for TRACE interrupt on sub CPU
-  usleep(50);
-  while(!(readbyte(0xA1200F) & 0x20));
-
-  subreq();
-  subsetbank(0);
-
-  if(readlong(SUBREG_PC) != 0x3A) {
-    printf("Warning: write operation failed.\n");
-  }
-
-  // Restore sub CPU status
-  writelong(SUBREG_PC, oldpc);
-  writeword(SUBREG_SR, oldsr);
-  subrelease();
-
-  subrun();
-}
-
-u32 subreadbyte(u32 address)
-{
-  // Generate the move instruction
-  u8 program[8];
-  program[0] = 0x11;
-  program[1] = 0xF9;
-  program[2] = (address >> 24) & 0xFF;
-  program[3] = (address >> 16) & 0xFF;
-  program[4] = (address >> 8) & 0xFF;
-  program[5] = address & 0xFF;
-  program[6] = 0x00; // Data will be written at 0x00005C (reserved interrupt area)
-  program[7] = 0x5C;
-  
-  submon();
-  subreq();
-  subsetbank(0);
-  // Put program in the reserved interrupt area
-  sendmem(0x020030, program, 8);
-
-  // Put the sub CPU in trace mode
-  u32 oldpc = readlong(SUBREG_PC);
-  writelong(SUBREG_PC, 0x30);
-  u32 oldsr = readword(SUBREG_SR);
-  writeword(SUBREG_SR, 0xA700);
-
-  subrelease();
-
-  // Run the instruction
-  subgo();
-  // Wait for TRACE interrupt on sub CPU
-  usleep(50);
-  while(!(readbyte(0xA1200F) & 0x20));
-
-  subreq();
-  subsetbank(0);
-
-  if(readlong(SUBREG_PC) != 0x38) {
-    printf("Warning: read operation failed.\n");
-  }
-
-  // Restore sub CPU status
-  writelong(SUBREG_PC, oldpc);
-  writeword(SUBREG_SR, oldsr);
-
-  // Read result
-  u32 result = readbyte(0x02005C);
-  subrelease();
-
-  subrun();
-
-  return result;
-}
-
-u32 subreadword(u32 address)
-{
-  // Generate the move instruction
-  u8 program[8];
-  program[0] = 0x31;
-  program[1] = 0xF9;
-  program[2] = (address >> 24) & 0xFF;
-  program[3] = (address >> 16) & 0xFF;
-  program[4] = (address >> 8) & 0xFF;
-  program[5] = address & 0xFF;
-  program[6] = 0x00; // Data will be written at 0x00005C (reserved interrupt area)
-  program[7] = 0x5C;
-  
-  submon();
-  subreq();
-  subsetbank(0);
-  // Put program in the reserved interrupt area
-  sendmem(0x020030, program, 8);
-
-  // Put the sub CPU in trace mode
-  u32 oldpc = readlong(SUBREG_PC);
-  writelong(SUBREG_PC, 0x30);
-  u32 oldsr = readword(SUBREG_SR);
-  writeword(SUBREG_SR, 0xA700);
-
-  subrelease();
-
-  // Run the instruction
-  subgo();
-  // Wait for TRACE interrupt on sub CPU
-  usleep(50);
-  while(!(readbyte(0xA1200F) & 0x20));
-
-  subreq();
-  subsetbank(0);
-
-  if(readlong(SUBREG_PC) != 0x38) {
-    printf("Warning: read operation failed.\n");
-  }
-
-  // Restore sub CPU status
-  writelong(SUBREG_PC, oldpc);
-  writeword(SUBREG_SR, oldsr);
-
-  // Read result
-  u32 result = readword(0x02005C);
-  subrelease();
-
-  subrun();
-
-  return result;
-}
-
-u32 subreadlong(u32 address)
-{
-  // Generate the move instruction
-  u8 program[8];
-  program[0] = 0x21;
-  program[1] = 0xF9;
-  program[2] = (address >> 24) & 0xFF;
-  program[3] = (address >> 16) & 0xFF;
-  program[4] = (address >> 8) & 0xFF;
-  program[5] = address & 0xFF;
-  program[6] = 0x00; // Data will be written at 0x00005C (reserved interrupt area)
-  program[7] = 0x5C;
-  
-  submon();
-  subreq();
-  subsetbank(0);
-  // Put program in the reserved interrupt area
-  sendmem(0x020030, program, 8);
-
-  // Put the sub CPU in trace mode
-  u32 oldpc = readlong(SUBREG_PC);
-  writelong(SUBREG_PC, 0x30);
-  u32 oldsr = readword(SUBREG_SR);
-  writeword(SUBREG_SR, 0xA700);
-
-  subrelease();
-
-  // Run the instruction
-  subgo();
-  // Wait for TRACE interrupt on sub CPU
-  usleep(50);
-  while(!(readbyte(0xA1200F) & 0x20));
-
-  subreq();
-  subsetbank(0);
-
-  if(readlong(SUBREG_PC) != 0x38) {
-    printf("Warning: read operation failed.\n");
-  }
-
-  // Restore sub CPU status
-  writelong(SUBREG_PC, oldpc);
-  writeword(SUBREG_SR, oldsr);
-
-  // Read result
-  u32 result = readlong(0x02005C);
-  subrelease();
-
-  subrun();
-
-  return result;
-}
-
-void open_device(const char *device)
-{
-  struct termios oldtio,newtio;
-
-  waitack = waitack_serial;
-
-  genfd = open(device, O_RDWR | O_NOCTTY); 
-  if(genfd < 0)
-  {
-    fprintf(stderr, "Cannot open %s : %s\n", device, strerror(errno));
-    exit(3);
-  }
-
-  tcgetattr(genfd, &oldtio);
-
-  bzero(&newtio, sizeof(newtio));
-  cfmakeraw(&newtio);
-  cfsetispeed(&newtio, SERIAL_BAUDRATE);
-  cfsetospeed(&newtio, SERIAL_BAUDRATE);
-  newtio.c_cc[VTIME] = 0;
-  newtio.c_cc[VMIN] = 1;
-
-  tcflush(genfd, TCIOFLUSH);
-  tcsetattr(genfd,TCSANOW,&newtio);
-}
-
-void open_network(const char *host)
-{
-  int res;
-  struct sockaddr_in server;
-  struct hostent *hp;
- 
-  waitack = waitack_tcp;
-
-  genfd = socket(AF_INET, SOCK_STREAM, 0);
-  server.sin_family = AF_INET;
-  hp = gethostbyname(host);
-  if(!hp)
-  {
-    fprintf(stderr, "Cannot find IP address for host %s\n", host);
-    exit(3);
-  }
-  bcopy(hp->h_addr, &(server.sin_addr.s_addr), hp->h_length);
-  server.sin_port = htons(2612);
-  res = connect(genfd, (struct sockaddr *) &server, sizeof(server));
-  if(res == -1)
-  {
-    fprintf(stderr, "Cannot connect to %s : %s\n", host, strerror(errno));
-    exit(3);
-  }
-}
-
-void open_debugger(const char *path)
-{
-  struct stat s;
-  if(!stat(path, &s))
-  {
-    // Serial device found
-    open_device(path);
+  if(cpu) {
+    int bank = (address >> 17) + 1;
+    if(!busstate[cpu]) {
+      subreq();
+    }
+    if(busstate[cpu] != bank) {
+      subsetbank(bank);
+    }
+    busstate[cpu] = bank;
   }
   else
   {
-    // Fallback to network connection
-    open_network(path);
+    // No busreq on main cpu
   }
 }
 
+
+void busrelease(int cpu)
+{
+  if(busstate[cpu]) {
+    if(cpu)
+    {
+      subrelease();
+    }
+    else
+    {
+      // No busreq on main cpu
+    }
+  }
+  busstate[cpu] = 0;
+}
+
+
+void vdpsetreg(int reg, u8 value)
+{
+  writeword(VDPCTRL, 0x8000 | ((u32)reg << 8) | value);
+}
+
+
+void setup_breakpoints(int cpu)
+{
+  int b;
+  if(!breakpoints[cpu][0][0]) { return; }
+  if(cpu) {
+    subreq();
+  }
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
+  {
+    if(!breakpoints[cpu][b][0])
+    {
+      break;
+    }
+    if(cpu) {
+      // Store the original instruction
+      subreadmem(&breakpoints[cpu][b][1], breakpoints[cpu][b][0], 2);
+      // Write TRAP #07
+      u8 trap7[2] = {0x4E, 0x47};
+      subwritemem(trap7, breakpoints[cpu][b][0], 2);
+    } else {
+      breakpoints[cpu][b][1] = cpu ? subreadword(breakpoints[cpu][b][0]) : readword(breakpoints[cpu][b][0]);
+      writeword(breakpoints[cpu][b][0], 0x4E47);
+    }
+  }
+  if(cpu) {
+    subrelease();
+  }
+}
+
+
+void cleanup_breakpoints(int cpu)
+{
+  int b;
+  if(!breakpoints[cpu][0][0]) { return; }
+  if(cpu) {
+    subreq();
+  }
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
+  {
+    if(!breakpoints[cpu][b][0])
+    {
+      break;
+    }
+    // Replace the breakpoint by the original instruction
+    if(cpu) {
+      subwritemem(breakpoints[cpu][b][0], &breakpoints[cpu][b][1]);
+    } else {
+      writeword(breakpoints[cpu][b][0], breakpoints[cpu][b][1]);
+    }
+  }
+  if(cpu) {
+    subrelease();
+  }
+}
+
+
+void list_breakpoints(int cpu) {
+  // List breakpoints
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
+  {
+    if(!breakpoints[cpu][b][0])
+    {
+      break;
+    }
+    printf("%s CPU breakpoint at $%06X\n", cpu ? "Sub" : "Main", (u32)breakpoints[cpu][b][0]);
+  }
+}
+
+
+void set_breakpoint(int cpu, u32 address)
+{
+  cpumonitor(cpu);
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
+  {
+    if(!breakpoints[cpu][b][0])
+    {
+      printf("Put a breakpoint at $%06X\n", address);
+      breakpoints[cpu][b][0] = (int)address;
+      breakpoints[cpu][b][1] = cpu ? subreadword(address) : readword(address);
+      breakpoints[cpu][b+1][0] = 0;
+      cpurelease(cpu);
+      return;
+    }
+  }
+  printf("Error: cannot place breakpoint: breakpoint count limit reached.\n");
+  cpurelease(cpu);
+}
+
+
+int delete_breakpoint(int cpu, u32 address)
+{
+  int deleted = 0;
+  cpumonitor(cpu);
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
+  {
+    if(!breakpoints[cpu][b][0])
+    {
+      break;
+    }
+    while(breakpoints[cpu][b][0] == (int)address)
+    {
+      int nb;
+      for(nb = b; nb < MAX_BREAKPOINTS; ++nb)
+      {
+        if(!breakpoints[cpu][nb][0])
+        {
+          break;
+        }
+        breakpoints[cpu][nb][0] = breakpoints[cpu][nb+1][0];
+        breakpoints[cpu][nb][1] = breakpoints[cpu][nb+1][1];
+      }
+      deleted = 1;
+    }
+  }
+  cpurelease(cpu);
+  return deleted;
+}
+
+
+// Returns PC if the CPU really reached a breakpoint, 0 otherwise
+u32 breakpoint_reached(int cpu)
+{
+  u32 pc;
+  u32 reg_pc = cpu ? SUBREG_PC : REG_PC;
+  pc = readlong(cpu, reg_pc);
+  int b;
+  for(b = 0; b < MAX_BREAKPOINTS; ++b)
+  {
+    if(!breakpoints[cpu][b][0])
+    {
+      break;
+    }
+    if(breakpoints[cpu][b][0] == pc)
+    {
+      // We hit a breakpoint and not a simple TRAP #7
+      cleanup_breakpoints(cpu);
+      cpustate[cpu] = 1;
+      // Place PC on the instruction
+      writelong(cpu ? SUBREG_PC : REG_PC, pc);
+      busrelease(cpu);
+      return pc;
+    }
+  }
+  return 0;
+}

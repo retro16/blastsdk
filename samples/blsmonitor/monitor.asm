@@ -227,42 +227,42 @@ int_vblank
 newinput
 		move.b	#25, inrepeat		; Slow repeat on new input
 processinput
-		btst	#BCBTNSTART+8, d0	; Test start
+		btst	#CBTNSTART_BIT+8, d0	; Test start
 		bne.b	.nostart
 
 		; Start pressed : scroll view
-		btst	#BCUP, d0
+		btst	#CUP_BIT, d0
 		bne.b	.noup
 		subi.l	#12, dumpscroll		; Scroll one line up
 
-.noup		btst	#BCDOWN, d0
+.noup		btst	#CDOWN_BIT, d0
 		bne.b	.nodown
 		addi.l	#12, dumpscroll		; Scroll one line down
 
-.nodown		btst	#BCLEFT, d0
+.nodown		btst	#CLEFT_BIT, d0
 		bne.b	.noleft
 		subi.l	#(12*27), dumpscroll	; Scroll one page up
 
-.noleft		btst	#BCRIGHT, d0
+.noleft		btst	#CRIGHT_BIT, d0
 		bne.b	int_vblank_end
 		addi.l	#(12*27), dumpscroll	; Scroll one page down
 
 		bra.b	int_vblank_end
 
 		; Start not pressed : normal actions
-.nostart	btst	#BCUP, d0
+.nostart	btst	#CUP_BIT, d0
 		beq.b	pressup
-		btst	#BCDOWN, d0
+		btst	#CDOWN_BIT, d0
 		beq.b	pressdown
-		btst	#BCLEFT, d0
+		btst	#CLEFT_BIT, d0
 		beq.w	pressleft
-		btst	#BCRIGHT, d0
+		btst	#CRIGHT_BIT, d0
 		beq.w	pressright
-		btst	#BCBTNB, d0		; Test B
+		btst	#CBTNB_BIT, d0		; Test B
 		beq.w	presswrite
-		btst	#BCBTNC, d0		; Test C
+		btst	#CBTNC_BIT, d0		; Test C
 		beq.w	pressread
-		btst	#BCBTNA+8, d0		; Test 1
+		btst	#CBTNA_BIT+8, d0		; Test 1
 		bne.b	int_vblank_end
 		move.l	addr, dumpscroll
 

@@ -68,7 +68,10 @@ bda_init					; Call at console initialization
 		move.l	#bda_sub_trace, $020024
 
 		; Set TRAP #7 exception vector for sub CPU
-		move.l	#bda_sub_trap, $02009C
+		move.l	#bda_sub_wait, $02009C
+
+		; Reset output buffer size
+		clr.w	$020030
 
 		; Release BUSREQ
 		move.w	#GA_NORESET, GA_RH
@@ -81,7 +84,7 @@ bda_init					; Call at console initialization
 		move.b	#BDA_NEUTRALCTRL, BDACTRL	; Enable level 2 interrupts and set TL+TR as output
 
 		rts
-		
+
 	if TARGET != TARGET_GEN
 bda_set_int_vector
 		cmp.l	(a0), d0
@@ -234,7 +237,7 @@ bda_enter
 		movem.l	d0-d7/a0-a6, -(a7)	; Push registers to bda_regs
 		subq.l	#4, a7			; Point a7 to bda_pkt_header
 		; Load frequently used constants in registers (to save code space)
-		moveq.l	#$00000006, d4	        ; Bit number of TH line (BCTH)
+		moveq.l	#$00000006, d4	        ; Bit number of TH line (CTH_BIT)
 		moveq.l	#$00000007, d5	        ; Longs per packet
 		moveq.l	#$0000001F, d6	        ; Bytes per packet
 		moveq.l	#$0000000F, d7	        ; Words per packet
@@ -329,7 +332,7 @@ bda_sendwords	lsr.b	#1, d3			; Convert d3 from byte count to word count
 		bracall	bda_sendbuf		; Send value in header
 		dbra	d3, .1
 		bra.w	bda_finishwrite
-		
+
 ; Send byte by byte
 bda_sendbytes	subq	#1, d3			; Adjust for DBRA
 		and.w	d6, d3			; Filter out bits
@@ -412,7 +415,6 @@ bda_sub_code
 bda_sub_l2
 		btst	#7, BDA_COMM_MAIN
 		bne.b	bda_sub_wait	; If the bit is set : go to monitor mode
-
 bda_l2_jmp	jmp	bda_l2_default.l		; The JMP target will be patched by bda_init to jump at the official L2 handler
 
 bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
@@ -443,21 +445,15 @@ bda_sub_wait	move.w	#$2700, sr		; Disable all interrupts
 		subq.l	#6, a7			; Restore interrupt stack frame
 		move.w	bdasub_sr.w, (a7)	; Restore SR in case it was changed by the monitor
 		move.l	bdasub_pc.w, 2(a7)	; Restore PC
-bda_l2_default	
+bda_l2_default
 		rte
 
 bda_sub_trace	; Voluntary interruption
 		bset	#5, BDA_COMM_SUB
 		jmp		bda_sub_wait
 
-bda_sub_trap	; Voluntary interruption
-		; Set trap flag
-		bset	#6, BDA_COMM_SUB
-		; Branch to monitor
-		jmp		bda_sub_wait
-		
 bda_sub_code_end
-		assert	bda_sub_code_end < $200	; Ensure subcode fits in header, before comm buffer
+		assert	bda_sub_code_end <= $1F0	; Ensure subcode fits in header, before comm buffer
 		rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN

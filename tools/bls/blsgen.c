@@ -5,6 +5,7 @@
 #include "blsgen_ext.h"
 #include "blspack.h"
 #include "blswrite.h"
+#include "blsparse.h"
 #include <sys/stat.h>
 #include <libgen.h>
 
@@ -14,155 +15,6 @@
 
 output mainout;
 
-void skipblanks(const char **l)
-{
-  while(**l && **l <= ' ') {
-    ++*l;
-  }
-}
-
-sv parse_hex_skip(const char **cp)
-{
-  skipblanks(cp);
-  sv val = 0;
-  int len = 8;
-  while(**cp && len--) {
-    if(**cp >= 'A' && **cp <= 'F') {
-      val <<= 4;
-      val |= **cp + 10 - 'A';
-    } else if(**cp >= 'a' && **cp <= 'f') {
-      val <<= 4;
-      val |= **cp + 10 - 'a';
-    } else if(**cp >= '0' && **cp <= '9') {
-      val <<= 4;
-      val |= **cp - '0';
-    } else {
-      break;
-    }
-    ++(*cp);
-  }
-  return val;
-}
-
-sv parse_hex(const char *cp)
-{
-  return parse_hex_skip(&cp);
-}
-
-sv parse_int_skip(const char **cp)
-{
-  skipblanks(cp);
-  sv val = 0;
-  int neg = 0;
-  if(**cp == '-') {
-    ++(*cp);
-    neg = 1;
-  } else if(**cp == '~') {
-    ++(*cp);
-    neg = 2;
-  }
-  if(**cp == '$') {
-    ++(*cp);
-    val = parse_hex_skip(cp);
-  } else if(**cp == '0' && (cp[0][1] == 'x' || cp[0][1] == 'X')) {
-    (*cp) += 2;
-    val = parse_hex_skip(cp);
-  } else while(**cp) {
-      if(**cp >= '0' && **cp <= '9') {
-        val *= 10;
-        val += **cp - '0';
-      } else if(**cp == '*') {
-        ++(*cp);
-        sv second = parse_int_skip(cp);
-        val *= second;
-        break;
-      } else {
-        break;
-      }
-      ++(*cp);
-    }
-  if(neg == 1) {
-    val = neint(val);
-  } else if(neg == 2) {
-    val = not_int(val);
-  }
-  return val;
-}
-
-sv parse_int(const char *cp)
-{
-  return parse_int_skip(&cp);
-}
-
-void parse_sym(char *s, const char **cp)
-{
-  const char *c = *cp;
-  while((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_' || *c == '.') {
-    *s = *c;
-    ++s;
-    ++c;
-  }
-  *s = '\0';
-  *cp = c;
-}
-
-size_t getsymname(char *output, const char *path)
-{
-  int sep;
-  char *op = output;
-
-  // Parse first character
-
-  if(!path || !*path) {
-    printf("Error : Empty path\n");
-    exit(1);
-  }
-  if(*path >= '0' && *path <= '9') {
-    printf("Warning : symbols cannot start with numbers, prepending underscore to [%s]\n", path);
-    *op = '_';
-    ++op;
-    sep = 0;
-  }
-
-  if(*path >= 'a' && *path <= 'z') {
-    *op = *path - 'a' + 'A';
-    ++op;
-    ++path;
-    sep = 0;
-  } else if(*path >= 'A' && *path <= 'Z') {
-    *op = *path;
-    ++op;
-    ++path;
-    sep = 0;
-  } else {
-    *op = '_';
-    ++op;
-    ++path;
-    sep = 1;
-  }
-
-  while(*path) {
-    if((*path >= '0' && *path <= '9') || (*path >= 'A' && *path <= 'Z') || *path == '_') {
-      *op = *path;
-      ++op;
-      sep = 0;
-    } else if(*path >= 'a' && *path <= 'z') {
-      *op = *path - 'a' + 'A';
-      ++op;
-      sep = 0;
-    } else {
-      if(!sep) {
-        *op = '_';
-        ++op;
-      }
-      sep = 1;
-    }
-    ++path;
-  }
-  *op = '\0';
-
-  return op - output;
-}
 
 group *group_new()
 {
@@ -1086,7 +938,7 @@ void bls_get_symbol_values()
     strcat(s, "_PHYSSIZE");
     symbol_set(&sec->intsym, s, nullca, sec);
   }
-  
+
 }
 
 void bls_compile()
@@ -1217,7 +1069,7 @@ void bls_map()
 
   if(mainout.target == target_scd) {
     // Map IP and SP first, to pack them as tightly as possible in RAM
-    
+
     secl = mainout.ipbin->provides;
     BLSLL_FOREACH(sec, secl) {
       bls_map_section(sec);
@@ -1342,10 +1194,10 @@ void bls_physmap_cd()
 
   // Map IP on physical medium
   mainout.ipbin->physaddr = CDHEADERSIZE + SECCODESIZE + 6;
- 
+
   // Map SP on physical medium
   mainout.spbin->physaddr = align_value(mainout.ipbin->physaddr + mainout.ipbin->physsize, CDBLOCKSIZE) + SPHEADERSIZE;
-  
+
   sv physstart = align_value(mainout.spbin->physaddr + mainout.spbin->physsize, CDBLOCKSIZE);
   sv physend = MAXCDBLOCKS;
 
@@ -1687,7 +1539,7 @@ void bls_build_cd_image()
   {
     mainout.region = strdup("U");
   }
-  
+
   fprintf(f, "SEGADISCSYSTEM  ");
   fprintf(f, "           "); // TITLE
   fwrite("\x00\x00\x00\x00\x01", 1, 5, f);
@@ -1795,7 +1647,7 @@ void bls_build_cd_image()
   if(spinit == -1) spinit = spmain;
   sv spl2 = symbol_get_bus("G_SUB_HWINT_LEVEL2", bus_sub);
   if(spl2 == -1) spl2 = symbol_get_bus("G_SUB_INT_LEVEL2", bus_sub);
-  
+
   if(spinit > 0x6020 + 0xFFFF) {
     printf("SP_INIT is too far from the beginning of the SP binary file.\n");
     exit(1);
@@ -1965,7 +1817,7 @@ void bls_build_cart_image()
   if(mainout.target == target_ram)
   {
     // Embed RAM loader in reserved interrupt vectors
-  
+
     // Pad with NOP
     for(i = 0; i < ramloader_padding; i += 2) { fputc('\x4E', f); fputc('\x71', f); }
 
@@ -2044,7 +1896,7 @@ size_t getbasename(char *output, const char *name)
 int findfile(char *name, const char *f)
 {
   strcpy(name, f);
-  
+
   FILE *fp = fopen(name, "r");
   if(fp) {
     fclose(fp);
@@ -2075,9 +1927,9 @@ void confdump()
   FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
   blsconf_dump(f); // Dump full configuration for reference and debugging
   // Dump physical mapping
-  
+
   fprintf(f, "\n----------------------------------------\n\nOutput map\n==========\n\n    offset   size     section\n");
-  
+
   BLSLL(section) *secl = sections;
   section *sec;
   BLSLL_FOREACH(sec, secl) {
@@ -2089,13 +1941,13 @@ void confdump()
     if(!i) {
       continue;
     }
-    
+
     fseek(i, 0, SEEK_END);
     fprintf(f, "    %08X %08X%s %s\n", (unsigned int)sec->physaddr, (unsigned int)sec->physsize, sec->physsize != ftell(i) ? " (wrong)" : "", sec->name);
 
     fclose(i);
   }
-  
+
   fclose(f);
 }
 

@@ -250,6 +250,17 @@ Only these 2 interrupts are caught by default. You must ensure that the
 interrupt vectors are set to int_trace and int_trap07 of bda.inc to make
 it work correctly.
 
+If these interrupts happen on the sub cpu, the following data is sent :
+
+Data sent by the genesis when TRACE triggered on the sub cpu :
+
+    00 00 01 09
+
+Data sent by the genesis when TRAP 7 triggered on the sub cpu :
+
+    00 00 01 27
+
+
 
 Receiving arbitrary data from the Genesis
 -----------------------------------------
@@ -270,8 +281,7 @@ To send more than 3 bytes, you must send as many commands as needed. This is
 inefficient, but it avoids doing complex computations when implementing the
 low level protocol in the Arduino
 
-Currently, BDB is able to display incoming data when running the program with
-the "go" command.
+On the sega cd, data may be sent from both cpu. There is no way to tell which cpu sent data.
 
 
 Flow control in serial mode
@@ -294,3 +304,39 @@ This is what is seen on the genesis side :
 
     84 00 02 00
     A4 00 02 00 53 45 47 41
+
+
+Main-sub cpu communication
+--------------------------
+
+The sub cpu cannot access the pad port, nor it can interrupt the main cpu. Communication between the sub cpu and the debugger is
+done by setting bits.
+
+Communication flags (gate array + $0E) :
+
+    |------------ MAIN -------------|------------- SUB -------------|
+    | 15| 14| 13| 12| 11| 10| 09| 08| 07| 06| 05| 04| 03| 02| 01| 00|
+    |REQ|   |CDR|SYN|   |   |   |   |MON|TRA|BUF|SYN|   |   |   |   |
+    |-------------------------------|-------------------------------|
+
+Main -> sub flags :
+
+ - REQ: The main cpu requests the sub cpu to enter monitor mode. This flag is checked by the sub cpu in its level 2 exception routine.
+ 
+ - CDR: CD read request. commwords 14-15 contain sector, commword 13 contains sector count.
+   The sub cpu will read the specified sectors from cd and put them at the beginning of word ram. The sub cpu will release word ram once data is ready. This mechanism is used by blsgen binary loader.
+ 
+ - SYN: main-sub synchronization
+
+Sub -> main flags :
+
+ - MON: The sub cpu is in monitor mode
+
+ - TRA: The sub cpu issued a TRACE exception
+
+ - BUF: The sub cpu communication buffer contains data
+
+ - SYN: main-sub synchronization
+
+
+To output data (bdp_write) from the sub cpu, the routine places data length at $30 and data in $32-$60 range in the program ram, sets BUF flag and waits until data length at $30 is reset to 0 by the main cpu.

@@ -32,35 +32,56 @@ SYNC_MAIN_SUB	macro
 	if BUS == BUS_MAIN
 
 SUB_BUSREQ	macro
-		move.w	#(GA_NORESET | GA_BUSREQ), GA_RH
+		move.b	#(GA_NORESET | GA_BUSREQ), GA_RH + 1
+.1\?		btst.b	#GA_BUSREQ_BIT, GA_RH + 1	; Wait until bus is ready
+		beq.b	.1\?
 		endm
 
 SUB_BUSRELEASE	macro
-		move.w	#GA_NORESET, GA_RH
+		move.b	#GA_NORESET, GA_RH + 1
 		endm
 
 SUB_RESET	macro
-		move.w	#GA_NORESET, GA_RH
-		move.w	#0, GA_RH
-		move.w	#GA_NORESET, GA_RH
+		move.b	#GA_NORESET, GA_RH + 1
+		move.b	#0, GA_RH + 1
+		move.b	#GA_NORESET, GA_RH + 1
 		endm
 
-SUB_ACCESS_BANK	macro b
-		; Check current mode
-		move.w	GA_MM, d0
-		btst	#2, d0
-		beq	.1\?
-		btst	#1, d0
-		beq	.1\?
+SUB_SET_BANK	macro	bank
+		move.b	GA_MM + 1, d0
+		lsr.b	#1, d0		; MODE flag represents neutral operation for DMNA
+		andi.b	#$02, d0	; Clear other bits
+		ori.b	#(bank << 6), d0
+		move.b	d0, GA_MM + 1	; Set bank without affecting WRAM
+		endm
 
-		; 2M mode with memory on sub : preserve DMNA bit
-		move.w	#(b<<6 | 2), GA_MM
-		bra	.2\?
+SUB_ACCESS_PRAM	macro bank
+		lea	GA_RH + 1, a0
+		move.b	(a0), -(a7)	; Push current busreq status on stack
+		bset	#GA_BUSREQ_BIT, (a0)
+.1\?	btst	#GA_BUSREQ_BIT, (a0)
+		beq.b	.1\?
+		
+		addq	#2, a0	; Point a0 at GH_MM + 1
+		move.b	(a0), d0
+		move.b	d0, -(a7)	; Push current bank on stack
+		lsr.b	#1, d0		; MODE flag represents neutral operation for DMNA
+		andi.b	#$02, d0	; Clear other bits
+		ori.b	#(bank << 6), d0
+		move.b	d0, (a0)
+		endm
 
-		; Other modes : leave 0 in DMNA to avoid bank switch
-.1\?		move.w	#(b<<6), GA_MM
-
-.2\?
+SUB_RELEASE_PRAM	macro
+		move.b	(a7)+, d0
+		move.b	(a7)+, GA_RH + 1	; Restore old busreq status
+		
+		; Restore old bank setting
+		move.b	d0, d1
+		lsr.b	#1, d1
+		andi.b	#$02, d1
+		andi.b	#$C0, d0
+		ori.b	d1, d0
+		move.b	d0, GA_MM + 1
 		endm
 
 	endif

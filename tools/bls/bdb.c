@@ -26,13 +26,8 @@
 sigjmp_buf mainloop_jmp;
 #define MAX_BREAKPOINTS 1024
 
+int cpu; // Current CPU
 char regname[][3] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "pc", "sr"};
-
-
-int breakpoints[MAX_BREAKPOINTS][2] = {{-1, -1}};
-
-////// Extern functions
-
 
 void usage()
 {
@@ -52,72 +47,49 @@ void goto_mainloop(int sig)
   printf("SIGINT\n");
   rl_free_line_state();
   rl_reset_after_signal();
-  
+
   // Go back to main loop
   siglongjmp(mainloop_jmp, 0);
 }
 
-void cleanup_breakpoints()
-{
-  int b;
-  for(b = 0; b < MAX_BREAKPOINTS; ++b)
-  {
-    if(breakpoints[b][0] == -1)
-    {
-      break;
-    }
 
-    // Write original instruction
-    writeword(breakpoints[b][0], breakpoints[b][1]);
-  }
+void on_unknown(const u8 inp[36], int inpl)
+{
+  erase_prompt();
+  printf("Received unknown data from the genesis\n");
+  hexdump(inp, inpl, 0);
+  exit(1);
 }
 
-void print_incoming()
+void on_breakpoint(int cpu, u32 address)
 {
-  // The genesis sent data : print it to stdout
-  readdata();
-  if(inpl < 4)
-  {
-    printf("Received partial data from the genesis\n");
-  }
-  else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] == 0x00 && inp[3] >= 0x20 && inp[3] < 0x2F)
-  {
-    printf("TRAP #%02d\n", inp[3] - 0x20);
-  }
-  else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] == 0x00 && inp[3] < 0x20)
-  {
-    printf("Exception %02X triggered\n", (unsigned int)(unsigned char)(inp[3]));
-  }
-  else if(inp[0] <= 3)
-  {
-    fwrite(&inp[1], 1, inp[0] & 0x03, stdout);
-  }
-  else
-  {
-    printf("(extra) ");
-    hexdump(inp, inpl, 0);
-  }
+  erase_prompt();
+  printf("%s CPU: breakpoint reached at %06X\n", cpu ? "Sub" : "Main", address & 0xFFFFFF);
+  restore_prompt();
 }
 
-void incoming_packet()
+void on_exception(int cpu, int ex)
+{
+  erase_prompt();
+  if(ex >= 0x20) {
+    printf("%s CPU: TRAP #%02d\n", cpu ? "Sub" : "Main", ex - 0x20);
+  } else {
+    printf("%s CPU: Exception %02d triggered\n", cpu ? "Sub" : "Main", ex);
+  }
+  restore_prompt();
+}
+
+void erase_prompt()
 {
   char *lb = rl_line_buffer;
-  while(*(lb++)) { usleep(1000000); printf("\b \b\b"); } // Erase readline line
-  printf("\b\b\b\b\b\b      \b\b\b\b\b\b"); // Erase "bdb > " prompt
-
-  print_incoming();
-
-  printf("bdb > %s", rl_line_buffer); // Restore readline line display
-  fflush(stdout);
+  while(*(lb++)) { printf("\b \b\b"); } // Erase readline line
+  printf("\b\b\b\b\b\b\b       \b\b\b\b\b\b\b"); // Erase "bdb > " prompt
 }
 
-void breakpoint_interrupt(int sig)
+void restore_prompt()
 {
-  (void) sig;
-
-  cleanup_breakpoints();
-  signal(SIGINT, goto_mainloop);
-  goto_mainloop(sig);
+  printf("bdb %c> %s", cpu ? 's' : 'm', rl_line_buffer); // Restore readline line display
+  fflush(stdout);
 }
 
 void parse_word(char *token, const char **line)
@@ -149,10 +121,12 @@ void parse_token(char *token, const char **line)
   skipblanks(line);
 }
 
-void showreg(u32 regaddr)
+void showreg(int cpu)
 {
-  u8 regs[17*4 + 2];
-  readmem(regs, regaddr, sizeof(regs));
+  u32 regs[18];
+  readregs(cpu, regs);
+
+  printf("%s cpu registers :\n", cpu ? "sub" : "main");
 
   int r;
   int t;
@@ -160,12 +134,11 @@ void showreg(u32 regaddr)
   {
     for(r = 0; r < 8; ++r)
     {
-      u32 value = getint(&regs[(r + t) * 4], 4);
-      printf("%s:%08X ", regname[r + t], value);
+      printf("%s:%08X ", regname[r + t], regs[r + t]);
     }
     printf("\n");
   }
-  printf("pc:%08X sr:%04X\n", getint(&regs[16 * 4], 4), getint(&regs[17 * 4], 2));
+  printf("pc:%08X sr:%04X\n", regs[REG_PC], regs[REG_SR]);
 }
 
 void boot_cd(u8 *image, int imgsize)
@@ -187,7 +160,7 @@ void boot_cd(u8 *image, int imgsize)
   printf("CD-ROM image. IP=%04X-%04X (%d bytes). SP=%04X-%04X (%d bytes).\n", (u32)(ip_start-image), (u32)(ip_start - image + ipsize - 1), ipsize, (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
   printf("Uploading IP (%d bytes) ...\n", ipsize);
-  sendmem(0xFF0000 + seccodesize, ip_start, ipsize);
+  writemem(0, 0xFF0000 + seccodesize, ip_start, ipsize);
 
   usleep(1000); // Wait to ensure that buffers are empty
 
@@ -195,17 +168,16 @@ void boot_cd(u8 *image, int imgsize)
   subreq();
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
-  subsendmem(0x6000 + SPHEADERSIZE, sp_start, spsize);
+  writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
   printf("Set sub CPU reset vector to beginning of sub code.\n");
-  subsetbank(0);
-  writelong(0x020004, 0x6000 + SPHEADERSIZE);
+  writelong(1, 0x000004, 0x6000 + SPHEADERSIZE);
   printf("Set main CPU registers.\n%06X PC=%08X\n%06X SP=%08X\n%06X SR=%04X\n", REG_PC, 0xFF0000 + seccodesize, REG_SP, 0xFFD000, REG_SR, 0x2700);
-  writelong(REG_PC, 0xFF0000 + seccodesize);
-  writelong(REG_SP, 0xFFD000);
-  writeword(REG_SR, 0x2700);
+  setreg(0, REG_PC, 0xFF0000 + seccodesize);
+  setreg(0, REG_SP, 0xFFD000);
+  setreg(0, REG_SR, 0x2700);
 
   printf("Resetting sub CPU.\n");
-  subreset();
+  resetcpu(1);
 
   printf("Ready to boot.\n");
 }
@@ -224,13 +196,12 @@ void boot_sp(u8 *image, int imgsize)
   subreq();
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
-  subsendmem(0x6000 + SPHEADERSIZE, sp_start, spsize);
+  writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
   printf("Set sub CPU reset vector to beginning of sub code.\n");
-  subsetbank(0);
-  writelong(0x020004, 0x6000 + SPHEADERSIZE);
+  writelong(1, 0x000004, 0x6000 + SPHEADERSIZE);
 
   printf("Resetting sub CPU.\n");
-  subreset();
+  resetcpu(1);
 
   printf("New SP code running.\n");
 }
@@ -244,7 +215,7 @@ void gen_setvector(u32 v, u32 value)
     // LEVEL4/HBLANK interrupt
     char romid[17];
     romid[16] = '\0';
-    readmem((u8*)romid, 0x120, 16);
+    readmem(0, (u8*)romid, 0x120, 16);
     if(strstr(romid, "BOOT ROM"))
     {
       printf("Sega CD detected : write the HBLANK vector at the special address\n");
@@ -252,13 +223,13 @@ void gen_setvector(u32 v, u32 value)
       {
         printf("Warning : cannot set HBLANK outside main RAM for Sega CD.\n");
       }
-      writelong(0xA12006, value & 0xFFFF);
+      writelong(0, 0xA12006, value & 0xFFFF);
       return;
     }
   }
 
   // Fetch wrapper from genesis
-  u32 wrapper = readlong(v) & 0x00FFFFFF;
+  u32 wrapper = readlong(0, v) & 0x00FFFFFF;
   if(wrapper < 0x200000)
   {
     // Not in RAM : cannot change vector
@@ -267,8 +238,8 @@ void gen_setvector(u32 v, u32 value)
   }
 
   printf("Set interrupt vector code %02X at %06X, jumping to %06X\n", v, wrapper, value);
-  writeword(wrapper, 0x4EF9); // Write jmp instruction
-  writelong(wrapper + 2, value); // Write target address
+  writeword(0, wrapper, 0x4EF9); // Write jmp instruction
+  writelong(0, wrapper + 2, value); // Write target address
 }
 
 void boot_ram(u8 *image, int imgsize)
@@ -300,9 +271,9 @@ void boot_ram(u8 *image, int imgsize)
   sendmem(0xFF0000, image + 0x200, imgsize - 0x200);
 
   // Set SR, SP and PC
-  writelong(REG_SP, sp);
-  writelong(REG_PC, pc);
-  writeword(REG_SR, 0x2700);
+  setreg(0, REG_SP, sp);
+  setreg(0, REG_PC, pc);
+  setreg(0, REG_SR, 0x2700);
 
   printf("Ready to boot.\n");
 }
@@ -419,14 +390,11 @@ u32 asmfile(const char *filename, u8 *target, u32 org)
   return codesize;
 }
 
-void d68k_instr(int sub)
+void d68k_instr(int cpu)
 {
-  u32 address = readlong(sub ? SUBREG_PC : REG_PC);
+  u32 address = readreg(cpu, REG_PC);
   u8 data[10];
-  if(sub)
-    subreadmem(data, address, 10);
-  else
-    readmem(data, address, 10);
+  readmem(cpu, data, address, 10);
 
   char out[256];
   int suspicious;
@@ -434,25 +402,20 @@ void d68k_instr(int sub)
   printf("(next) %s", out);
 }
 
-void d68k_skip_instr(int sub)
+void d68k_skip_instr(int cpu)
 {
-  if(sub) subsetbank(0);
-  u32 address = readlong(sub ? SUBREG_PC : REG_PC);
+  u32 address = readreg(cpu, REG_PC);
   u8 data[10];
-  if(sub)
-    subreadmem(data, address, 10);
-  else
-    readmem(data, address, 10);
+  readmem(cpu, data, address, 10);
 
   char out[256];
   int suspicious;
   address = d68k(out, 256, data, 10, 1, address, 0, 1, &suspicious);
   printf("(skip) %s", out);
-  if(sub) subsetbank(0);
-  writelong(sub ? SUBREG_PC : REG_PC, address);
-  showreg(sub ? SUBREGADDR : REGADDR);
+  setreg(cpu, REG_PC, address);
   d68k_instr(sub);
 }
+
 
 char lastline[1024] = "";
 void on_line_input(char *l);
@@ -466,23 +429,22 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  open_debugger(argv[1]);
+  open_debugger(argv[1], on_unknown, on_breakpoint, on_exception);
 
 	printf("Blast ! debugger. Connected to %s\n", argv[1]);
+
+	cpu = 0;
 
   if(argc >= 3)
   {
     printf("\n");
     boot_img(argv[2]);
-    sendcmd(CMD_EXIT, 0);
-    waitack();
-    readdata();
   }
 
   sigsetjmp(mainloop_jmp, 1);
   signal(SIGINT, SIG_DFL);
   rl_callback_handler_install("bdb > ", on_line_input);
-  
+
   for(;;) {
     fd_set readset;
     int selectresult;
@@ -490,14 +452,14 @@ int main(int argc, char **argv)
     FD_ZERO(&readset);
     FD_SET(0, &readset);
     FD_SET(genfd, &readset);
-    
+
     selectresult = select(genfd + 1, &readset, NULL, NULL, NULL);
-    
+
     if(selectresult > 0) {
       if(FD_ISSET(0, &readset)) {
         rl_callback_read_char();
       } else if(FD_ISSET(genfd, &readset)) {
-        incoming_packet();
+        bls_readdata();
       }
     }
   }
@@ -507,9 +469,9 @@ void on_line_input(char *line)
 {
   char token[1024] = "";
   const char *l = line;
-  
+
   rl_callback_handler_remove();
-  
+
   do {
     if(*l)
     {
@@ -527,7 +489,19 @@ void on_line_input(char *line)
     }
 
     signal(SIGINT, goto_mainloop); // Handle Ctrl-C : jump back to prompt
-    
+
+    if(strncmp(l, "main", 4) == 0) {
+      if(cpu != 0) printf("Switch to main cpu\n");
+      cpu = 0;
+      l += 4;
+    }
+
+    if(strncmp(l, "sub", 4) == 0) {
+      if(cpu != 1) printf("Switch to main cpu\n");
+      cpu = 1;
+      l += 3;
+    }
+
     parse_token(token, &l);
 
     if(strcmp(token, "q") == 0)
@@ -535,11 +509,9 @@ void on_line_input(char *line)
       exit(0);
     }
 
-    if(strcmp(token, "flush") == 0)
+    if(strcmp(token, "cpu") == 0)
     {
-      readdata();
-      hexdump(inp, inpl, 0);
-
+      printf("Working on %s cpu", cpu ? "sub" : "main";
       continue;
     }
 
@@ -548,48 +520,19 @@ void on_line_input(char *line)
       parse_word(token, &l);
       u32 address = parse_int(&l, 8);
 
-      if(!address) address = 0xFF0000;
+      if(!address) address = cpu ? 0x006000 : 0xFF0000;
 
       u8 obj[65536];
       u32 osize = asmfile(token, obj, address);
 
-      sendmem(address, obj, osize);
-      writelong(REG_PC, address);
-      showreg(REGADDR);
+      sendmem(cpu, address, obj, osize);
+      setreg(cpu, REG_PC, address);
+      showreg(cpu);
 
       continue;
     }
 
-    if(strcmp(token, "subasmx") == 0)
-    {
-      parse_word(token, &l);
-      u32 address = parse_int(&l, 8);
-
-      if(!address) address = 0x006028;
-
-      u8 obj[65536];
-      u32 osize = asmfile(token, obj, address);
-
-      substop();
-      subreq();
-      subsendmem(address, obj, osize);
-      subsetbank(0);
-      writelong(SUBREG_PC, address);
-      showreg(SUBREGADDR);
-      subrelease();
-
-      continue;
-    }
-
-    if(strcmp(token, "flush") == 0)
-    {
-      readdata();
-      hexdump(inp, inpl, 0);
-
-      continue;
-    }
-
-    if(strcmp(token, "sr") == 0)
+    if(strcmp(token, "r") == 0)
     {
       parse_token(token, &l);
       u32 address = parse_int(&l, 8);
@@ -597,122 +540,37 @@ void on_line_input(char *line)
       switch(token[0])
       {
         case 'b':
-          value = subreadbyte(address);
+          value = readbyte(cpu, address);
           break;
         case 'w':
-          value = subreadword(address);
+          value = readword(cpu, address);
           break;
         case 'l':
-          value = subreadlong(address);
+          value = readlong(cpu, address);
           break;
       }
       printf("%06X: %08X\n", address, value);
       continue;
     }
 
-    if(strcmp(token, "sw") == 0)
-    {
-      parse_token(token, &l);
-      u32 address = parse_int(&l, 8);
-      u32 value = parse_int(&l, 8);
-      switch(token[0])
-      {
-        case 'b':
-          subwritebyte(address, value);
-          break;
-        case 'w':
-          subwriteword(address, value);
-          break;
-        case 'l':
-          subwritelong(address, value);
-          break;
-      }
-      continue;
-    }
-
-    if(strcmp(token, "r") == 0)
-    {
-      u8 cmd = CMD_READ;
-      parse_token(token, &l);
-      const char *c = &token[1];
-
-      if(!token[0])
-      {
-        continue;
-      }
-
-      switch(token[0])
-      {
-        case 'b':
-        cmd |= CMD_BYTE;
-        if(token[1]) {
-          cmd |= parse_int(&c, 8) & CMD_LEN;
-        } else {
-          cmd |= 1;
-        }
-        break;
-
-        case 'w':
-        cmd |= CMD_WORD;
-        if(token[1]) {
-          cmd |= (parse_int(&c, 8) << 1) & CMD_LEN;
-        } else {
-          cmd |= 2;
-        }
-        break;
-
-        case 'l':
-        cmd |= CMD_LONG;
-        if(token[1]) {
-          cmd |= (parse_int(&c, 8) << 2) & CMD_LEN;
-        } else {
-          cmd |= 4;
-        }
-        break;
-
-        default:
-        break;
-      }
-
-      u32 address = parse_int(&l, 8);
-      sendcmd(cmd, address);
-      waitack();
-
-      readdata();
-      if(inpl <= 4)
-      {
-        printf("Invalid response length : %d\n", inpl);
-        hexdump(inp, inpl, 0);
-        continue;
-      }
-      address = getint(&inp[1], 3);
-      hexdump(&inp[4], inpl - 4, address);
-
-      continue;
-    }
-
     if(strcmp(token, "w") == 0)
     {
       parse_token(token, &l);
-
       u32 address = parse_int(&l, 8);
-
       u32 value = parse_int(&l, 8);
       switch(token[0])
       {
         case 'b':
-        writebyte(address, value);
-        break;
-
+          writebyte(cpu, address, value);
+          break;
         case 'w':
-        writeword(address, value);
-        break;
-
+          writeword(cpu, address, value);
+          break;
         case 'l':
-        writelong(address, value);
-        break;
+          writelong(cpu, address, value);
+          break;
       }
-
+      printf("%06X: %08X\n", address, value);
       continue;
     }
 
@@ -720,141 +578,33 @@ void on_line_input(char *line)
     {
       u32 address = parse_int(&l, 8);
       parse_word(token, &l);
-      sendfile(token, address);
-
+      writefile(cpu, token, address);
       continue;
     }
 
     if(strcmp(token, "go") == 0)
     {
-      int b;
-      for(b = 0; b < MAX_BREAKPOINTS; ++b)
-      {
-        if(breakpoints[b][0] == -1)
-        {
-          break;
-        }
-        breakpoints[b][1] = readword(breakpoints[b][0]);
-
-        // Write a TRAP #07 instruction
-        writeword(breakpoints[b][0], 0x4E47);
-        signal(SIGINT, breakpoint_interrupt);
-      }
-      sendcmd(CMD_EXIT, 0);
-      waitack();
-      
-      do {
-        readdata();
-        if((inp[0] & 0xE0) == 0 && inp[0] & 0x03)
-        {
-          // The genesis sent data
-          fwrite(&inp[1], 1, inp[0] & 0x03, stdout);
-          fflush(stdout);
-        }
-      } while((inp[0] & 0xE0) == 0 && (inp[0] & 0x03));
-      if((inp[0] & 0xE0) != CMD_EXIT)
-      {
-        printf("Error : genesis did not acknowledge.\n");
-        hexdump(inp, inpl, 0);
-        continue;
-      }
-
-      if(breakpoints[0][0] != -1)
-      {
-        // Wait until breakpoint
-        readdata();
-        signal(SIGINT, goto_mainloop);
-        if(inp[3] == 0x07)
-          printf("Breakpoint triggered.\n");
-        else
-          printf("Interrupted before reaching breakpoint.\n");
-
-        // Restore original instructions
-        cleanup_breakpoints();
-
-        // Adjust PC to point on the break instruction
-        writelong(REG_PC, readlong(REG_PC) - 2);
-
-        showreg(REGADDR);
-      }
-
+      startcpu(cpu);
       continue;
     }
 
-    if(strcmp(token, "ping") == 0)
+    if(strcmp(token, "stop") == 0)
     {
-      printf("Ping");
-      fflush(stdout);
-
-      sendcmd(CMD_HANDSHAKE, 0);
-      printf(" ..");
-      fflush(stdout);
-      waitack();
-      printf(". ");
-      fflush(stdout);
-
-      readdata();
-      if(inpl != 4 || inp[0])
-      {
-        printf("crash !\nError : genesis did not handshake.\n");
-        hexdump(inp, inpl, 0);
-        continue;
-      }
-      else
-      {
-        printf("pong !\n");
-        hexdump(inp, inpl, 0);
-      }
-
+      stopcpu(cpu);
       continue;
     }
 
-    if(strcmp(token, "test") == 0)
+    if(strcmp(token, "bridge") == 0)
     {
-      printf("Test");
-      fflush(stdout);
-
-      sendcmd(CMD_EXIT, 0x56510A);
-      waitack();
-
-      printf(" ... ");
-      fflush(stdout);
-
-      readdata();
-      if(inpl != 4
-      || inp[0] != 0x20
-      || inp[1] < '0' || inp[1] > '9'
-      || inp[2] < '0' || inp[2] > '9'
-      || inp[3] < '0' || inp[3] > '9')
-      {
-        printf("crash !\n");
-        hexdump(inp, inpl, 0);
-        continue;
+      u8 inp[3];
+      if(bridgequery(inp)) {
+        printf("OK !\n\n Protocol v%c\n Implementation v%c.%c\n", inp[0], inp[1], inp[2]);
       }
-      else
-      {
-        printf("OK !\n\n Protocol v%c\n Implementation v%c.%c\n", inp[1], inp[2], inp[3]);
-      }
-
-      continue;
     }
 
     if(strcmp(token, "reg") == 0)
     {
-      showreg(REGADDR);
-
-      continue;
-    }
-
-    if(strcmp(token, "subreg") == 0)
-    {
-      submon();
-      subreq();
-      subsetbank(0);
-      showreg(SUBREGADDR);
-      subrelease();
-      subrun();
-
+      showreg(cpu);
       continue;
     }
 
@@ -865,37 +615,7 @@ void on_line_input(char *line)
       u32 size = parse_int(&l, 12);
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
-      readmem(data, address, size);
-
-      skipblanks(&l);
-
-      if(*l)
-      {
-        FILE *f = fopen(l, "w");
-        if(!f)
-        {
-          printf("Cannot open file %s.\n", l);
-          continue;
-        }
-
-        fwrite(data, 1, size, f);
-        fclose(f);
-      }
-      else
-      {
-        hexdump(data, size, address);
-      }
-      continue;
-    }
-
-    if(strcmp(token, "subdump") == 0)
-    {
-      u32 address = parse_int(&l, 12);
-      skipblanks(&l);
-      u32 size = parse_int(&l, 12);
-      skipblanks(&l);
-      u8 *data = (u8 *)malloc(size);
-      subreadmem(data, address, size);
+      readmem(cpu, data, address, size);
 
       skipblanks(&l);
 
@@ -922,7 +642,7 @@ void on_line_input(char *line)
     {
       u32 address = parse_int(&l, 12) * 32;
       u8 data[32];
-      vramreadmem(data, address, 32);
+      readvram(data, address, 32);
       int c, x, y;
       c = 0;
       printf(" --------\n");
@@ -949,7 +669,7 @@ void on_line_input(char *line)
       u32 size = parse_int(&l, 12);
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
-      vramreadmem(data, address, size);
+      readvram(data, address, size);
 
       skipblanks(&l);
 
@@ -989,50 +709,13 @@ void on_line_input(char *line)
         instructions = 1;
       }
       u8 *data = (u8 *)malloc(size);
-      readmem(data, address, size);
+      readmem(cpu, data, address, size);
 
       char out[262144];
       int suspicious;
       d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
       printf("%s\n", out);
 
-      continue;
-    }
-
-    if(strcmp(token, "subd68k") == 0)
-    {
-      u32 address = parse_int(&l, 12);
-      u32 size = parse_int(&l, 12);
-      int instructions = -1;
-      u8 *data = (u8 *)malloc(size);
-
-      subreq();
-      subsetbank(0);
-      if(!address) { address = subreadlong(SUBREG_PC); size = 0; printf("Starting at PC (%08X)\n", address); }
-      if(!size) {
-        size = 10;
-        instructions = 1;
-      }
-      subreadmem(data, address, size);
-      subrelease();
-
-      char out[262144];
-      int suspicious;
-      d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
-      printf("%s\n", out);
-
-      continue;
-    }
-
-    if(strcmp(token, "substop") == 0)
-    {
-      substop();
-      continue;
-    }
-
-    if(strcmp(token, "subgo") == 0)
-    {
-      subgo();
       continue;
     }
 
@@ -1045,98 +728,22 @@ void on_line_input(char *line)
         continue;
       }
       u32 value = parse_int(&l, 12);
-      if(reg == 17)
-      {
-        writeword(REG_SR, value);
-      }
-      else
-      {
-        writelong(REGADDR + reg * 4, value);
-      }
-      showreg(REGADDR);
-      continue;
-    }
-
-    if(strcmp(token, "subset") == 0)
-    {
-      int reg = parse_register(&l);
-      if(reg < 0)
-      {
-        printf("Unknown register.\n");
-        continue;
-      }
-      u32 value = parse_int(&l, 12);
-      submon();
-      subreq();
-      subsetbank(0);
-      if(reg == 17)
-      {
-        writeword(SUBREG_SR, value);
-      }
-      else
-      {
-        writelong(SUBREGADDR + reg * 4, value);
-      }
-      showreg(SUBREGADDR);
-      subrelease();
-      subrun();
+      setreg(cpu, reg, value);
+      showreg(cpu);
       continue;
     }
 
     if(strcmp(token, "step") == 0 || strcmp(token, "s") == 0)
     {
-      int oldsr = readword(REG_SR);
-printf("oldsr=%04X\n", oldsr);
-      writeword(REG_SR, 0x8700 | oldsr); // Set trace bit and mask interrupts
-
-      sendcmd(CMD_EXIT, 0);
-      waitack();
-      readdata();
-      readdata();
-printf("SR=%04X\n", readword(REG_SR));
-      writeword(REG_SR, (readword(REG_SR) & 0x00FF) | (oldsr & 0xFF00));
-      showreg(REGADDR);
-      d68k_instr(0);
+      stepcpu(cpu);
+      showreg(cpu);
+      d68k_instr(cpu);
       continue;
     }
 
     if(strcmp(token, "skip") == 0)
     {
-      d68k_skip_instr(0);
-      continue;
-    }
-
-    if(strcmp(token, "substep") == 0 || strcmp(token, "ss") == 0)
-    {
-      substop();
-      subreq();
-      subsetbank(0);
-      int oldsr = readword(SUBREG_SR);
-      writeword(SUBREG_SR, 0x8700 | oldsr); // Set trace bit and mask interrupts
-      subrelease();
-      subgo();
-
-      // Wait for TRACE interrupt on sub CPU
-      usleep(50);
-      while(!(readbyte(0xA1200F) & 0x20));
-
-      subreq();
-      subsetbank(0);
-      writeword(SUBREG_SR, (readword(SUBREG_SR) & 0x00FF) | (oldsr & 0xFF00));
-      showreg(SUBREGADDR);
-      d68k_instr(1);
-      subrelease();
-
-      continue;
-    }
-
-    if(strcmp(token, "subskip") == 0)
-    {
-      submon();
-      subreq();
-      d68k_skip_instr(1);
-      subrelease();
-      subrun();
+      d68k_skip_instr(cpu);
       continue;
     }
 
@@ -1159,75 +766,37 @@ printf("SR=%04X\n", readword(REG_SR));
       int b;
       if(!*l)
       {
-        // List breakpoints
-        for(b = 0; b < MAX_BREAKPOINTS; ++b)
-        {
-          if(breakpoints[b][0] == -1)
-          {
-            break;
-          }
-          printf("Breakpoint at $%06X\n", (u32)breakpoints[b][0]);
-        }
+        list_breakpoints(cpu);
         continue;
       }
       u32 address = parse_int(&l, 12);
-      for(b = 0; b < MAX_BREAKPOINTS; ++b)
-      {
-        if(breakpoints[b][0] == -1)
-        {
-          printf("Put a breakpoint at $%06X\n", address);
-          breakpoints[b][0] = (int)address;
-          breakpoints[b][1] = readword(address);
-          breakpoints[b+1][0] = -1;
-          break;
-        }
-      }
+      set_breakpoint(cpu, address);
       continue;
     }
 
     if(strcmp(token, "delete") == 0)
     {
       u32 address = parse_int(&l, 12);
-      int b;
-      for(b = 0; b < MAX_BREAKPOINTS; ++b)
-      {
-        if(breakpoints[b][0] == -1)
-        {
-          break;
-        }
-        while(breakpoints[b][0] == (int)address)
-        {
-          int nb;
-          for(nb = b; nb < MAX_BREAKPOINTS; ++nb)
-          {
-            if(breakpoints[nb][0] == -1)
-            {
-              break;
-            }
-            breakpoints[nb][0] = breakpoints[nb+1][0];
-            breakpoints[nb][1] = breakpoints[nb+1][1];
-          }
-          printf("Deleted a breakpoint at $%06X\n", address);
-        }
-      }
+      if(delete_breakpoint(cpu, address)) printf("Deleted a breakpoint at $%06X\n", address);
       continue;
     }
 
-    if(strcmp(token, "subreset") == 0)
+    if(strcmp(token, "reset") == 0)
     {
-      subreset();
+      resetcpu(cpu);
       continue;
     }
 
     if(strcmp(token, "bdpdump") == 0)
     {
-      bdpdump = parse_int(&l, 12);
+      int bdpdump = parse_int(&l, 12);
       printf("bdp debug trace %sabled.\n", bdpdump ? "en" : "dis");
+      bdp_set_dump(bdpdump);
       continue;
     }
   } while(0);
-  
+
   signal(SIGINT, SIG_DFL);
-  rl_callback_handler_install("bdb > ", on_line_input);
+  rl_callback_handler_install("bdb %c> ", cpu ? 's' : 'm', on_line_input);
 }
 

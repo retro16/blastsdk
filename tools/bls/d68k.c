@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "bls.h"
+#include "blsparse.h"
 
 void help()
 {
@@ -26,11 +28,11 @@ int main(int argc, char **argv)
   int labels = 0;
   int assemble = 0;
   int instructions = -1;
-  sv_t size = 0xFFFFFFF;
-  sv_t offset = 0;
+  u32 size = 0xFFFFFFF;
+  u32 offset = 0;
   const char *oa;
 
-  int c;  
+  int c;
   while((c = getopt (argc, argv, "aclo:s:i:")) != -1)
   {
     switch(c)
@@ -38,7 +40,7 @@ int main(int argc, char **argv)
       case 'c':
       cycles = 1;
       break;
-      
+
       case 'l':
       labels = 1;
       break;
@@ -46,28 +48,25 @@ int main(int argc, char **argv)
       case 'a':
       assemble = 1;
       break;
-      
+
       case 'o':
-      oa = optarg;
-      offset = parse_int(&oa, 8);
+      offset = parse_int(optarg);
       break;
-      
+
       case 's':
-      oa = optarg;
-      size = parse_int(&oa, 8);
+      size = parse_int(optarg);
       break;
-      
+
       case 'i':
-      oa = optarg;
-      instructions = parse_int(&oa, 8);
+      instructions = parse_int(optarg);
       break;
-      
+
       default:
       help();
       break;
     }
   }
-  
+
   if(argc < optind + 2 || argc > optind + 3)
   {
     help();
@@ -83,8 +82,7 @@ int main(int argc, char **argv)
     labels = 1;
   }
 
-  const char *addrptr = argv[optind + 1];
-  u32 address = parse_int(&addrptr, 10);
+  u32 address = parse_int(argv[optind + 1]);
 
   char infilename[4096];
   strcpy(infilename, argv[optind + 0]);
@@ -117,17 +115,18 @@ int main(int argc, char **argv)
   char *dasm = malloc(size * 40);
 
   int suspicious;
-  int r = d68k(dasm, size * 40, data + offset, size, instructions, address, labels, cycles, &suspicious);
-
-  printf("%s", dasm);
+  int64_t r = d68k(dasm, size * 40, data + offset, size, instructions, address, labels, cycles, &suspicious);
   free(data);
-  free(dasm);
 
-  if(r)
+  if(r < 0)
   {
+    free(dasm);
     fprintf(stderr, "d68k error : %s\n", d68k_error(r));
     return 2;
   }
+
+  printf("%s", dasm);
+  free(dasm);
 
   return 0;
 }

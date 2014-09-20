@@ -34,34 +34,36 @@ TARGET_RAM  equ 2
 ; Mapping :
 ; Bit 7  6  5  4  3  2  1  0
 ;       TH TR TL RT LT DN UP
-;        0  C  B RT LT DN UP
-;        1 ST  A  -  - DN UP
+;        1  C  B RT LT DN UP
+;        0 ST  A  -  - DN UP
 
 ; Game controller lines
 CUP		equ	$01
-BCUP		equ	0
+CUP_BIT		equ	0
 CDOWN		equ	$02
-BCDOWN		equ	1
+CDOWN_BIT		equ	1
 CLEFT		equ	$04
-BCLEFT		equ	2
+CLEFT_BIT		equ	2
 CRIGHT		equ	$08
-BCRIGHT		equ	3
+CRIGHT_BIT		equ	3
 CTL		equ	$10
-BCTL		equ	4
+CTL_BIT		equ	4
 CTR		equ	$20
-BCTR		equ	5
+CTR_BIT		equ	5
 CTH		equ	$40
-BCTH		equ	6
+CTH_BIT		equ	6
 CSEL		equ	CTH
-BCSEL		equ	BCTH
+CSEL_BIT		equ	CTH_BIT
+CSEL_ASTART	equ	0
+CSEL_LRBC	equ	CSEL
 CBTNB		equ	CTL
-BCBTNB		equ	BCTL
+CBTNB_BIT		equ	CTL_BIT
 CBTNA		equ	CTL
-BCBTNA		equ	BCTL
+CBTNA_BIT		equ	CTL_BIT
 CBTNC		equ	CTR
-BCBTNC		equ	BCTR
+CBTNC_BIT		equ	CTR_BIT
 CBTNSTART	equ	CTR
-BCBTNSTART	equ	BCTR
+CBTNSTART_BIT	equ	CTR_BIT
 
 ; CCTRL bits
 CTHINT		equ	$80 ; Enable TH interrupt

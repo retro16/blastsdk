@@ -1,4 +1,5 @@
 #include "bls.h"
+#include <stdio.h>
 
 #ifndef BLAST_AS
 #define BLAST_AS "m68k-elf-as"
@@ -364,7 +365,7 @@ sv_t parse_int(const char **cp, int len)
   }
   if(**cp == '0' && ((*cp)[1] == 'x' || (*cp)[1] == 'X'))
   {
-    *cp += 2; 
+    *cp += 2;
     return parse_hex(cp, 9);
   }
   while(*c)

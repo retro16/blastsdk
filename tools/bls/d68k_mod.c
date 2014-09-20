@@ -159,7 +159,7 @@ struct instr m68k_instr[] =
   {"BSET.B", 0x08C0, 0xFFC0, ope_ims, op1_EA, 1, 4},
   {"BTST.L", 0x0100, 0xF1C0, op2_Dn, op1_EA, 4, 6},
   {"BTST.B", 0x0800, 0xFFC0, ope_ims, op1_EA, 1, 4},
-  
+
   {"CHK.W", 0x4180, 0xF1C0, op1_EA, op2_Dn, 2, 10},
 
   {"CLR.B", 0x4200, 0xFFC0, op1_EA, op_none, 1, 4},
@@ -343,7 +343,7 @@ struct instr m68k_instr[] =
   {"SUBQ.B", 0x5100, 0xF1C0, op2_imm, op1_EA, 1, 4},
   {"SUBQ.W", 0x5140, 0xF1C0, op2_imm, op1_EA, 2, 4},
   {"SUBQ.L", 0x5180, 0xF1C0, op2_imm, op1_EA, 4, 8},
-  
+
   {"TAS", 0x4AC0, 0xFFC0, op1_EA, op_none, 1, 4},
 
   {"TRAP", 0x4E40, 0xFFF0, opo_vect, op_none, 0, 38},
@@ -381,13 +381,18 @@ static u32 baseaddr;
 static iptr op;
 
 static jmp_buf error_jmp;
+
 // Errors returned by longjmp
-const char * d68k_error(int r)
+const char * d68k_error(int64_t r)
 {
+  if(r >= 0)
+  {
+    return "Disassembly successful";
+  }
   switch(r)
   {
-    case 1 : return "Fetched past the end of code";
-    case 2 : return "Not enough space to store disassembled string";
+    case -1 : return "Fetched past the end of code";
+    case -2 : return "Not enough space to store disassembled string";
   }
   return "Invalid error code";
 }
@@ -606,7 +611,7 @@ void print_operand(enum iop ot)
       TPRINTF("CCR");
       cycles += 8;
       break;
-      
+
     case op_sr:
       TPRINTF("SR");
       cycles += 8;
@@ -650,7 +655,7 @@ void print_operand(enum iop ot)
           u >>= 1;
         }
         print_rl(inverse);
-        
+
         u32 bit;
         for(bit = 0; bit < 16; ++bit)
         {
@@ -683,7 +688,7 @@ void print_operand(enum iop ot)
       print_pc_offset(s);
       cycles += 0;
       break;
-    
+
     case opo_dis8v:
       s = opcode;
       signext(&s, 8);
@@ -797,39 +802,39 @@ static void compute_base_cycles()
       cycles = 8;
     }
   }
-  
+
   else if((op->code & 0xF000) == 0x6000) // Bcc
   {
     // Conditional branch
     cycles = 10;
     cyclesmax = op->size == 1 ? -2 : 2; // cyclesmax is difference when branch is not taken
   }
-  
+
   else if((op->code & 0xF0F8) == 0x50C8) // DBcc
   {
     // Decrement and conditional branch
     cycles = 10;
     cyclesmax = 4;
   }
-  
+
   else if((op->code & 0xF1C0) == 0x81C0) // DIVS
   {
     cycles = 126;
     cyclesmax = 14;
   }
-  
+
   else if((op->code & 0xF1C0) == 0x80C0) // DIVU
   {
     cycles = 142;
     cyclesmax = 16;
   }
-  
+
   else if((op->code & 0xF0C0) == 0xC0C0) // MULS/MULU
   {
     cycles = 38;
     cyclesmax = 32;
   }
-  
+
   else if((op->code & 0xF0C0) == 0x50C0) // Scc
   {
     if(op->code >> 3 & 7)
@@ -862,7 +867,7 @@ static void d68k_pass()
     --instructions;
     opcode = fetch(2);
     baseaddr = address;
-    
+
     u32 c;
     for(c = 0; c < (sizeof(m68k_instr) / sizeof(struct instr)); ++c)
     {
@@ -872,7 +877,7 @@ static void d68k_pass()
         continue;
       }
       TPRINTF("%s", op->name);
-      
+
       // Compute cycles
       cycles = op->cycles;
       cyclesmax = 0; // Upper range of cycles
@@ -880,7 +885,7 @@ static void d68k_pass()
       {
         compute_base_cycles();
       }
-      
+
       if(op->op1 != op_none)
       {
         TALIGN(16);
@@ -891,7 +896,7 @@ static void d68k_pass()
         TPRINTF(", ");
         print_operand(op->op2);
       }
-      
+
       if(showcycles)
       {
         TALIGN(40);
@@ -918,7 +923,7 @@ static void d68k_pass()
   }
 }
 
-sv_t d68k(char *_target, int _tsize, const u8 *_code, int _size, int _instructions, sv_t _address, int _labels, int _showcycles, int *_suspicious)
+int64_t d68k(char *_target, int _tsize, const u8 *_code, int _size, int _instructions, u32 _address, int _labels, int _showcycles, int *_suspicious)
 {
   target = _target;
   tsize = _tsize;

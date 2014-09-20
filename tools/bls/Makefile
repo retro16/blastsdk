@@ -29,8 +29,7 @@ BLSPREFIX ?= $(shell dirname $$(dirname $$(which $(BLAST_CC) ) ) )
 
 # Per-source rules
 blsgen: blsgen.o blsgen_gcc.o blsgen_png.o blsgen_img.o blsgen_asmx.o blsconf.o mdconf.o blsaddress.o blspack.o blswrite.o
-blsbuild: blsbuild.o address.o compile.o config.o output.o source.o utils.o img.o
-bdb: bdb.o bdp.o d68k_mod.o symtable.o utils.o binparse.o
+bdb: bdb.o bdp.o d68k_mod.o utils.o binparse.o
 d68k: d68k.o d68k_mod.o symtable.o utils.o
 scdupload: scdupload.o bdp.o utils.o
 d68ktest:
