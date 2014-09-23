@@ -30,7 +30,6 @@ void group_free(group *p)
 }
 
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
-const char target_names[][8] = {"gen", "scd", "ram"};
 
 section *section_new()
 {
@@ -410,7 +409,10 @@ void group_dump(const group *grp, FILE *out)
     fprintf(out, " - optimize %d\n", grp->optimize);
   }
 
-  fprintf(out, " - bus %s\n\n", bus_names[grp->banks.bus]);
+  if(grp->banks.bus < bus_max) {
+    fprintf(out, " - bus %s\n\n", bus_names[grp->banks.bus]);
+  }
+
   int c;
   for(c = 0; c < chip_max; ++c) {
     if(grp->banks.bank[c] != -1) {
@@ -512,7 +514,7 @@ void section_dump(const section *sec, FILE *out)
     fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
     if(sec->symbol->value.addr != -1) {
       fprintf(out, " - addr $%08lX", (uint64_t)sec->symbol->value.addr);
-      if(chipaddr_reachable(sec->symbol->value, &sec->source->banks)) {
+      if(sec->source && chipaddr_reachable(sec->symbol->value, &sec->source->banks)) {
         busaddr ba = chip2bus(sec->symbol->value, sec->source->banks.bus);
         if(ba.addr != -1) {
           fprintf(out, " ($%08X bus=%s bank=%d)", (unsigned int)ba.addr, bus_names[sec->source->banks.bus], ba.bank);

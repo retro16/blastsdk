@@ -371,14 +371,13 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 
   MDCONF_GET_ENUM(mdnode, bus, bus, bin->banks.bus);
   bankreset(&bin->banks);
-  const mdconfnode *banknode;
-  for(banknode = n; (banknode = mdconfsearch(banknode, "bank")); banknode = banknode->next) {
-    const char *bank = strchr(banknode->value, ':');
+  for(n = mdnode; (n = mdconfsearch(n, "bank")); n = n->next) {
+    const char *bank = strchr(n->value, ':');
     if(!bank) continue;
 
     char chipname[8];
-    strncpy(chipname, banknode->value, bank - banknode->value);
-    chipname[bank - banknode->value] = '\0';
+    strncpy(chipname, n->value, bank - n->value);
+    chipname[bank - n->value] = '\0';
     chip chip = chip_parse(chipname);
     if(chip != chip_none) {
       bin->banks.bank[chip] = parse_int(bank);

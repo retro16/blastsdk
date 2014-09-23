@@ -17,9 +17,9 @@ BLSENUM(bus, 8)
 // A chip is a memory space
 typedef enum chip {
   chip_none,
-  chip_mstack, // Pseudo-chip : push data onto main stack.
-  chip_sstack, // Pseudo-chip : push data onto sub stack.
-  chip_zstack, // Pseudo-chip : push data onto z80 stack.
+  chip_mstk, // Pseudo-chip : push data onto main stack.
+  chip_sstk, // Pseudo-chip : push data onto sub stack.
+  chip_zstk, // Pseudo-chip : push data onto z80 stack.
   chip_cart,
   chip_bram, // Optional genesis in-cartridge battery RAM
   chip_zram,

@@ -304,9 +304,9 @@ const char *gen_load_defines_asmx()
 
         switch(sec->symbol->value.chip) {
         case chip_none:
-        case chip_mstack:
-        case chip_sstack:
-        case chip_zstack:
+        case chip_mstk:
+        case chip_sstk:
+        case chip_zstk:
         case chip_cart:
         case chip_bram:
         case chip_pram:

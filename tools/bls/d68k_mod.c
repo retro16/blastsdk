@@ -485,6 +485,7 @@ const char * getdsymat(u32 val)
     {
       if(s->val.chip != chip_none) {
         // Update current bank
+        banks.bus = bc.bus;
         banks.bank[s->val.chip] = bc.bank[s->val.chip];
       }
       return s->name;
@@ -527,6 +528,7 @@ void d68k_readsymbols(const char *filename)
           line[slen - 1] = '\0'; // erase trailing \n
           const char *chip = &line[5];
           skipblanks(&chip);
+          line[9] = '\0';
           chipaddr value = {chip_parse(chip), parse_int(&line[10])};
           setdsym(&line[30], value);
         }
@@ -556,7 +558,7 @@ void print_label(u32 addr)
 void print_pc_offset(int offset)
 {
   u32 a = baseaddr + offset;
-  if(labels && a >= startaddr && a < endaddr)
+  if(labels && ((a >= startaddr && a < endaddr) || getdsymat(a)))
   {
     print_label(a);
   }
@@ -671,13 +673,29 @@ void print_ea(int mode, int reg)
       switch(reg) {
         case 0: { /* xxx.W */
           u32 addr = fetch(2); if(addr >= 0x8000) addr |= 0xFF0000;
-          TPRINTF("$%06X.W", addr);
+          if(labels && addr >= startaddr && addr < endaddr) {
+            print_label(addr);
+          } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
+            // JMP to a known target
+            print_label(addr);
+          } else {
+            TPRINTF("$%06X", addr);
+          }
+          TPRINTF(".W");
           cycles += op->size == 4 ? 12 : 8;
           break;
         }
         case 1: { /* xxx.L */
           u32 addr = fetch(4);
-          TPRINTF("$%06X.L", addr);
+          if(labels && addr >= startaddr && addr < endaddr) {
+            print_label(addr);
+          } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
+            // JMP to a known target
+            print_label(addr);
+          } else {
+            TPRINTF("$%06X", addr);
+          }
+          TPRINTF(".L");
           cycles += op->size == 4 ? 16 : 12;
           break;
         }

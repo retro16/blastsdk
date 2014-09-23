@@ -1,7 +1,8 @@
 #include "blsaddress.h"
 
 const char bus_names[][8] = {"none", "main", "sub", "z80"};
-const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
+const char chip_names[][8] = {"none", "mstk", "sstk", "zstk", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
+const char target_names[][8] = {"unknown", "gen", "scd", "ram"};
 
 target maintarget = target_unknown;
 
@@ -12,8 +13,8 @@ bus find_bus(chip chip)
     case chip_none:
     case chip_max:
     case chip_wram:
-    case chip_sstack:
-    case chip_zstack:
+    case chip_sstk:
+    case chip_zstk:
       return bus_none;
 
     case chip_zram:
@@ -24,7 +25,7 @@ bus find_bus(chip chip)
     case chip_vram:
     case chip_cram:
     case chip_ram:
-    case chip_mstack:
+    case chip_mstk:
       return bus_main;
 
     case chip_pram:
@@ -131,9 +132,9 @@ busaddr chip2bus(chipaddr ca, bus bus)
   ba.bank = -1;
   switch(ca.chip)
   {
-    case chip_mstack:
-    case chip_sstack:
-    case chip_zstack:
+    case chip_mstk:
+    case chip_sstk:
+    case chip_zstk:
       break;
 
     case chip_none:
@@ -270,21 +271,23 @@ target guesstarget(chip chip) {
   switch(chip) {
     case chip_none:
     case chip_max:
-    case chip_mstack:
+    case chip_mstk:
     case chip_vram:
     case chip_ram:
     case chip_cram:
-    case chip_zstack:
+    case chip_zstk:
     case chip_zram:
       break;
     case chip_cart:
     case chip_bram:
+    printf("Guessed GEN target\n");
       return target_gen;
       break;
-    case chip_sstack:
+    case chip_sstk:
     case chip_pram:
     case chip_wram:
     case chip_pcm:
+    printf("Guessed SCD target\n");
       return target_scd;
       break;
   }
@@ -297,21 +300,23 @@ bus guessbus(chip chip) {
     case chip_none:
     case chip_max:
       break;
-    case chip_mstack:
+    case chip_mstk:
     case chip_cart:
     case chip_bram:
     case chip_vram:
     case chip_cram:
     case chip_ram:
+    printf("Guessed MAIN bus\n");
       return bus_main;
       break;
-    case chip_sstack:
+    case chip_sstk:
     case chip_pram:
     case chip_wram:
     case chip_pcm:
+    printf("Guessed SUB bus\n");
       return bus_sub;
       break;
-    case chip_zstack:
+    case chip_zstk:
     case chip_zram:
       return bus_z80;
       break;
@@ -403,20 +408,20 @@ sv chip_size(chip chip)
         return 0xFD00;
       }
       return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
-    case chip_zstack:
+    case chip_zstk:
     case chip_zram:
       return 0x2000;
     case chip_vram:
       return 0x10000;
     case chip_cram:
       return 0x80;
-    case chip_mstack:
+    case chip_mstk:
     case chip_ram:
       if(maintarget != target_gen) {
         return 0xFD00; // Avoid allocating over exception vectors
       }
       return 0xFFB6; // Avoid allocating over monitor CPU state
-    case chip_sstack:
+    case chip_sstk:
     case chip_pram:
       return 0x80000 - 0x6000;
     case chip_wram:
@@ -465,7 +470,7 @@ void chip_align(chipaddr *chip)
       align = 2;
       break;
     case chip_zram:
-    case chip_zstack:
+    case chip_zstk:
       align = 1;
       break;
     case chip_vram:
@@ -475,11 +480,11 @@ void chip_align(chipaddr *chip)
       align = 32;
       break;
     case chip_ram:
-    case chip_mstack:
+    case chip_mstk:
       align = 2;
       break;
     case chip_pram:
-    case chip_sstack:
+    case chip_sstk:
       align = 2;
       break;
     case chip_wram:
@@ -519,12 +524,12 @@ const char *chip_name(chip chip)
      return "wram";
     case chip_pcm:
      return "pcm";
-    case chip_mstack:
-     return "mstack";
-    case chip_sstack:
-     return "sstack";
-    case chip_zstack:
-     return "zstack";
+    case chip_mstk:
+     return "mstk";
+    case chip_sstk:
+     return "sstk";
+    case chip_zstk:
+     return "zstk";
   }
   return "unknown";
 }
