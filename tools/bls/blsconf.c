@@ -90,14 +90,27 @@ group * source_parse(const mdconfnode *n, const char *name) {
   } else if(!n) {
     return s;
   }
+  bankreset(&s->banks);
   s->name = strdupnul(name);
   s->format = format_parse(mdconfget(n, "format"));
   if(s->format == format_auto && s->name) {
     s->format = format_guess(s->name);
   }
 
-  MDCONF_GET_ENUM(n, bus, bus, s->bus);
-  MDCONF_GET_INT(n, bank, s->banks.bank[s->bus]);
+  MDCONF_GET_ENUM(n, bus, bus, s->banks.bus);
+  const mdconfnode *banknode;
+  for(banknode = n; (banknode = mdconfsearch(banknode, "bank")); banknode = banknode->next) {
+    const char *bank = strchr(banknode->value, ':');
+    if(!bank) continue;
+
+    char chipname[8];
+    strncpy(chipname, banknode->value, bank - banknode->value);
+    chipname[bank - banknode->value] = '\0';
+    chip chip = chip_parse(chipname);
+    if(chip != chip_none) {
+      s->banks.bank[chip] = parse_int(bank);
+    }
+  }
 
   switch(s->format) {
     case format_auto:
@@ -136,7 +149,7 @@ section * section_parse_nosrc(const mdconfnode *md, const char *name);
 void output_parse(const mdconfnode *n, const char *name)
 {
   mainout.name = strdupnorm(name, 48);
-  mainout.target = target_parse(mdconfget(n, "target"));
+  maintarget = target_parse(mdconfget(n, "target"));
   /*
   mainout.name = strdupnul(mdconfget(n, "name"));
   if(!mainout.name) mainout.name = strdupnul(n->value);
@@ -155,7 +168,7 @@ void output_parse(const mdconfnode *n, const char *name)
 	{
 		char n[4096];
 		strcpy(n, name);
-		switch(mainout.target)
+		switch(maintarget)
 		{
 			case target_gen:
 				strcat(n, ".bin");
@@ -356,8 +369,21 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 
   int explicitdeps = 0;
 
-  MDCONF_GET_ENUM(mdnode, bus, bus, bin->bus);
-  MDCONF_GET_INT(mdnode, bank, bin->banks.bank[bin->bus]);
+  MDCONF_GET_ENUM(mdnode, bus, bus, bin->banks.bus);
+  bankreset(&bin->banks);
+  const mdconfnode *banknode;
+  for(banknode = n; (banknode = mdconfsearch(banknode, "bank")); banknode = banknode->next) {
+    const char *bank = strchr(banknode->value, ':');
+    if(!bank) continue;
+
+    char chipname[8];
+    strncpy(chipname, banknode->value, bank - banknode->value);
+    chipname[bank - banknode->value] = '\0';
+    chip chip = chip_parse(chipname);
+    if(chip != chip_none) {
+      bin->banks.bank[chip] = parse_int(bank);
+    }
+  }
 
   group *g;
   section *s;
@@ -369,9 +395,8 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
       // Matches an existing file : represents a source
       explicitdeps = 1;
       g = source_parse(n, name);
-      if(bin->bus != bus_none && g->bus == bus_none)
+      if(bin->banks.bus != bus_none && g->banks.bus == bus_none)
       {
-        g->bus = bin->bus;
         g->banks = bin->banks;
       }
       printf("Binary provides source %s\n", g->name);
@@ -391,9 +416,8 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
     explicitdeps = 1;
     const char *name = n->value;
     g = source_parse(NULL, name);
-    if(bin->bus != bus_none && g->bus == bus_none)
+    if(bin->banks.bus != bus_none && g->banks.bus == bus_none)
     {
-      g->bus = bin->bus;
       g->banks = bin->banks;
     }
     printf("Binary provides explicit source %s\n", g->name);
@@ -417,11 +441,10 @@ group * binary_parse(const mdconfnode *mdnode, const char *name) {
 		if(findfile(srcname, name)) {
 			// File exists as-is : binary is a source
 			g = source_parse(NULL, name);
-			if(bin->bus != bus_none && g->bus == bus_none)
-			{
-				g->bus = bin->bus;
-				g->banks = bin->banks;
-			}
+      if(bin->banks.bus != bus_none && g->banks.bus == bus_none)
+      {
+        g->banks = bin->banks;
+      }
 			bin->provides_sources = blsll_insert_group(bin->provides_sources, g);
 		} else {
 			// Try to remove the last extension which may be a section name

@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "bls.h"
+#include "blsaddress.h"
 #include "mdconf.h"
 
 extern BLSLL(group) *sources;
@@ -44,52 +45,6 @@ static inline char * strdupnul(const char *s) {
   return strdup(s);
 }
 
-typedef int64_t sv;
-
-// A bus is an address space viewed from a CPU
-typedef enum bus {
-  bus_none,
-  bus_main,
-  bus_sub,
-  bus_z80,
-  bus_max
-} bus;
-BLSENUM(bus, 8)
-
-typedef struct bankconfig {
-  int bank[bus_max]; // Gives bank based on bus
-} bankconfig;
-
-// A chip is a memory space
-typedef enum chip {
-  chip_none,
-  chip_mstack, // Pseudo-chip : push data onto main stack.
-  chip_sstack, // Pseudo-chip : push data onto sub stack.
-  chip_zstack, // Pseudo-chip : push data onto z80 stack.
-  chip_cart,
-  chip_bram, // Optional genesis in-cartridge battery RAM
-  chip_zram,
-  chip_vram,
-  chip_cram, // Color VRAM
-  chip_ram,
-  chip_pram,
-  chip_wram,
-  chip_pcm,
-  chip_max
-} chip;
-BLSENUM(chip, 8)
-
-typedef struct busaddr {
-  bus bus;
-  sv addr;
-  int bank; // -1 = unknown
-} busaddr;
-
-typedef struct chipaddr {
-  chip chip;
-  sv addr;
-} chipaddr;
-
 typedef enum {
   format_auto, // Guess from extension
   format_empty, // Empty space (do not store)
@@ -103,14 +58,6 @@ typedef enum {
   format_max
 } format;
 BLSENUM(format, 8)
-
-typedef enum target {
-  target_gen,
-  target_scd,
-  target_ram,
-  target_max
-} target;
-BLSENUM(target, 8)
 
 // Sources are groups of sections
 // Binaries are groups of sections
@@ -126,8 +73,7 @@ typedef struct group {
   int physalign; // Alignment on physical medium
 
   int optimize; // Optimization level (used for compilation or compression level)
-  bus bus;
-  bankconfig banks; // Status of banks when using the source
+  bankconfig banks; // Current bus and status of banks when using the source
 
   struct blsll_node_section *provides;
   struct blsll_node_group *provides_sources;
@@ -226,7 +172,7 @@ section * section_find_ext(const char *name, const char *suffix);
 section * section_find_sym(const char *name);
 section * section_find_using(section *section);
 symbol * symbol_find(const char *name);
-sv symbol_get_addr(const char *name);
+sv symbol_get_addr(const char *name, bankconfig *bankconfig);
 chip symbol_get_chip(const char *name);
 group * binary_find(const char *name);
 group * binary_find_sym(const char *name);
@@ -235,8 +181,10 @@ group * binary_find_providing(BLSLL(group) * glist, section *section);
 int sections_overlap(section *s1, section *s2);
 int phys_overlap(element *s1, element *s2);
 
+symbol * symbol_def(BLSLL(symbol) **symlist, char *symname, section *section);
 symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
 symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
+symbol * symbol_set_addr(BLSLL(symbol) **symlist, char *symname, sv value, section *section);
 
 void *merge_lists(void *target, void *source);
 

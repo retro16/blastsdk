@@ -1,5 +1,9 @@
 #include "blsaddress.h"
 
+const char bus_names[][8] = {"none", "main", "sub", "z80"};
+const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
+
+target maintarget = target_unknown;
 
 bus find_bus(chip chip)
 {
@@ -43,7 +47,7 @@ chipaddr bus2chip(busaddr ba)
       return ca;
 
     case bus_main:
-      if(mainout.target == target_gen && ba.addr >= 0 && ba.addr < 0x400000)
+      if(maintarget == target_gen && ba.addr >= 0 && ba.addr < 0x400000)
       {
         ca.chip = chip_cart;
         ca.addr = ba.addr;
@@ -67,7 +71,7 @@ chipaddr bus2chip(busaddr ba)
           ca.addr = ba.addr - 0x200000;
           return ca;
       }
-      if(mainout.target == target_scd)
+      if(maintarget == target_scd)
       {
         if(ba.addr >= 0x020000 && ba.addr < 0x040000 && ba.bank >= 0 && ba.bank <= 3)
         {
@@ -138,7 +142,7 @@ busaddr chip2bus(chipaddr ca, bus bus)
       return ba;
     case chip_cart:
       if(ca.addr < 0 || ca.addr >= MAXCARTSIZE) break;
-      if(mainout.target == target_ram)
+      if(maintarget == target_ram)
       {
         if(ca.addr >= 0x00FD00)
         {
@@ -215,8 +219,9 @@ busaddr chip2bus(chipaddr ca, bus bus)
         default:
           break;
         case bus_main:
-          switch(mainout.target)
+          switch(maintarget)
           {
+            case target_unknown:
             case target_max:
               break;
             case target_gen:
@@ -249,9 +254,115 @@ busaddr translate(busaddr busaddr, bus target)
   return chip2bus(bus2chip(busaddr), target);
 }
 
+chipaddr bank2chip(const bankconfig *bankconfig, sv addr)
+{
+  // Find the chip contining addr
+  busaddr ba = {bankconfig->bus, addr, 0};
+  chipaddr ca = bus2chip(ba);
+
+  // Use current bankconfig based on chip to return the real address
+  ba.bank = bankconfig->bank[ca.chip];
+  return bus2chip(ba);
+}
+
+target guesstarget(chip chip) {
+  // Try to guess target from chip
+  switch(chip) {
+    case chip_none:
+    case chip_max:
+    case chip_mstack:
+    case chip_vram:
+    case chip_ram:
+    case chip_cram:
+    case chip_zstack:
+    case chip_zram:
+      break;
+    case chip_cart:
+    case chip_bram:
+      return target_gen;
+      break;
+    case chip_sstack:
+    case chip_pram:
+    case chip_wram:
+    case chip_pcm:
+      return target_scd;
+      break;
+  }
+  return target_unknown;
+}
+
+bus guessbus(chip chip) {
+  // Try to guess bus from chip
+  switch(chip) {
+    case chip_none:
+    case chip_max:
+      break;
+    case chip_mstack:
+    case chip_cart:
+    case chip_bram:
+    case chip_vram:
+    case chip_cram:
+    case chip_ram:
+      return bus_main;
+      break;
+    case chip_sstack:
+    case chip_pram:
+    case chip_wram:
+    case chip_pcm:
+      return bus_sub;
+      break;
+    case chip_zstack:
+    case chip_zram:
+      return bus_z80;
+      break;
+  }
+  return bus_none;
+}
+
+sv chip2bank(chipaddr chipaddr, bankconfig *bankconfig)
+{
+  if(chipaddr.chip == chip_none) {
+    // Simple value, no bus information
+    return chipaddr.addr;
+  }
+  if(maintarget == target_unknown) {
+    maintarget = guesstarget(chipaddr.chip);
+  }
+  if(bankconfig->bus == bus_none) {
+    bankconfig->bus = guessbus(chipaddr.chip);
+  }
+  if(bankconfig->bus == bus_none) {
+    return -1;
+  }
+  busaddr ba = chip2bus(chipaddr, bankconfig->bus);
+  if(ba.bank != -1 && chipaddr.chip != chip_none) {
+    bankconfig->bank[chipaddr.chip] = ba.bank;
+  }
+  return ba.addr;
+}
+
+void bankreset(bankconfig *bankconfig)
+{
+  bankconfig->bus = -1;
+  unsigned int i;
+  for(i = 0; i < chip_max; ++i) {
+    bankconfig->bank[i] = -1;
+  }
+}
+
+int chipaddr_reachable(chipaddr chipaddr, const bankconfig *bankconfig)
+{
+  if(bankconfig->bus == bus_none || chipaddr.chip == chip_none) return 0;
+
+  busaddr ba = chip2bus(chipaddr, bankconfig->bus);
+  if(ba.addr == -1) return 0; // chipaddr ouside chip
+  if(ba.bank == -1) return 1; // no bank switch
+  return ba.bank == bankconfig->bank[chipaddr.chip];
+}
+
 sv physoffset()
 {
-  if(mainout.target == target_ram)
+  if(maintarget == target_ram)
   {
     return 0xFF0000;
   }
@@ -261,7 +372,7 @@ sv physoffset()
 
 sv chip_start(chip chip)
 {
-  if(chip == chip_cart && mainout.target != target_ram)
+  if(chip == chip_cart && maintarget != target_ram)
   {
     return ROMHEADERSIZE;
   }
@@ -288,7 +399,7 @@ sv chip_size(chip chip)
     case chip_max:
       return -1;
     case chip_cart:
-      if(mainout.target == target_ram) {
+      if(maintarget == target_ram) {
         return 0xFD00;
       }
       return MAXCARTSIZE - ROMHEADERSIZE; // Avoid allocating over ROM header
@@ -301,7 +412,7 @@ sv chip_size(chip chip)
       return 0x80;
     case chip_mstack:
     case chip_ram:
-      if(mainout.target != target_gen) {
+      if(maintarget != target_gen) {
         return 0xFD00; // Avoid allocating over exception vectors
       }
       return 0xFFB6; // Avoid allocating over monitor CPU state
@@ -461,7 +572,7 @@ sv tilemap_addr8(sv addr, sv width)
 
 chipaddr phys2chip(sv physaddr)
 {
-  switch(mainout.target)
+  switch(maintarget)
   {
     case target_gen:
       {
@@ -490,7 +601,7 @@ busaddr phys2bus(sv physaddr, bus bus)
 
 sv chip2phys(chipaddr ca)
 {
-  switch(mainout.target)
+  switch(maintarget)
   {
     case target_ram:
       if(ca.chip == chip_ram || ca.chip == chip_cart)

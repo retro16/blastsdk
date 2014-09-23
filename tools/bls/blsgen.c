@@ -29,8 +29,6 @@ void group_free(group *p)
   free(p);
 }
 
-const char bus_names[][8] = {"none", "main", "sub", "z80"};
-const char chip_names[][8] = {"none", "mstack", "sstack", "zstack", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
 const char format_names[][8] = {"auto", "empty", "zero", "raw", "asmx", "sdcc", "gcc", "as", "png"};
 const char target_names[][8] = {"gen", "scd", "ram"};
 
@@ -157,11 +155,11 @@ symbol *symbol_find(const char *name)
   return NULL;
 }
 
-sv symbol_get_addr(const char *name)
+sv symbol_get_addr(const char *name, bankconfig *bankconfig)
 {
   symbol *sym = symbol_find(name);
   if(!sym) return -1;
-  return sym->value.addr;
+  return chip2bank(sym->value, bankconfig);
 }
 
 chip symbol_get_chip(const char *name)
@@ -364,9 +362,21 @@ symbol *symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, secti
   return s;
 }
 
+symbol *symbol_def(BLSLL(symbol) **symlist, char *symname, section *section)
+{
+  chipaddr ca = {chip_none, -1};
+  return symbol_set(symlist, symname, ca, section);
+}
+
 symbol *symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section)
 {
   chipaddr ca = bus2chip(value);
+  return symbol_set(symlist, symname, ca, section);
+}
+
+symbol *symbol_set_addr(BLSLL(symbol) **symlist, char *symname, sv value, section *section)
+{
+  chipaddr ca = bank2chip(&section->source->banks, value);
   return symbol_set(symlist, symname, ca, section);
 }
 
@@ -400,7 +410,13 @@ void group_dump(const group *grp, FILE *out)
     fprintf(out, " - optimize %d\n", grp->optimize);
   }
 
-  fprintf(out, " - bus %s\n - bank %d\n", bus_names[grp->bus], grp->banks.bank[grp->bus]);
+  fprintf(out, " - bus %s\n\n", bus_names[grp->banks.bus]);
+  int c;
+  for(c = 0; c < chip_max; ++c) {
+    if(grp->banks.bank[c] != -1) {
+      fprintf(out, " - bank %s:%u\n", chip_names[c], grp->banks.bank[c]);
+    }
+  }
 
   if(grp->provides) {
     secl = grp->provides;
@@ -496,10 +512,10 @@ void section_dump(const section *sec, FILE *out)
     fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
     if(sec->symbol->value.addr != -1) {
       fprintf(out, " - addr $%08lX", (uint64_t)sec->symbol->value.addr);
-      if(sec->source && sec->source->bus != bus_none) {
-        busaddr ba = chip2bus(sec->symbol->value, sec->source->bus);
+      if(chipaddr_reachable(sec->symbol->value, &sec->source->banks)) {
+        busaddr ba = chip2bus(sec->symbol->value, sec->source->banks.bus);
         if(ba.addr != -1) {
-          fprintf(out, " ($%08X bus=%s bank=%d)", (unsigned int)ba.addr, bus_names[sec->source->bus], ba.bank);
+          fprintf(out, " ($%08X bus=%s bank=%d)", (unsigned int)ba.addr, bus_names[sec->source->banks.bus], ba.bank);
         }
       }
       fprintf(out, "\n");
@@ -563,14 +579,14 @@ void section_dump(const section *sec, FILE *out)
 
 void output_dump(FILE *out)
 {
-  fprintf(out, " - target %s\n", target_names[mainout.target]);
+  fprintf(out, " - target %s\n", target_names[maintarget]);
   if(mainout.region) {
     fprintf(out, " - region %s\n", mainout.region);
   }
   if(mainout.file) {
     fprintf(out, " - file `%s`\n", mainout.file);
   }
-  if(mainout.target == target_scd) {
+  if(maintarget == target_scd) {
     if(mainout.ip) {
       fprintf(out, " - ip `%s`\n", mainout.ip->name);
     }
@@ -695,7 +711,7 @@ void gen_bol(group *bin)
 
 void bls_gen_bol()
 {
-  if(mainout.target == target_scd) {
+  if(maintarget == target_scd) {
     gen_bol(mainout.ipbin);
     gen_bol(mainout.spbin);
   } else {
@@ -730,7 +746,7 @@ bls_check_binary_load_bin_ok:
 
 void bls_find_entry()
 {
-  switch(mainout.target) {
+  switch(maintarget) {
     default:
     {
       mainout.entry = symbol_find("MAIN");
@@ -890,9 +906,9 @@ void bls_get_symbols()
     strcat(s, "_PHYSSIZE");
     symbol_set(&sec->intsym, s, nullca, sec);
 
-    if(mainout.target != target_scd)
+    if(maintarget != target_scd)
     {
-      nullca.chip = mainout.target == target_ram ? chip_ram : chip_cart;
+      nullca.chip = maintarget == target_ram ? chip_ram : chip_cart;
     }
     strcpy(s, sec->symbol->name);
     strcat(s, "_PHYS");
@@ -1067,7 +1083,7 @@ void bls_map()
 
   printf("Map logical addresses.\n");
 
-  if(mainout.target == target_scd) {
+  if(maintarget == target_scd) {
     // Map IP and SP first, to pack them as tightly as possible in RAM
 
     secl = mainout.ipbin->provides;
@@ -1106,7 +1122,7 @@ void bls_physmap_cart()
       sec->physaddr = -1;
       continue;
     }
-    if(sec->symbol->value.chip == chip_cart || (mainout.target == target_ram && sec->symbol->value.chip == chip_ram)) {
+    if(sec->symbol->value.chip == chip_cart || (maintarget == target_ram && sec->symbol->value.chip == chip_ram)) {
       // Section on cartridge are already mapped
       sec->physaddr = chip2phys(sec->symbol->value);
       if(sec->physaddr < chipstart || sec->physaddr + sec->physsize > chipend)
@@ -1331,7 +1347,7 @@ void bls_finalize_binary_dependencies()
     }
   }
 
-  if(mainout.target == target_ram)
+  if(maintarget == target_ram)
   {
     // Remap all cart symbols to ram
     BLSLL(symbol) *syml = symbols;
@@ -1344,7 +1360,7 @@ void bls_finalize_binary_dependencies()
     }
   }
 
-  if(mainout.target != target_scd)
+  if(maintarget != target_scd)
   {
     if(!mainout.mainstack)
     {
@@ -1500,7 +1516,7 @@ void bls_pack_sections()
 
 void bls_build_genesis_header(FILE *f)
 {
-  if(mainout.target == target_gen)
+  if(maintarget == target_gen)
   {
     if(mainout.region && mainout.region[0] == 'U')
     {
@@ -1511,11 +1527,11 @@ void bls_build_genesis_header(FILE *f)
       fprintf(f, "SEGA MEGA DRIVE ");
     }
   }
-  else if(mainout.target == target_ram)
+  else if(maintarget == target_ram)
   {
       fprintf(f, "SEGA RAM PROGRAM");
   }
-  else if(mainout.target == target_scd)
+  else if(maintarget == target_scd)
   {
     fprintf(f, "SEGA CD         ");
   }
@@ -1727,7 +1743,7 @@ void bls_build_cart_image()
     fclose(i);
   }
 
-  if(mainout.target == target_ram)
+  if(maintarget == target_ram)
   {
     fseek(f, 0, SEEK_END);
     sv i;
@@ -1763,7 +1779,7 @@ void bls_build_cart_image()
   fputaddr(stk, bus_main, f);
 
   // Write entry point
-  if(mainout.target == target_ram)
+  if(maintarget == target_ram)
   {
     fputlong(0x00000C0 + ramloader_padding, f); // Boot on RAM loader
   }
@@ -1814,7 +1830,7 @@ void bls_build_cart_image()
   INTVECT(TRAP13)
   INTVECT(TRAP14)
   INTVECT(TRAP15) // 0xBC
-  if(mainout.target == target_ram)
+  if(maintarget == target_ram)
   {
     // Embed RAM loader in reserved interrupt vectors
 
@@ -1922,15 +1938,12 @@ void tmpdir(char *out, const char *f)
   sprintf(out, BUILDDIR "/%s", f);
 }
 
-void confdump()
+void output_dump_cart(FILE *f)
 {
-  FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
-  blsconf_dump(f); // Dump full configuration for reference and debugging
   // Dump physical mapping
-
   fprintf(f, "\n----------------------------------------\n\nOutput map\n==========\n\n    offset   size     section\n");
 
-  BLSLL(section) *secl = sections;
+  BLSLL(section) *secl = usedsections;
   section *sec;
   BLSLL_FOREACH(sec, secl) {
     if(sec->physaddr == -1 || sec->physsize == 0) continue;
@@ -1947,7 +1960,53 @@ void confdump()
 
     fclose(i);
   }
+}
 
+void output_dump_cd(FILE *f)
+{
+  // Dump physical mapping
+  fprintf(f, "\n----------------------------------------\n\nOutput map\n==========\n\n    offset   size     binary\n");
+
+  BLSLL(group) *binl = usedbinaries;
+  group *bin;
+  BLSLL_FOREACH(bin, binl) {
+    if(bin->physaddr == -1 || bin->physsize == 0) continue;
+
+    char inname[4096];
+    snprintf(inname, 4096, BUILDDIR"/%s.binary.phy", bin->name);
+    FILE *i = fopen(inname, "r");
+    if(!i) {
+      continue;
+    }
+
+    fseek(i, 0, SEEK_END);
+    fprintf(f, "    %08X %08X%s %s\n", (unsigned int)bin->physaddr, (unsigned int)bin->physsize, bin->physsize != ftell(i) ? " (wrong)" : "", bin->name);
+
+    BLSLL(section) *secl = bin->provides;
+    section *sec;
+    u32 offset = 0;
+    BLSLL_FOREACH(sec, secl) {
+      if(sec->physsize <= 0) continue;
+      fprintf(f, "     -> %08X %08X %s\n", offset, (unsigned int)sec->physsize, sec->name);
+      offset += sec->physsize;
+      if(sec->physsize & 1) {
+        ++offset;
+      }
+    }
+
+    fclose(i);
+  }
+}
+
+void confdump()
+{
+  FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
+  blsconf_dump(f); // Dump full configuration for reference and debugging
+  if(maintarget == target_scd) {
+    output_dump_cd(f);
+  } else {
+    output_dump_cart(f);
+  }
   fclose(f);
 }
 
@@ -1973,14 +2032,14 @@ int main(int argc, char **argv)
   bls_find_entry();
   bls_gen_bol();
   bls_check_binary_load();
-  if(mainout.target != target_gen) {
+  if(maintarget != target_gen) {
     bls_cart_to_ram();
   }
   bls_get_symbols(); // Get binary size with correct binary load
   bls_map();
   bls_get_symbol_values();
   bls_compile(); // Compile with most values to get a good approximation of file sizes
-  if(mainout.target != target_scd) {
+  if(maintarget != target_scd) {
     bls_pack_sections(); // Pack once to find physical size for all files
     bls_physmap_cart(); // Map physical cartridge image
     bls_compile(); // Recompile with physical addresses

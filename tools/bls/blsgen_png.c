@@ -63,9 +63,9 @@ void section_create_png(group *source, const mdconfnode *mdconf)
   s->source = source;
   s->align = 0x2000;
 
-  if(source->bus == bus_none && mainout.target != target_scd) {
+  if(source->banks.bus == bus_none && maintarget != target_scd) {
     // For genesis, default to main bus
-    source->bus = bus_main;
+    source->banks.bus = bus_main;
   }
 }
 
@@ -120,7 +120,7 @@ void source_premap_png(group *s)
   section *map = section_find_ext(s->name, ".map");
 
   if(img->symbol->value.chip == chip_none) {
-    switch(s->bus) {
+    switch(s->banks.bus) {
     case bus_none:
     case bus_max:
       break;
@@ -135,7 +135,7 @@ void source_premap_png(group *s)
   }
 
   if(pal->symbol->value.chip == chip_none) {
-    switch(s->bus) {
+    switch(s->banks.bus) {
     case bus_none:
     case bus_max:
       break;
@@ -150,7 +150,7 @@ void source_premap_png(group *s)
   }
 
   if(map->symbol->value.chip == chip_none) {
-    switch(s->bus) {
+    switch(s->banks.bus) {
     case bus_none:
     case bus_max:
       break;

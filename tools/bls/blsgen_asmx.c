@@ -17,27 +17,27 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
   if(strstr(s->name, "_ram.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_ram;
     if(s->format == format_auto) s->format = format_empty;
-    if(source->bus == bus_none) source->bus = bus_main;
+    if(source->banks.bus == bus_none) source->banks.bus = bus_main;
   }
   else if(strstr(s->name, "_cart.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_cart;
-    if(source->bus == bus_none) source->bus = bus_main;
+    if(source->banks.bus == bus_none) source->banks.bus = bus_main;
   }
   else if(strstr(s->name, "_pram.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_pram;
-    if(source->bus == bus_none) source->bus = bus_sub;
+    if(source->banks.bus == bus_none) source->banks.bus = bus_sub;
   }
   else if(strstr(s->name, "_wram.asm.bin")) {
     if(s->symbol->value.chip == chip_none) s->symbol->value.chip = chip_wram;
-    if(source->bus == bus_none) source->bus = bus_sub;
+    if(source->banks.bus == bus_none) source->banks.bus = bus_sub;
   }
-  else if(source->bus == bus_none && mainout.target != target_scd) {
+  else if(source->banks.bus == bus_none && maintarget != target_scd) {
     // For genesis, default to main bus
-    source->bus = bus_main;
+    source->banks.bus = bus_main;
   }
 }
 
-static void gen_symtable_section_asmx(FILE *out, const section *s, bus bus)
+static void gen_symtable_section_asmx(FILE *out, const section *s)
 {
   const BLSLL(symbol) *syml = s->extsym;
   const symbol *sym;
@@ -50,8 +50,8 @@ static void gen_symtable_section_asmx(FILE *out, const section *s, bus bus)
       printf("Warning : Undefined symbol needed by %s : %s\n", s->name, sym->name);
       continue;
     }
-    busaddr ba = chip2bus(sym->value, bus);
-    fprintf(out, "%s\tEQU\t$%08X;\n", sym->name, (uint32_t)ba.addr);
+    sv addr = chip2bank(sym->value, &s->source->banks);
+    fprintf(out, "%s\tEQU\t$%08X;\n", sym->name, (uint32_t)addr);
   }
 }
 
@@ -63,7 +63,7 @@ static void gen_symtable_asmx(const group *s)
   snprintf(symfile, 4096, BUILDDIR"/%s.sym", s->name);
   FILE *f = fopen(symfile, "w");
 
-  gen_symtable_section_asmx(f, sec, s->bus);
+  gen_symtable_section_asmx(f, sec);
 
   fclose(f);
 }
@@ -87,16 +87,16 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       if(strncasecmp("ORG", c, 3) == 0 && c[3] <= ' ')
       {
         // first ORG declaration : map to address
-        if(src->bus == bus_none) {
+        if(src->banks.bus == bus_none) {
           // Guess bus based on context
-          if(mainout.target == target_scd && address < 0xA00000) {
-            src->bus = bus_sub;
+          if(maintarget == target_scd && address < 0xA00000) {
+            src->banks.bus = bus_sub;
           } else {
-            src->bus = bus_main;
+            src->banks.bus = bus_main;
           }
         }
         busaddr ba;
-        ba.bus = src->bus;
+        ba.bus = src->banks.bus;
         ba.addr = address;
         ba.bank = -1;
         chipaddr ca = bus2chip(ba);
@@ -153,7 +153,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       sv binend = parse_hex(line);
       if(sec->symbol->value.addr != -1)
       {
-        sec->size = binend - chip2bus(sec->symbol->value, src->bus).addr;
+        sec->size = binend - chip2bus(sec->symbol->value, src->banks.bus).addr;
       }
       else
       {
@@ -179,14 +179,11 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       sv symval = parse_hex_skip(&c);
       if(*c == '\n' || !*c)
       {
-				busaddr busaddr = {src->bus, symval, src->banks.bank[src->bus]};
-        if(!setvalues)
-        {
-					busaddr.bus = bus_none;
-					busaddr.addr = -1;
-					busaddr.bank = -1;
-				}
-				symbol_set_bus(&sec->intsym, sym, busaddr, sec);
+        if(!setvalues) {
+          symbol_def(&sec->intsym, sym, sec);
+				} else {
+  				symbol_set_addr(&sec->intsym, sym, symval, sec);
+        }
         continue;
       }
       if(*c != ' ')
@@ -209,14 +206,11 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 					{
 					  break; // Do not touch external symbols
 					}
-					busaddr busaddr = {src->bus, symval, src->banks.bank[src->bus]};
-					if(!setvalues)
-					{
-						busaddr.bus = bus_none;
-						busaddr.addr = -1;
-						busaddr.bank = -1;
-					}
-					symbol_set_bus(&sec->intsym, sym, busaddr, sec);
+					if(!setvalues) {
+  					symbol_def(&sec->intsym, sym, sec);
+					} else {
+  					symbol_set_addr(&sec->intsym, sym, symval, sec);
+          }
           break;
 				}
         case 'U':
@@ -229,8 +223,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 					}
 					else
 					{
-						chipaddr unknown = {chip_none, -1};
-						symbol_set(&sec->extsym, sym, unknown, NULL);
+						symbol_def(&sec->extsym, sym, NULL);
 						printf("%s unknown\n", sym);
 					}
           break;
@@ -273,7 +266,7 @@ const char *gen_load_defines_asmx()
     char binname[1024];
     getsymname(binname, bin->name);
     fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO\n", binname);
-    if(mainout.target == target_scd) {
+    if(maintarget == target_scd) {
       // Begin SCD transfer
       // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
 //      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
@@ -333,7 +326,7 @@ const char *gen_load_defines_asmx()
           fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
           break;
         case chip_ram:
-          if(mainout.target != target_ram && ba.addr != physba.addr)
+          if(maintarget != target_ram && ba.addr != physba.addr)
           {
             fprintf(out, "\tBLSFASTCOPY_ALIGNED\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
           }
@@ -361,13 +354,13 @@ void source_get_symbols_asmx(group *s)
   }
 
   section *sec = section_find_ext(s->name, ".bin");
-  busaddr org = {s->bus, 0x40000, -1};
-  if(s->bus != bus_none && sec && sec->symbol && sec->symbol->value.addr != -1)
+  sv org = 0x40000;
+  if(s->banks.bus != bus_none && sec && sec->symbol && sec->symbol->value.addr != -1)
   {
-    org = chip2bus(sec->symbol->value, s->bus);
+    org = chip2bank(sec->symbol->value, &s->banks);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l "BUILDDIR"/%s.lst -o /dev/null %s", (unsigned int)org.addr, include_prefixes, defs, s->bus, mainout.target, mainout.target, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l "BUILDDIR"/%s.lst -o /dev/null %s", (unsigned int)org, include_prefixes, defs, s->banks.bus, maintarget, maintarget, s->name, srcname);
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
   snprintf(cmdline, 4096, "cp "BUILDDIR"/%s.lst "BUILDDIR"/%s.lst.1", s->name, s->name);
@@ -391,9 +384,9 @@ void source_compile_asmx(group *s)
   }
 
   section *sec = section_find_ext(s->name, ".bin");
-  busaddr org = chip2bus(sec->symbol->value, s->bus);
+  sv org = chip2bank(sec->symbol->value, &s->banks);
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i %s -d BUS:=%d -d SCD:=%d -d TARGET:=%d -i bls.inc -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org.addr, include_prefixes, defs, s->bus, mainout.target, mainout.target, s->name, s->name, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i %s -d BUS:=%d -d SCD:=%d -d TARGET:=%d -i bls.inc -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org, include_prefixes, defs, s->banks.bus, maintarget, maintarget, s->name, s->name, s->name, srcname);
   printf("\n\nSecond pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
 
@@ -411,12 +404,12 @@ void source_premap_asmx(group *src)
   section *sec = section_find_ext(src->name, ".bin");
 
   if(sec->symbol->value.chip == chip_none) {
-    switch(src->bus) {
+    switch(src->banks.bus) {
     case bus_none:
     case bus_max:
       break;
     case bus_main:
-      if(mainout.target == target_scd) {
+      if(maintarget == target_scd) {
         sec->symbol->value.chip = chip_ram;
       } else {
         sec->symbol->value.chip = chip_cart;

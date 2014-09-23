@@ -52,6 +52,9 @@ const char * sections_cat(group *bin, const char *binname)
     i = fopen(secfile, "rb");
     filecat(i, o);
     sec->physsize = ftell(i);
+    if(sec->physsize & 1) {
+      fputc('\x00', o); // Align sections to word in binary
+    }
     fclose(i);
   }
 

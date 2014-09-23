@@ -11,9 +11,9 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
   (void)mdconf;
   section *s;
 
-  if(source->bus == bus_none && mainout.target != target_scd) {
+  if(source->banks.bus == bus_none && maintarget != target_scd) {
     // For genesis, default to main bus
-    source->bus = bus_main;
+    source->banks.bus = bus_main;
   }
 
   // Generate the .text section
@@ -46,7 +46,7 @@ const char *objcopy = "m68k-elf-objcopy";
 const char *objdump = "m68k-elf-objdump";
 
 
-static void gen_symtable_section(FILE *out, const section *s, bus bus)
+static void gen_symtable_section(FILE *out, const section *s)
 {
   const BLSLL(symbol) *syml = s->extsym;
   const symbol *sym;
@@ -59,9 +59,9 @@ static void gen_symtable_section(FILE *out, const section *s, bus bus)
       printf("Warning : Undefined symbol needed by %s : %s\n", s->name, sym->name);
       continue;
     }
-    busaddr ba = chip2bus(sym->value, bus);
-    fprintf(out, "%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
-    printf("%s = 0x%08X;\n", sym->name, (uint32_t)ba.addr);
+    sv addr = chip2bank(sym->value, &s->source->banks);
+    fprintf(out, "%s = 0x%08X;\n", sym->name, (uint32_t)addr);
+    printf("%s = 0x%08X;\n", sym->name, (uint32_t)addr);
   }
 }
 
@@ -87,9 +87,9 @@ static void gen_symtable(const group *s)
 
   fprintf(f, "BLAST_DUMMY_LINE_XXXXXXXXXX_ = 0x00000000;\n");
 
-  gen_symtable_section(f, text, s->bus);
-  gen_symtable_section(f, data, s->bus);
-  gen_symtable_section(f, bss, s->bus);
+  gen_symtable_section(f, text);
+  gen_symtable_section(f, data);
+  gen_symtable_section(f, bss);
 
   fclose(f);
 }
@@ -175,7 +175,6 @@ static section * extract_section_elf(const group *src, const char *name, unsigne
 void parse_symtable_dump(section *s, FILE *in, int setvalues)
 {
   const char *sname = strrchr(s->name, '.');
-  chipaddr unknown = {chip_none, -1};
   while(!feof(in)) {
     char line[1024];
     fgets(line, 1024, in);
@@ -194,13 +193,6 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
     skipblanks(&c);
     parse_sym(symname, &c);
 
-    busaddr busaddr = {s->source->bus, addr, s->source->banks.bank[s->source->bus]};
-    if(!setvalues) {
-      busaddr.bus = bus_none;
-      busaddr.addr = -1;
-      busaddr.bank = -1;
-    }
-
     if(sname[0] == '.' && sname[1] == 't' && strncmp(line + 17, "*UND*", 5) == 0)
     {
       // Undefined (extern) symbol, referenced in text section
@@ -212,7 +204,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
       }
       else
       {
-        symbol_set(&s->extsym, symname, unknown, NULL);
+        symbol_def(&s->extsym, symname, NULL);
         printf("%s unknown\n", symname);
       }
       continue;
@@ -222,7 +214,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
 
     if(strncmp(line + 17, sname, strlen(sname)) != 0) continue;
 
-    symbol_set_bus(&s->intsym, symname, busaddr, s);
+    symbol_set_addr(&s->intsym, symname, addr, s);
     s->extsym = blsll_insert_unique_symbol(s->extsym, symbol_find(symname));
     printf("%s = %08X\n", symname, (unsigned int)addr);
   }
@@ -297,7 +289,7 @@ const char *gen_load_defines()
     char binname[1024];
     getsymname(binname, bin->name);
     fprintf(out, "#define %s%s() do { ", binary_load_function, binname);
-    if(mainout.target == target_scd) {
+    if(maintarget == target_scd) {
       // Begin SCD transfer
       // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
 //      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
@@ -350,7 +342,7 @@ const char *gen_load_defines()
           fprintf(out, "blsvdp_set_cram(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)sec->size);
           break;
         case chip_ram:
-          if(mainout.target != target_ram)
+          if(maintarget != target_ram)
           {
             fprintf(out, "blsfastcopy_word(0x%08X, 0x%08X, 0x%08X);", (unsigned int)ba.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)((sec->size + 1) / 2));
           }
@@ -441,9 +433,9 @@ void source_get_symbols_gcc(group *s)
   pclose(f);
 
   if(is_asm(s)) {
-    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, srcname, object);
+    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, srcname, object);
   } else {
-    snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->bus, mainout.target, defs, srcname, object);
+    snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->banks.bus, maintarget, defs, srcname, object);
   }
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
@@ -476,9 +468,9 @@ void source_get_symbol_values_gcc(group *s)
   const char *defs = gen_load_defines();
 
   if(is_asm(s)) {
-    snprintf(cmdline, 1024, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->bus, mainout.target, srcname, object);
+    snprintf(cmdline, 1024, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->banks.bus, maintarget, srcname, object);
   } else {
-    snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
+    snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, defs, cflags, srcname, object);
   }
   printf("Compile %s with load defines :\n%s\n", s->name, cmdline);
   system(cmdline);
@@ -488,9 +480,9 @@ void source_get_symbol_values_gcc(group *s)
   section *bss = section_find_ext(s->name, ".bss");
 
   // Link to get internal symbols
-  busaddr textba = chip2bus(text->symbol->value, s->bus);
-  busaddr databa = chip2bus(data->symbol->value, s->bus);
-  busaddr bssba = chip2bus(bss->symbol->value, s->bus);
+  busaddr textba = chip2bus(text->symbol->value, s->banks.bus);
+  busaddr databa = chip2bus(data->symbol->value, s->banks.bus);
+  busaddr bssba = chip2bus(bss->symbol->value, s->banks.bus);
   snprintf(cmdline, 1024, "%s %s -r %s -o %s", ld, ldflags, object, elf);
   printf("Get internal symbol values from %s :\n%s\n", s->name, cmdline);
   system(cmdline);
@@ -517,9 +509,9 @@ void source_compile_gcc(group *s)
   const char *defs = gen_load_defines();
 
   if(is_asm(s)) {
-    snprintf(cmdline, 4096, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->bus, mainout.target, srcname, object);
+    snprintf(cmdline, 4096, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->banks.bus, maintarget, srcname, object);
   } else {
-    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->bus, mainout.target, defs, cflags, srcname, object);
+    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, defs, cflags, srcname, object);
   }
   printf("Final compilation of %s :\n%s\n", s->name, cmdline);
   system(cmdline);
@@ -531,9 +523,9 @@ void source_compile_gcc(group *s)
   gen_symtable(s);
 
   // Link at final address
-  busaddr textba = chip2bus(text->symbol->value, s->bus);
-  busaddr databa = chip2bus(data->symbol->value, s->bus);
-  busaddr bssba = chip2bus(bss->symbol->value, s->bus);
+  busaddr textba = chip2bus(text->symbol->value, s->banks.bus);
+  busaddr databa = chip2bus(data->symbol->value, s->banks.bus);
+  busaddr bssba = chip2bus(bss->symbol->value, s->banks.bus);
   snprintf(cmdline, 1024, "%s %s -Ttext=0x%08X -Tdata=0x%08X -Tbss=0x%08X -R "BUILDDIR"/%s.sym %s -o %s", ld, ldflags, (unsigned int)textba.addr, (unsigned int)databa.addr, (unsigned int)bssba.addr, s->name, object, elf);
   printf("Link at final address %s :\n%s\n", s->name, cmdline);
   system(cmdline);
@@ -556,12 +548,12 @@ void source_premap_gcc(group *s)
   printf(" !!!! premapping %s : %p;%p;%p\n", s->name, (void*)text, (void*)data, (void*)bss);
 
   if(text->symbol->value.chip == chip_none) {
-    switch(s->bus) {
+    switch(s->banks.bus) {
     case bus_none:
     case bus_max:
       break;
     case bus_main:
-      if(mainout.target == target_scd) {
+      if(maintarget == target_scd) {
         text->symbol->value.chip = chip_ram;
       } else {
         text->symbol->value.chip = chip_cart;
@@ -577,7 +569,7 @@ void source_premap_gcc(group *s)
   }
 
   if(data->symbol->value.chip == chip_none) {
-    switch(s->bus) {
+    switch(s->banks.bus) {
     case bus_none:
     case bus_max:
       break;
@@ -594,7 +586,7 @@ void source_premap_gcc(group *s)
   }
 
   if(bss->symbol->value.chip == chip_none) {
-    switch(s->bus) {
+    switch(s->banks.bus) {
     case bus_none:
     case bus_max:
       break;

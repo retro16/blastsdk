@@ -30,11 +30,12 @@ int main(int argc, char **argv)
   int labels = 0;
   int assemble = 0;
   int instructions = -1;
+  int readsymbols = 1;
   u32 size = 0xFFFFFFF;
   u32 offset = 0;
 
   int c;
-  while((c = getopt (argc, argv, "aclo:s:i:")) != -1)
+  while((c = getopt (argc, argv, "aclo:s:i:t:")) != -1)
   {
     switch(c)
     {
@@ -62,25 +63,25 @@ int main(int argc, char **argv)
       instructions = parse_int(optarg);
       break;
 
+      case 't':
+      d68k_readsymbols(optarg);
+      labels = 1;
+      readsymbols = 0;
+      break;
+
       default:
       help();
       break;
     }
   }
 
+  if(readsymbols) {
+    d68k_readsymbols(NULL);
+  }
+
   if(argc < optind + 2 || argc > optind + 3)
   {
     help();
-  }
-
-  if(argc == optind + 3)
-  {
-/*    if(!parsedsymfile(argv[fi + 2]))
-    {
-      fprintf(stderr, "Could not parse symbol file %s.\n", argv[fi + 2]);
-      return 1;
-    }*/
-    labels = 1;
   }
 
   u32 address = parse_int(argv[optind + 1]);

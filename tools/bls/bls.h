@@ -68,6 +68,20 @@ typedef uint32_t u32;
 typedef uint8_t u8;
 typedef int64_t sv;
 
+// Globals
+
+typedef enum target {
+  target_unknown,
+  target_gen,
+  target_scd,
+  target_ram,
+  target_max
+} target;
+BLSENUM(target, 8)
+
+extern target maintarget; // Defined in blsaddress.c
+
+
 // Static inlines
 
 static inline u32 getint(const u8 *data, int size)

@@ -2,6 +2,8 @@
  */
 
 #include "bls.h"
+#include "blsparse.h"
+#include "blsaddress.h"
 #include <stdio.h>
 #include <setjmp.h>
 #include <string.h>
@@ -363,7 +365,7 @@ struct instr m68k_instr[] =
 #undef cc
 };
 
-static char *target;
+static char *targetdata;
 static int tsize;
 static const u8 *code;
 static int size;
@@ -375,6 +377,7 @@ static int *suspicious;
 static int cycles;
 static int cyclesmax;
 static int lsize;
+static bankconfig banks;
 
 static u32 startaddr;
 static u32 endaddr;
@@ -419,14 +422,14 @@ u32 fetch(int bytes)
 }
 
 #define TPRINTF(...) do { int TPRINTF_sz;\
-  if(tsize) TPRINTF_sz = snprintf(target, tsize, __VA_ARGS__); else longjmp(error_jmp, 2); \
+  if(tsize) TPRINTF_sz = snprintf(targetdata, tsize, __VA_ARGS__); else longjmp(error_jmp, 2); \
   tsize -= TPRINTF_sz; \
   lsize += TPRINTF_sz; \
-  target += TPRINTF_sz; \
+  targetdata += TPRINTF_sz; \
   } while(0)
 
 #define TALIGN(sz) do { \
-  if(tsize) *(target++) = ' '; else longjmp(error_jmp, 2); \
+  if(tsize) *(targetdata++) = ' '; else longjmp(error_jmp, 2); \
   --tsize; \
   ++lsize; \
   } while(lsize < (sz))
@@ -435,12 +438,22 @@ u32 fetch(int bytes)
 typedef struct dsym {
   struct dsym *next;
   char name[256];
-  u32 val;
+  chipaddr val;
 } *dsymptr;
 
 dsymptr dsymtable = 0;
 
-void setdsym(const char *name, u32 val)
+void d68k_freesymbols()
+{
+  dsymptr s;
+  dsymptr n;
+  for(s = dsymtable; s; s = n) {
+    n = s->next;
+    free(s);
+  }
+}
+
+void setdsym(const char *name, chipaddr val)
 {
   dsymptr s;
   for(s = dsymtable; s; s = s->next)
@@ -462,16 +475,66 @@ void setdsym(const char *name, u32 val)
 
 const char * getdsymat(u32 val)
 {
+  bankconfig bc = banks;
   dsymptr s;
   for(s = dsymtable; s; s = s->next)
   {
-    if(s->val == val)
+    sv addr = chip2bank(s->val, &bc);
+
+    if(addr == val)
     {
+      if(s->val.chip != chip_none) {
+        // Update current bank
+        banks.bank[s->val.chip] = bc.bank[s->val.chip];
+      }
       return s->name;
     }
   }
 
   return 0;
+}
+
+void d68k_readsymbols(const char *filename)
+{
+  FILE *f = fopen(filename, "r");
+  if(!f) {
+    filename = "build_blsgen/blsgen.md";
+    f = fopen(filename, "r");
+  }
+  if(!f) {
+    filename = "blsgen.md";
+    f = fopen(filename, "r");
+  }
+  if(!f) {
+    return;
+  }
+  d68k_freesymbols();
+
+  char line[4096] = "";
+
+  while(!feof(f) && strcmp(line, "Symbols\n")) {
+    fgets(line, 4096, f);
+  }
+  if(!feof(f)) {
+    fgets(line, 4096, f);
+    if(!feof(f) && !strcmp(line, "=======\n")) {
+      fgets(line, 4096, f);
+      if(!feof(f) && !strcmp(line, "\n")) {
+        while(!feof(f)) {
+          fgets(line, 4096, f);
+          int slen = strnlen(line, 4096);
+          if(slen < 30) break;
+          line[slen - 1] = '\0'; // erase trailing \n
+          const char *chip = &line[5];
+          skipblanks(&chip);
+          chipaddr value = {chip_parse(chip), parse_int(&line[10])};
+          setdsym(&line[30], value);
+        }
+      }
+    }
+  }
+
+  fclose(f);
 }
 
 void print_label(u32 addr)
@@ -486,7 +549,8 @@ void print_label(u32 addr)
   char n[8];
   snprintf(n, 8, "a%06X", addr);
   TPRINTF("%s", n);
-  setdsym(n, addr);
+  chipaddr ca = bank2chip(&banks, addr);
+  setdsym(n, ca);
 }
 
 void print_pc_offset(int offset)
@@ -968,9 +1032,9 @@ static void d68k_pass()
   }
 }
 
-int64_t d68k(char *_target, int _tsize, const u8 *_code, int _size, int _instructions, u32 _address, int _labels, int _showcycles, int *_suspicious)
+int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _instructions, u32 _address, int _labels, int _showcycles, int *_suspicious)
 {
-  target = _target;
+  targetdata = _targetdata;
   tsize = _tsize;
   code = _code;
   size = _size;
@@ -999,7 +1063,7 @@ int64_t d68k(char *_target, int _tsize, const u8 *_code, int _size, int _instruc
     return address;
   }
 
-  target = _target;
+  targetdata = _targetdata;
   tsize = _tsize;
   code = _code;
   size = _size;

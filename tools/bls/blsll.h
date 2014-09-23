@@ -1,5 +1,6 @@
-#include <stdlib.h>
 #ifndef BLSLL
+#include <stdlib.h>
+#include <string.h>
 
 
 #define BLSLL(name) struct blsll_node_##name
