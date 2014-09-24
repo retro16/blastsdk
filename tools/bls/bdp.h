@@ -1,3 +1,6 @@
+#ifndef BDP_H
+#define BDP_H
+
 typedef void (*unknown_handler_ptr)(const u8 inp[36], int inpl);
 typedef void (*breakpoint_handler_ptr)(int cpu, u32 address);
 typedef void (*exception_handler_ptr)(int cpu, int ex);
@@ -52,4 +55,5 @@ extern void list_breakpoints(int cpu);
 extern void set_breakpoint(int cpu, u32 address);
 extern int delete_breakpoint(int cpu, u32 address);
 
+#endif
 // vim: ts=2 sw=2 sts=2 et

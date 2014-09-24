@@ -1,10 +1,11 @@
 #ifndef BLSLL
+#define BLSLL(name) struct blsll_node_##name
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 
-#define BLSLL(name) struct blsll_node_##name
 
 #define BLSLL_FOREACH(var, list) for(; (list) && ((var = list->data), list); (list) = (list)->next)
 #define BLSLL_FIND(list, field, value) for(; (list) && (!(list)-data || ((list)->data->(field) != (value))), (list) = (list)->next);

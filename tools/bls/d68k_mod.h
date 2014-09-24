@@ -1,3 +1,6 @@
+#ifndef D68K_MOD_H
+#define D68K_MOD_H
+
 /* 68000 disassembler.
  */
 
@@ -7,4 +10,5 @@ extern int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, i
 extern void d68k_readsymbols(const char *filename);
 extern void d68k_freesymbols();
 
+#endif
 // vim: ts=2 sw=2 sts=2 et
