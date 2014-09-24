@@ -129,3 +129,5 @@ memset
         move.l  4(sp), d0
         rts
 
+
+; vim: ts=8 sw=8 sts=8 et

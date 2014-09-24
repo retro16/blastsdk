@@ -19,7 +19,27 @@ BLSFASTFILL_WORD macro dest, words, value
     endif
     endm
 
+; Repeat instruction with zero or one parameter count times
+BLSREPEAT macro count, instruction
+    if (count) > 256
+    BLSREPEAT 256, instruction
+    BLSREPEAT ((count)-256), instruction
+    elsif (count) > 64
+    BLSREPEAT 64, instruction
+    BLSREPEAT ((count)-64), instruction
+    elsif (count) > 16
+    BLSREPEAT 16, instruction
+    BLSREPEAT ((count)-16), instruction
+    elsif (count) > 4
+    BLSREPEAT 4, instruction
+    BLSREPEAT ((count)-4), instruction
+    elsif (count) > 0
+    instruction 
+    BLSREPEAT ((count)-1), instruction
+    endif
+    endm
 
+; Repeat instruction with 2 parameters count times
 BLSREPEAT2 macro count, instruction, p2
     if (count) > 256
     BLSREPEAT2 256, instruction, p2
@@ -41,18 +61,26 @@ BLSREPEAT2 macro count, instruction, p2
 
 
 ; Copy memory from word-aligned addresses.
-; dest and src can be anything supported by LEA, except something based on a1. Addresses must be aligned to a word boundary.
+; dest and src can be anything supported by LEA.
+; dest can also be a1 and src can be a0.
+; Addresses must be aligned to a word boundary.
 ; bytes is the number of bytes to copy. It must be <= 2097152.
+; returns address past dest in a1 and past src in a0
 BLSFASTCOPY_ALIGNED macro dest, src, bytes
     if bytes == 0
     else
 
+    if src != a0
+    lea     src, a0                     ; a0 = src : Load source and dest address
+    endif
+    if dest != a1
+    lea     dest, a1                    ; a1 = dst
+    endif
+
     if bytes >= $60
 
-    movem.l d0-d7/a0-a2, -(a7)
-    ; Compute d0 = block count, a1 = src address, a2 = dest address
-    lea     src, a1                     ; a1 = src : Load source and dest address
-    lea     dest, a2                    ; a2 = dst
+    movem.l d2-d7/a2, -(a7)
+    ; Compute d0 = block count, a0 = src address, a1 = dest address
     if bytes < ($100*$20)               ; Try to load value into d0 using moveq
     moveq   #(bytes/$20)-1, d0          ; Compute number of $20 bytes blocks
     else
@@ -61,26 +89,24 @@ BLSFASTCOPY_ALIGNED macro dest, src, bytes
 
     ; Do block copy
 .blockcopy_loop\?
-    movem.l (a1)+, d1-d7/a0
-    movem.l d1-d7/a0, (a2)
-    lea     $20(a2), a2
+    movem.l (a0)+, d1-d7/a2
+    movem.l d1-d7/a2, (a1)
+    lea     $20(a1), a1
     dbra    d0, .blockcopy_loop\?
 
-    movem.l (a7)+, d0-d7/a0
-    ; Copy long data remainder
-    BLSREPEAT2 (bytes & $1F) / 4, move.l (a1)+, (a2)+
-    BLSREPEAT2 (bytes & 3) / 2, move.w (a1)+, (a2)+
-    BLSREPEAT2 (bytes & 1), move.b (a1)+, (a2)+
+    movem.l (a7)+, d2-d7/a2
+
+    ; Copy long data remainder with move.l expansion
+    BLSREPEAT2 (bytes & $1F) / 4, move.l (a0)+, (a1)+
+
     else
-    movem.l a1-a2, -(a7)
-    lea     src, a1
-    lea     dest, a2
-    BLSREPEAT2 bytes / 4, move.l (a1)+, (a2)+
-    BLSREPEAT2 (bytes & 3) / 4, move.w (a1)+, (a2)+
-    BLSREPEAT2 (bytes & 1), move.b (a1)+, (a2)+
+    // Expanded move.l copy
+    BLSREPEAT2 bytes / 4, move.l (a0)+, (a1)+
     endif
 
-    movem.l (a7)+, a1-a2
+    BLSREPEAT2 (bytes & 3) / 2, move.w (a0)+, (a1)+
+    BLSREPEAT2 (bytes & 1), move.b (a0)+, (a1)+
+
     endif
     endm
 
@@ -99,3 +125,5 @@ BLS_SETINTVECTOR macro vect, target
     movem.l (a7)+, d0/a0
     endif
     endm
+
+; vim: ts=8 sw=8 sts=8 et

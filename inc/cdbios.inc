@@ -175,7 +175,7 @@ _WAITVSYNC        EQU   $00005F10
 ;   nothing 
 ;----------------------------------------------------------------------- 
 CDBIOS macro fcode 
-      moveq		#0, d0
+      moveq             #0, d0
       move.w    fcode,d0 
       jsr       _CDBIOS 
       endm 
@@ -1102,3 +1102,5 @@ BIOS_BRMVERIFY macro
 ;       File Name - CDBIOS.INC                                          ; 
 ;       End of file                                                     ; 
 ;-----------------------------------------------------------------------; 
+
+; vim: ts=8 sw=8 sts=8 et
