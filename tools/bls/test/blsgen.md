@@ -4,7 +4,7 @@ Sections
 Section level1.c.text
 ---------------------
 
- - chip ram
+- chip ram
 
 Binaries
 ========
@@ -39,12 +39,12 @@ Binary vdp.c
 Output mygame.bin
 =================
 
-An output defines the image on the physical medium.
+  An output defines the image on the physical medium.
 
- - target ram (or gen or scd or vcart, deduced from output name if ending in bin, gen, iso, vct or ram)
- - region JUE
- - copyright 2014 GPL
- - author Retro 16
- - binaries splash.c
+  - target ram (or gen or scd or vcart, deduced from output name if ending in bin, gen, iso, vct or ram)
+    - region JUE
+    - copyright 2014 GPL
+    - author Retro 16
+    - binaries splash.c
 
- - entry main
+    - entry main

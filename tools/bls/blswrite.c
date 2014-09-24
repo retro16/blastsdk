@@ -20,3 +20,5 @@ void fputaddr(chipaddr ca, bus bus, FILE *f)
   busaddr ba = chip2bus(ca, bus);
   fputlong(ba.addr, f);
 }
+
+// vim: ts=2 sw=2 sts=2 et

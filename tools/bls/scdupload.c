@@ -9,13 +9,12 @@ void usage()
 
 int main(int argc, char **argv)
 {
-  if(argc != 4)
-  {
+  if(argc != 4) {
     usage();
   }
 
   open_debugger(argv[1]);
- 
+
   sendfile(argv[2], 0xF000);
   subsendfile(argv[3], 0x6000 + SPHEADERSIZE);
 
@@ -28,5 +27,7 @@ int main(int argc, char **argv)
   // Exit debugger
   sendcmd(CMD_EXIT, 0);
 
-	return 0;
+  return 0;
 }
+
+// vim: ts=2 sw=2 sts=2 et

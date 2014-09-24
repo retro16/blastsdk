@@ -16,8 +16,12 @@ typedef struct strip {
 int lz68k_pack_complete(uint32_t size, const strip *strips)
 {
   uint32_t current = 0;
+
   for(; strips; strips = strips->next) {
-    if(strips->offset != current) return 0;
+    if(strips->offset != current) {
+      return 0;
+    }
+
     current += strips->size;
   }
 
@@ -42,16 +46,18 @@ void strips_dump(const strip *strips)
 {
   uint32_t total = 0;
   printf("-----------------\n");
-  for(; strips; strips = strips->next)
-  {
+
+  for(; strips; strips = strips->next) {
     printf("%s strip %X-%X", strips->srcoffset == LITTERAL_STRIP ? "Litteral" : "Backcopy", strips->offset, strips->offset + strips->size);
-    if(strips->srcoffset != LITTERAL_STRIP)
-    {
+
+    if(strips->srcoffset != LITTERAL_STRIP) {
       printf(" from %X", strips->srcoffset);
     }
+
     printf("\n");
     total += strips->size;
   }
+
   printf("\n Total bytes : %u\n", total);
   printf("-----------------\n");
 }
@@ -62,12 +68,10 @@ void lz68k_pack_output(const char *src, FILE *dst, const strip *strips)
   uint32_t offset = 0;
   int phase = 0; // 0 = litteral; 1 = backcopy
   uint32_t zll = 0;
-  for(; strips; strips = strips->next)
-  {
-    if(strips->srcoffset == LITTERAL_STRIP)
-    {
-      if(phase == 1)
-      {
+
+  for(; strips; strips = strips->next) {
+    if(strips->srcoffset == LITTERAL_STRIP) {
+      if(phase == 1) {
         fwrite("\0\0", 1, 2, dst); // Zero-length backcopy
         phase = 0;
 //        printf("Zero-length backcopy\n");
@@ -77,11 +81,8 @@ void lz68k_pack_output(const char *src, FILE *dst, const strip *strips)
       lz68k_out_number(strips->size, dst);
       fwrite(src + strips->offset, 1, strips->size, dst);
 //      printf("Litteral %X-%X\n", strips->offset, strips->offset + strips->size);
-    }
-    else
-    {
-      if(phase == 0)
-      {
+    } else {
+      if(phase == 0) {
         fwrite("\0", 1, 1, dst); // Zero-length litteral
         phase = 1;
         zll++;
@@ -94,17 +95,16 @@ void lz68k_pack_output(const char *src, FILE *dst, const strip *strips)
 //      printf("Backcopy %X-%X from %X-%X\n", strips->offset, strips->offset + strips->size, strips->srcoffset, strips->srcoffset + strips->size);
     }
 
-    if(offset != strips->offset)
-    {
+    if(offset != strips->offset) {
       printf("Strip list not contiguous : offset should be %X instead of %X\n", offset, strips->offset);
       exit(1);
     }
+
     offset += strips->size;
     phase = 1 - phase;
   }
 
-  if(phase == 1)
-  {
+  if(phase == 1) {
     fwrite("\0", 1, 1, dst); // Zero-length litteral
   }
 
@@ -115,14 +115,14 @@ void lz68k_pack_output(const char *src, FILE *dst, const strip *strips)
 
 int lz68k_strips_cover(uint32_t offset, uint32_t size, const strip *strips)
 {
-  if(!strips)
+  if(!strips) {
     return 0;
+  }
 
   // Seek at the beginning of the zone
   for(; strips && strips->offset + strips->size < offset; strips = strips->next);
 
-  if(strips && strips->offset < offset + size)
-  {
+  if(strips && strips->offset < offset + size) {
 //    printf(" %X-%X covered by %X-%X\n", offset, offset + size, strips->offset, strips->offset + strips->size);
     return 1;
   }
@@ -139,15 +139,13 @@ void lz68k_insert_strip(const char *src, strip **strips, uint32_t offset, uint32
   s->next = NULL;
 
   // Empty list
-  if(!*strips)
-  {
+  if(!*strips) {
     *strips = s;
     return;
   }
 
   // First element
-  if((*strips)->offset > offset)
-  {
+  if((*strips)->offset > offset) {
     s->next = *strips;
     *strips = s;
     return;
@@ -157,14 +155,12 @@ void lz68k_insert_strip(const char *src, strip **strips, uint32_t offset, uint32
   strip *c = prev->next;
 
   // Insert sorted by offset
-  while(c)
-  {
-    if(c->offset > offset)
-    {
-      if(prev->offset + prev->size > offset || offset + stripsize > c->offset)
-      {
+  while(c) {
+    if(c->offset > offset) {
+      if(prev->offset + prev->size > offset || offset + stripsize > c->offset) {
         printf("Overlaps : %u(%u) %u(%u) %u(%u)\n", prev->offset, prev->size, offset, stripsize, c->offset, c->size);
       }
+
       prev->next = s;
       s->next = c;
       return;
@@ -185,17 +181,15 @@ void lz68k_fill_holes(const char *src, uint32_t size, strip **strips)
   // Fill holes with litterals
   strip *curstrip;
   uint32_t offset = 0;
-  if(*strips)
-  {
-    for(curstrip = *strips; curstrip; curstrip = curstrip->next)
-    {
-      while(curstrip->offset > offset)
-      {
+
+  if(*strips) {
+    for(curstrip = *strips; curstrip; curstrip = curstrip->next) {
+      while(curstrip->offset > offset) {
         // Hole detected
         uint32_t soffset = offset; // Compute litteral offset
         uint32_t ssize = curstrip->offset - soffset;
-        if(ssize > 32737)
-        {
+
+        if(ssize > 32737) {
           // Cap litterals to 32737
           soffset = curstrip->offset - 32737;
           ssize = 32767;
@@ -208,19 +202,23 @@ void lz68k_fill_holes(const char *src, uint32_t size, strip **strips)
         curstrip->size = ssize;
         curstrip->srcoffset = LITTERAL_STRIP;
       }
+
       offset = curstrip->offset + curstrip->size;
-      if(!curstrip->next) break;
+
+      if(!curstrip->next) {
+        break;
+      }
     }
-    while(curstrip->offset + curstrip->size < size)
-    {
+
+    while(curstrip->offset + curstrip->size < size) {
       // Append a last litteral at the end
       strip *next = curstrip->next;
       curstrip->next = (strip *)malloc(sizeof(strip));
       curstrip->next->next = NULL;
       curstrip->next->offset = curstrip->offset + curstrip->size;
       curstrip->next->size = size - (curstrip->offset + curstrip->size);
-      if(curstrip->next->size > 32767)
-      {
+
+      if(curstrip->next->size > 32767) {
         curstrip->next->offset = curstrip->offset + 32767;
         curstrip->next->size = 32767;
       }
@@ -229,9 +227,7 @@ void lz68k_fill_holes(const char *src, uint32_t size, strip **strips)
 
       curstrip = curstrip->next;
     }
-  }
-  else
-  {
+  } else {
     // Could not compress at all !
     // Generate a list of litterals
     // TODO
@@ -242,9 +238,9 @@ void lz68k_fill_holes(const char *src, uint32_t size, strip **strips)
 
 /* the Rollsum struct type*/
 typedef struct _lz68k_rollsum {
-    unsigned long count;               /* count of bytes included in sum */
-    unsigned long s1;                  /* s1 part of sum */
-    unsigned long s2;                  /* s2 part of sum */
+  unsigned long count;               /* count of bytes included in sum */
+  unsigned long s1;                  /* s1 part of sum */
+  unsigned long s2;                  /* s2 part of sum */
 } lz68k_rollsum;
 
 #define ROLLSUM_CHAR_OFFSET 31
@@ -280,8 +276,7 @@ void lz68k_gen_strip(const char *src, uint32_t size, strip **strips, uint32_t pa
   strip s;
   uint32_t matches = 0, longmatches = 0;
 
-  if(size <= patsize)
-  {
+  if(size <= patsize) {
     return;
   }
 
@@ -291,8 +286,7 @@ void lz68k_gen_strip(const char *src, uint32_t size, strip **strips, uint32_t pa
   // Start scanning from the end of the buffer
   uint32_t dstoff = size;
 
-  while(dstoff > patsize)
-  {
+  while(dstoff > patsize) {
     s.size = 0;
     uint32_t srcoff = dstoff;
 
@@ -301,8 +295,8 @@ void lz68k_gen_strip(const char *src, uint32_t size, strip **strips, uint32_t pa
 
     // Insert patsize chars in both sums
     uint32_t i;
-    for(i = 0; i < patsize; ++i)
-    {
+
+    for(i = 0; i < patsize; ++i) {
       --dstoff;
       --srcoff;
       lz68k_rollsum_rollin(dstsum, src[dstoff]);
@@ -310,75 +304,77 @@ void lz68k_gen_strip(const char *src, uint32_t size, strip **strips, uint32_t pa
     }
 
     // Scan src backwards
-    while(srcoff != 0)
-    {
+    while(srcoff != 0) {
       --srcoff;
       lz68k_rollsum_rollout(srcsum, src[srcoff + patsize]);
       lz68k_rollsum_rollin(srcsum, src[srcoff]);
 
-      if(lz68k_rollsum_compare(dstsum, srcsum))
-      {
+      if(lz68k_rollsum_compare(dstsum, srcsum)) {
         // Potential match
         uint32_t dcheck = dstoff + patsize - 1;
         uint32_t scheck = srcoff + patsize - 1;
         uint32_t matchsize = 1;
-        for(;;)
-        {
-          if(!scheck || !dcheck) break;
-          if(dstoff + patsize > 32767 && scheck < dstoff + patsize - 32767) break;
-          if(src[dcheck] != src[scheck])
-          {
+
+        for(;;) {
+          if(!scheck || !dcheck) {
+            break;
+          }
+
+          if(dstoff + patsize > 32767 && scheck < dstoff + patsize - 32767) {
+            break;
+          }
+
+          if(src[dcheck] != src[scheck]) {
             // Undo last cursor movement
             ++dcheck;
             ++scheck;
             --matchsize;
             break;
           }
+
           ++matchsize;
           --dcheck;
           --scheck;
         }
-        if(matchsize > 32767)
-        {
+
+        if(matchsize > 32767) {
           printf("match size too large\n");
           exit(1);
         }
-        if(matchsize >= patsize && matchsize > s.size)
-        {
 
-            // dcheck and scheck point at the first byte of the match strip
-            if(matchsize != dstoff + patsize - dcheck)
-            {
-              printf("Error : matchsize = %u, dstoff + patsize - dcheck = %u, dcheck = %u\n",matchsize , dstoff + patsize - dcheck, dcheck); exit(1);
-            }
+        if(matchsize >= patsize && matchsize > s.size) {
+
+          // dcheck and scheck point at the first byte of the match strip
+          if(matchsize != dstoff + patsize - dcheck) {
+            printf("Error : matchsize = %u, dstoff + patsize - dcheck = %u, dcheck = %u\n",matchsize , dstoff + patsize - dcheck, dcheck); exit(1);
+          }
+
           // Found a better match starting at scheck
 //          if(s.size) printf("Improved match from %u to %u\n", s.size, matchsize);
           s.srcoffset = scheck;
           s.offset = dcheck;
           s.size = matchsize;
         }
-        if(scheck < srcoff)
-        {
+
+        if(scheck < srcoff) {
           srcoff = scheck;
         }
       }
     }
 
     // Reached beginning : move dstoff and retry
-    if(s.size)
-    {
+    if(s.size) {
       ++matches;
-      if(s.size > 15)
-      {
+
+      if(s.size > 15) {
         ++longmatches;
       }
+
       s.next = *strips;
       *strips = (strip *)malloc(sizeof(strip));
       memcpy(*strips, &s, sizeof(strip));
       dstoff -= s.size - patsize;
-    }
-    else
-    {
+    } else {
       dstoff += patsize - 1;
     }
   }
@@ -492,8 +488,7 @@ void lz68k_pack(const char *src, uint32_t size, FILE *dst)
   lz68k_pack_output(src, dst, strips);
 
   // Free strips
-  while(strips)
-  {
+  while(strips) {
     strip *old = strips;
     strips = strips->next;
     free(old);
@@ -534,7 +529,9 @@ uint32_t lz68k_unpack(const char *src, char *dst)
     ++src;
 
     // Backoffset == 0 means end of stream
-    if(!backoffset) return unpacked;
+    if(!backoffset) {
+      return unpacked;
+    }
 
     if(backoffset >= 128) {
       backoffset &= 0x7F;
@@ -566,8 +563,7 @@ uint32_t lz68k_unpack(const char *src, char *dst)
 
 int main(int argc, char **argv)
 {
-  if(argc < 3)
-  {
+  if(argc < 3) {
     fprintf(stderr, "Usage: %s input output\n", argv[0]);
     return 1;
   }
@@ -587,8 +583,7 @@ int main(int argc, char **argv)
   printf("Packed data :\n  insize = %u\n outsize = %u\n factor = %f\n", (unsigned int)insize, (unsigned int)ftell(outfile), (float)ftell(outfile) / (float)insize);
   fclose(outfile);
 
-  if(argc >= 4)
-  {
+  if(argc >= 4) {
     uint32_t verifsize = insize;
     char *outdata = (char *)malloc(verifsize * 10);
 
@@ -603,19 +598,19 @@ int main(int argc, char **argv)
     fclose(infile);
     uint32_t outsize = lz68k_unpack(data, outdata);
 
-    if(outsize != verifsize)
-    {
+    if(outsize != verifsize) {
       uint32_t i;
-      for(i = 0; i < (outsize > verifsize ? verifsize : outsize); ++i)
-      {
-        if(indata[i] != outdata[i])
-        {
+
+      for(i = 0; i < (outsize > verifsize ? verifsize : outsize); ++i) {
+        if(indata[i] != outdata[i]) {
           printf("First error at %X\n", i);
           break;
         }
       }
+
       printf("Error : Output %X bytes instead of %X\n", outsize, verifsize);
     }
+
     outfile = fopen(argv[3], "wb");
     fwrite(outdata, 1, outsize, outfile);
     fclose(outfile);
@@ -623,3 +618,5 @@ int main(int argc, char **argv)
 
   return 0;
 }
+
+// vim: ts=2 sw=2 sts=2 et

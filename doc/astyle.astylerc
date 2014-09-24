@@ -1,0 +1,7 @@
+--break-blocks
+--add-brackets
+--keep-one-line-statements
+--indent=spaces=2
+-A3
+--align-pointer=name
+--lineend=linux

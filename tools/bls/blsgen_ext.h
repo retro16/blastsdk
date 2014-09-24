@@ -21,3 +21,5 @@ void source_compile_png(group *s);
 //blsgen_img : generic image manipulation
 sv compute_map_size(unsigned int width, unsigned int height);
 void gen_simple_map(char *out, sv tiles_ram_offset, sv null_tile_offset, unsigned int width, unsigned int height);
+
+// vim: ts=2 sw=2 sts=2 et

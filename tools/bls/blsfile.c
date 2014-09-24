@@ -11,10 +11,11 @@ size_t filesize(const char *file);
 int readfile(const char *name, u8 **data)
 {
   FILE *f = fopen(name, "r");
-  if(!f)
-  {
+
+  if(!f) {
     return -1;
   }
+
   fseek(f, 0, SEEK_END);
   size_t s = ftell(f);
   fseek(f, 0, SEEK_SET);
@@ -29,8 +30,8 @@ int readfile(const char *name, u8 **data)
 int writefile(const char *name, const u8 *data, int size)
 {
   FILE *f = fopen(name, "w");
-  if(!f)
-  {
+
+  if(!f) {
     return 0;
   }
 
@@ -45,6 +46,7 @@ size_t filecat(FILE *i, FILE *o)
 {
   // Copy a file and returns its size
   size_t filesize = 0;
+
   while(!feof(i)) {
     char buf[65536];
     size_t r = fread(buf, 1, sizeof(buf), i);
@@ -61,11 +63,14 @@ void filecopy(const char *src, const char *dst)
   FILE *o;
 
   i = fopen(src, "rb");
-  if(!i) return;
+
+  if(!i) {
+    return;
+  }
 
   o = fopen(dst, "wb");
-  if(o)
-  {
+
+  if(o) {
     filecat(i, o);
   }
 
@@ -79,11 +84,14 @@ void fileappend(const char *src, const char *dst)
   FILE *o;
 
   i = fopen(src, "rb");
-  if(!i) return;
+
+  if(!i) {
+    return;
+  }
 
   o = fopen(dst, "ab");
-  if(o)
-  {
+
+  if(o) {
     filecat(i, o);
   }
 
@@ -94,6 +102,7 @@ void fileappend(const char *src, const char *dst)
 size_t filesize(const char *file)
 {
   FILE *f = fopen(file, "rb");
+
   if(!f) {
     printf("Cannot open file %s to get its size.\n", file);
     exit(1);
@@ -109,9 +118,13 @@ size_t filesize(const char *file)
 int fileexists(const char *filename)
 {
   FILE *f = fopen(filename, "rb");
+
   if(!f) {
     return 0;
   }
+
   fclose(f);
   return 1;
 }
+
+// vim: ts=2 sw=2 sts=2 et

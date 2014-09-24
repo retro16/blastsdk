@@ -13,9 +13,8 @@ typedef uint16_t u16;
 typedef int16_t i16;
 
 // Instruction operand type
-enum iop
-{
-              //  Bits  Description
+enum iop {
+  //  Bits  Description
   op_none,    //        No operand
   op_ccr,     //        CCR
   op_sr,      //        SR
@@ -46,8 +45,7 @@ enum iop
   op1e_AnDis  // 02..00 Address register + 16 bits displacement in ext word
 };
 
-struct instr
-{
+struct instr {
   char      name[12];
   u16       code;
   u16       mask;
@@ -60,8 +58,7 @@ typedef struct instr *iptr;
 
 
 // Matching order is important
-struct instr m68k_instr[] =
-{
+struct instr m68k_instr[] = {
 #define cc(ipre, ipost, opcode, mask, op1, op2, size, cycles) \
   {ipre "T"  ipost, opcode | 0x0000, mask, op1, op2, size, cycles}, \
   {ipre "F"  ipost, opcode | 0x0100, mask, op1, op2, size, cycles}, \
@@ -388,32 +385,34 @@ static iptr op;
 static jmp_buf error_jmp;
 
 // Errors returned by longjmp
-const char * d68k_error(int64_t r)
+const char *d68k_error(int64_t r)
 {
-  if(r >= 0)
-  {
+  if(r >= 0) {
     return "Disassembly successful";
   }
-  switch(r)
-  {
-    case -1 : return "Fetched past the end of code";
-    case -2 : return "Not enough space to store disassembled string";
+
+  switch(r) {
+  case -1 : return "Fetched past the end of code";
+
+  case -2 : return "Not enough space to store disassembled string";
   }
+
   return "Invalid error code";
 }
 
 u32 fetch(int bytes)
 {
-  if(size < bytes)
-  {
+  if(size < bytes) {
     longjmp(error_jmp, 1);
   }
+
   u32 mask = 0xFFFFFFFF;
-  if(bytes == 1)
-  {
+
+  if(bytes == 1) {
     bytes = 2;
     mask = 0xFF;
   }
+
   u32 v = getint(code, bytes);
   code += bytes;
   size -= bytes;
@@ -447,6 +446,7 @@ void d68k_freesymbols()
 {
   dsymptr s;
   dsymptr n;
+
   for(s = dsymtable; s; s = n) {
     n = s->next;
     free(s);
@@ -456,10 +456,9 @@ void d68k_freesymbols()
 void setdsym(const char *name, chipaddr val)
 {
   dsymptr s;
-  for(s = dsymtable; s; s = s->next)
-  {
-    if(strcmp(name, s->name) == 0)
-    {
+
+  for(s = dsymtable; s; s = s->next) {
+    if(strcmp(name, s->name) == 0) {
       strcpy(s->name, name);
       s->val = val;
       return;
@@ -473,21 +472,21 @@ void setdsym(const char *name, chipaddr val)
   dsymtable = s;
 }
 
-const char * getdsymat(u32 val)
+const char *getdsymat(u32 val)
 {
   bankconfig bc = banks;
   dsymptr s;
-  for(s = dsymtable; s; s = s->next)
-  {
+
+  for(s = dsymtable; s; s = s->next) {
     sv addr = chip2bank(s->val, &bc);
 
-    if(addr == val)
-    {
+    if(addr == val) {
       if(s->val.chip != chip_none) {
         // Update current bank
         banks.bus = bc.bus;
         banks.bank[s->val.chip] = bc.bank[s->val.chip];
       }
+
       return s->name;
     }
   }
@@ -498,17 +497,21 @@ const char * getdsymat(u32 val)
 void d68k_readsymbols(const char *filename)
 {
   FILE *f = fopen(filename, "r");
+
   if(!f) {
     filename = "build_blsgen/blsgen.md";
     f = fopen(filename, "r");
   }
+
   if(!f) {
     filename = "blsgen.md";
     f = fopen(filename, "r");
   }
+
   if(!f) {
     return;
   }
+
   d68k_freesymbols();
 
   char line[4096] = "";
@@ -516,15 +519,22 @@ void d68k_readsymbols(const char *filename)
   while(!feof(f) && strcmp(line, "Symbols\n")) {
     fgets(line, 4096, f);
   }
+
   if(!feof(f)) {
     fgets(line, 4096, f);
+
     if(!feof(f) && !strcmp(line, "=======\n")) {
       fgets(line, 4096, f);
+
       if(!feof(f) && !strcmp(line, "\n")) {
         while(!feof(f)) {
           fgets(line, 4096, f);
           int slen = strnlen(line, 4096);
-          if(slen < 30) break;
+
+          if(slen < 30) {
+            break;
+          }
+
           line[slen - 1] = '\0'; // erase trailing \n
           const char *chip = &line[5];
           skipblanks(&chip);
@@ -542,8 +552,8 @@ void d68k_readsymbols(const char *filename)
 void print_label(u32 addr)
 {
   const char *name = getdsymat(addr);
-  if(name)
-  {
+
+  if(name) {
     TPRINTF("%s", name);
     return;
   }
@@ -558,68 +568,60 @@ void print_label(u32 addr)
 void print_pc_offset(int offset)
 {
   u32 a = baseaddr + offset;
-  if(labels && ((a >= startaddr && a < endaddr) || getdsymat(a)))
-  {
+
+  if(labels && ((a >= startaddr && a < endaddr) || getdsymat(a))) {
     print_label(a);
-  }
-  else
-  {
+  } else {
     TPRINTF("$%06X", a);
   }
 }
 
 void print_rl(u32 list)
 {
-  if(!list)
-  {
+  if(!list) {
     ++*suspicious;
     TPRINTF("none");
     return;
   }
+
   int fr = 1; // First register
   int ls = 0; // Last set
   int sc = 0; // Set count
   char rt; // Register type
   int rn; // Register number
-  for(rt = 'D'; rt >= 'A'; rt -= 'D' - 'A')
-  {
-    for(rn = 0; rn <= 7; ++rn)
-    {
+
+  for(rt = 'D'; rt >= 'A'; rt -= 'D' - 'A') {
+    for(rn = 0; rn <= 7; ++rn) {
       int r = list & 1;
-      if(r && !ls)
-      {
+
+      if(r && !ls) {
         ls = 1;
         sc = 1;
-        if(fr)
-        {
+
+        if(fr) {
           fr = 0;
-        }
-        else
-        {
+        } else {
           TPRINTF("/");
         }
+
         TPRINTF("%c%d", rt, rn);
-      }
-      else if(r && ls)
-      {
+      } else if(r && ls) {
         ++sc;
-      }
-      else if(!r && ls)
-      {
-	ls = 0;
-        if(sc >= 2)
-        {
+      } else if(!r && ls) {
+        ls = 0;
+
+        if(sc >= 2) {
           TPRINTF("-%c%d", rt, rn - 1);
         }
       }
 
       list >>= 1;
     }
-    if(ls)
-    {
+
+    if(ls) {
       ls = 0;
-      if(sc >= 2)
-      {
+
+      if(sc >= 2) {
         TPRINTF("-%c%d", rt, rn - 1);
       }
     }
@@ -629,101 +631,128 @@ void print_rl(u32 list)
 void print_ea(int mode, int reg)
 {
   switch(mode) {
-    case 0: { /* Dn */
-      TPRINTF("D%d", (reg));
-      cycles += 0;
-      break;
+  case 0: { /* Dn */
+    TPRINTF("D%d", (reg));
+    cycles += 0;
+    break;
+  }
+
+  case 1: { /* An */
+    TPRINTF("A%d", (reg));
+    cycles += 0;
+    break;
+  }
+
+  case 2: { /* (An) */
+    TPRINTF("(A%d)", (reg));
+    cycles += op->size == 4 ? 8 : 4;
+    break;
+  }
+
+  case 3: { /* (An)+ */
+    TPRINTF("(A%d)+", (reg));
+    cycles += op->size == 4 ? 8 : 4;
+    break;
+  }
+
+  case 4: { /* -(An) */
+    TPRINTF("-(A%d)", (reg));
+    cycles += op->size == 4 ? 10 : 6;
+    break;
+  }
+
+  case 5: { /* d16(An) */
+    int offset = (i16)fetch(2);
+    TPRINTF("%d(A%d)", offset, (reg));
+    cycles += op->size == 4 ? 12 : 8;
+    break;
+  }
+
+  case 6: { /* d8(An,Xn) */
+    u32 flags = fetch(2);
+    int offset = (int)(char)(flags & 0xFF);
+    flags >>= 8;
+    TPRINTF("%d(A%d,%c%d.%c)", offset, (reg), (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'L' : 'W');
+
+    if(flags & 0x07) {
+      TPRINTF("\t; Illegal");
+      ++*suspicious;
     }
-    case 1: { /* An */
-      TPRINTF("A%d", (reg));
-      cycles += 0;
-      break;
-    }
-    case 2: { /* (An) */
-      TPRINTF("(A%d)", (reg));
-      cycles += op->size == 4 ? 8 : 4;
-      break;
-    }
-    case 3: { /* (An)+ */
-      TPRINTF("(A%d)+", (reg));
-      cycles += op->size == 4 ? 8 : 4;
-      break;
-    }
-    case 4: { /* -(An) */
-      TPRINTF("-(A%d)", (reg));
-      cycles += op->size == 4 ? 10 : 6;
-      break;
-    }
-    case 5: { /* d16(An) */
-      int offset = (i16)fetch(2);
-      TPRINTF("%d(A%d)", offset, (reg));
+
+    cycles += op->size == 4 ? 14 : 10;
+    break;
+  }
+
+  case 7: { /* Other modes */
+    switch(reg) {
+    case 0: { /* xxx.W */
+      u32 addr = fetch(2); if(addr >= 0x8000) {
+        addr |= 0xFF0000;
+      }
+      if(labels && addr >= startaddr && addr < endaddr) {
+        print_label(addr);
+      } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
+        // JMP to a known target
+        print_label(addr);
+      } else {
+        TPRINTF("$%06X", addr);
+      }
+
+      TPRINTF(".W");
       cycles += op->size == 4 ? 12 : 8;
       break;
     }
-    case 6: { /* d8(An,Xn) */
+
+    case 1: { /* xxx.L */
+      u32 addr = fetch(4);
+
+      if(labels && addr >= startaddr && addr < endaddr) {
+        print_label(addr);
+      } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
+        // JMP to a known target
+        print_label(addr);
+      } else {
+        TPRINTF("$%06X", addr);
+      }
+
+      TPRINTF(".L");
+      cycles += op->size == 4 ? 16 : 12;
+      break;
+    }
+
+    case 2: { /* d16(PC) */
+      int offset = (int)(i16)fetch(2);
+      print_pc_offset(offset);
+      TPRINTF("(PC)");
+      cycles += op->size == 4 ? 12 : 8;
+      break;
+    }
+
+    case 3: { /* d8(PC,Xn) */
       u32 flags = fetch(2);
       int offset = (int)(char)(flags & 0xFF);
       flags >>= 8;
-      TPRINTF("%d(A%d,%c%d.%c)", offset, (reg), (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'L' : 'W');
-      if(flags & 0x07) { TPRINTF("\t; Illegal"); ++*suspicious; }
+      TPRINTF("%d(PC,%c%d.%c)", offset, (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'L' : 'W');
+
+      if(flags & 0x07) {
+        TPRINTF(" ; Illegal");
+        ++*suspicious;
+      }
+
       cycles += op->size == 4 ? 14 : 10;
       break;
     }
-    case 7: { /* Other modes */
-      switch(reg) {
-        case 0: { /* xxx.W */
-          u32 addr = fetch(2); if(addr >= 0x8000) addr |= 0xFF0000;
-          if(labels && addr >= startaddr && addr < endaddr) {
-            print_label(addr);
-          } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
-            // JMP to a known target
-            print_label(addr);
-          } else {
-            TPRINTF("$%06X", addr);
-          }
-          TPRINTF(".W");
-          cycles += op->size == 4 ? 12 : 8;
-          break;
-        }
-        case 1: { /* xxx.L */
-          u32 addr = fetch(4);
-          if(labels && addr >= startaddr && addr < endaddr) {
-            print_label(addr);
-          } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
-            // JMP to a known target
-            print_label(addr);
-          } else {
-            TPRINTF("$%06X", addr);
-          }
-          TPRINTF(".L");
-          cycles += op->size == 4 ? 16 : 12;
-          break;
-        }
-        case 2: { /* d16(PC) */
-          int offset = (int)(i16)fetch(2);
-          print_pc_offset(offset);
-          TPRINTF("(PC)");
-          cycles += op->size == 4 ? 12 : 8;
-          break;
-        }
-        case 3: { /* d8(PC,Xn) */
-          u32 flags = fetch(2);
-          int offset = (int)(char)(flags & 0xFF);
-          flags >>= 8;
-          TPRINTF("%d(PC,%c%d.%c)", offset, (flags & 0x80) ? 'A':'D', (flags >> 4) & 7, (flags & 0x08) ? 'L' : 'W');
-          if(flags & 0x07) { TPRINTF(" ; Illegal"); ++*suspicious; }
-          cycles += op->size == 4 ? 14 : 10;
-          break;
-        }
-        case 4: { /* #xxx */
-          u32 data = fetch(op->size);
-          TPRINTF("#$%X", data);
-          cycles += op->size == 4 ? 8 : 4;
-          break;
-        }
-      }
+
+    case 4: { /* #xxx */
+      u32 data = fetch(op->size);
+      TPRINTF("#$%X", data);
+      cycles += op->size == 4 ? 8 : 4;
       break;
     }
+    }
+
+    break;
+  }
   }
 }
 
@@ -731,177 +760,190 @@ void print_operand(enum iop ot)
 {
   u32 u;
   int s;
-  switch(ot)
-  {
-    case op_none: break;
-    case op_ccr:
-      TPRINTF("CCR");
-      cycles += 8;
-      break;
 
-    case op_sr:
-      TPRINTF("SR");
-      cycles += 8;
-      break;
+  switch(ot) {
+  case op_none: break;
 
-    case ope_imm:
-      u = fetch(op->size);
-      TPRINTF("#$%X", u);
-      cycles += 0;
-      break;
+  case op_ccr:
+    TPRINTF("CCR");
+    cycles += 8;
+    break;
 
-    case ope_ims:
-      s = fetch(op->size);
-      signext(&s, op->size * 8);
-      TPRINTF("#%d", s);
-      cycles += op->size == 4 ? 8 : 4;
-      break;
+  case op_sr:
+    TPRINTF("SR");
+    cycles += 8;
+    break;
 
-    case ope_rl:
-      u = fetch(2);
-      print_rl(u);
-      {
-        u32 bit;
-        for(bit = 0; bit < 16; ++bit)
-        {
-          if(u & (1 << bit)) cycles += (op->size == 4 ? 8 : 4);
+  case ope_imm:
+    u = fetch(op->size);
+    TPRINTF("#$%X", u);
+    cycles += 0;
+    break;
+
+  case ope_ims:
+    s = fetch(op->size);
+    signext(&s, op->size * 8);
+    TPRINTF("#%d", s);
+    cycles += op->size == 4 ? 8 : 4;
+    break;
+
+  case ope_rl:
+    u = fetch(2);
+    print_rl(u);
+    {
+      u32 bit;
+
+      for(bit = 0; bit < 16; ++bit) {
+        if(u & (1 << bit)) {
+          cycles += (op->size == 4 ? 8 : 4);
         }
       }
-      break;
+    }
+    break;
 
-    case ope_rld:
-      u = fetch(2);
-      {
-        // Inverse bits and display normally
-        u32 inverse = 0;
-        int i = 0;
-        for(i = 0; i < 16; ++i)
-        {
-          inverse <<= 1;
-          inverse |= u & 1;
-          u >>= 1;
-        }
-        print_rl(inverse);
+  case ope_rld:
+    u = fetch(2);
+    {
+      // Inverse bits and display normally
+      u32 inverse = 0;
+      int i = 0;
 
-        u32 bit;
-        for(bit = 0; bit < 16; ++bit)
-        {
-          if(inverse & (1 << bit)) cycles += (op->size == 4 ? 8 : 4);
+      for(i = 0; i < 16; ++i) {
+        inverse <<= 1;
+        inverse |= u & 1;
+        u >>= 1;
+      }
+
+      print_rl(inverse);
+
+      u32 bit;
+
+      for(bit = 0; bit < 16; ++bit) {
+        if(inverse & (1 << bit)) {
+          cycles += (op->size == 4 ? 8 : 4);
         }
       }
-      break;
+    }
+    break;
 
-    case ope_mmovem:
-      u = fetch(2);
-      {
-        u32 bit;
-        for(bit = 0; bit < 16; ++bit)
-        {
-          if(u & (1 << bit)) cycles += (op->size == 4 ? 8 : 4);
+  case ope_mmovem:
+    u = fetch(2);
+    {
+      u32 bit;
+
+      for(bit = 0; bit < 16; ++bit) {
+        if(u & (1 << bit)) {
+          cycles += (op->size == 4 ? 8 : 4);
         }
       }
-      print_ea((opcode >> 3) & 7, opcode & 7);
-      TPRINTF(", ");
-      print_rl(u);
-      break;
+    }
+    print_ea((opcode >> 3) & 7, opcode & 7);
+    TPRINTF(", ");
+    print_rl(u);
+    break;
 
-    case op_bra:
-      s = (int)(char)(opcode);
-      if(!s) {
+  case op_bra:
+    s = (int)(char)(opcode);
+
+    if(!s) {
     case ope_dp:
-        s = fetch(2);
-        signext(&s, 16);
-      }
-      print_pc_offset(s);
-      cycles += 0;
-      break;
-
-    case opo_dis8v:
-      s = opcode;
-      signext(&s, 8);
-      TPRINTF("#%d", s);
-      cycles += 0;
-      break;
-
-    case opo_dis8p:
-      s = opcode;
-      signext(&s, 8);
-      print_pc_offset(s);
-      cycles += 0;
-      break;
-
-    case opo_vect:
-      TPRINTF("#%d", opcode & 0xF);
-      break;
-
-    case op2_imm:
-      u = (opcode >> 9) & 7;
-      if(!u)
-      {
-        u = 8;
-      }
-      TPRINTF("#%u", u);
-      cycles += 0;
-      break;
-
-    case op1_Dn:
-      TPRINTF("D%d", opcode & 7);
-      cycles += 0;
-      break;
-
-    case op2_Dn:
-      TPRINTF("D%d", (opcode >> 9) & 7);
-      cycles += 0;
-      break;
-
-    case op1_An:
-      TPRINTF("A%d", opcode & 7);
-      cycles += 0;
-      break;
-
-    case op2_An:
-      TPRINTF("A%d", (opcode >> 9) & 7);
-      cycles += 0;
-      break;
-
-    case op1_AnPD:
-      TPRINTF("-(A%d)", opcode & 7);
-      cycles += op->size == 4 ? 10 : 7;
-      break;
-
-    case op2_AnPD:
-      TPRINTF("-(A%d)", (opcode >> 9) & 7);
-      cycles += op->size == 4 ? 10 : 7;
-      break;
-
-    case op1_AnPI:
-      TPRINTF("(A%d)+", opcode & 7);
-      cycles += op->size == 4 ? 8 : 4;
-      break;
-
-    case op2_AnPI:
-      TPRINTF("(A%d)+", (opcode >> 9) & 7);
-      cycles += op->size == 4 ? 8 : 4;
-      break;
-
-    case op1_EA:
-      print_ea((opcode >> 3) & 7, opcode & 7);
-      break;
-
-    case op2_EA:
-      print_ea((opcode >> 6) & 7, (opcode >> 9) & 7);
-      break;
-
-    case op1e_AnDis:
       s = fetch(2);
       signext(&s, 16);
-      if(s) {
-        TPRINTF("%d(A%d)", s, opcode & 7);
-      } else {
-        TPRINTF("(A%d)", opcode & 7);
-      }
-      cycles += op->size == 4 ? 16 : 8;
-      break;
+    }
+
+    print_pc_offset(s);
+    cycles += 0;
+    break;
+
+  case opo_dis8v:
+    s = opcode;
+    signext(&s, 8);
+    TPRINTF("#%d", s);
+    cycles += 0;
+    break;
+
+  case opo_dis8p:
+    s = opcode;
+    signext(&s, 8);
+    print_pc_offset(s);
+    cycles += 0;
+    break;
+
+  case opo_vect:
+    TPRINTF("#%d", opcode & 0xF);
+    break;
+
+  case op2_imm:
+    u = (opcode >> 9) & 7;
+
+    if(!u) {
+      u = 8;
+    }
+
+    TPRINTF("#%u", u);
+    cycles += 0;
+    break;
+
+  case op1_Dn:
+    TPRINTF("D%d", opcode & 7);
+    cycles += 0;
+    break;
+
+  case op2_Dn:
+    TPRINTF("D%d", (opcode >> 9) & 7);
+    cycles += 0;
+    break;
+
+  case op1_An:
+    TPRINTF("A%d", opcode & 7);
+    cycles += 0;
+    break;
+
+  case op2_An:
+    TPRINTF("A%d", (opcode >> 9) & 7);
+    cycles += 0;
+    break;
+
+  case op1_AnPD:
+    TPRINTF("-(A%d)", opcode & 7);
+    cycles += op->size == 4 ? 10 : 7;
+    break;
+
+  case op2_AnPD:
+    TPRINTF("-(A%d)", (opcode >> 9) & 7);
+    cycles += op->size == 4 ? 10 : 7;
+    break;
+
+  case op1_AnPI:
+    TPRINTF("(A%d)+", opcode & 7);
+    cycles += op->size == 4 ? 8 : 4;
+    break;
+
+  case op2_AnPI:
+    TPRINTF("(A%d)+", (opcode >> 9) & 7);
+    cycles += op->size == 4 ? 8 : 4;
+    break;
+
+  case op1_EA:
+    print_ea((opcode >> 3) & 7, opcode & 7);
+    break;
+
+  case op2_EA:
+    print_ea((opcode >> 6) & 7, (opcode >> 9) & 7);
+    break;
+
+  case op1e_AnDis:
+    s = fetch(2);
+    signext(&s, 16);
+
+    if(s) {
+      TPRINTF("%d(A%d)", s, opcode & 7);
+    } else {
+      TPRINTF("(A%d)", opcode & 7);
+    }
+
+    cycles += op->size == 4 ? 16 : 8;
+    break;
   }
 }
 
@@ -909,68 +951,54 @@ static void compute_base_cycles()
 {
   // Compute base cycles for non-trivial instructions
 
-  if((op->code & 0xF000) == 0xE000) // ASL/ASR/LSL/LSR/ROL/ROR/ROXL/ROXR
-  {
+  if((op->code & 0xF000) == 0xE000) { // ASL/ASR/LSL/LSR/ROL/ROR/ROXL/ROXR
     // Shift / rotate instruction
     cycles = (op->size == 4) ? 8 : 6;
-    if(op->op1 == op2_imm)
-    {
+
+    if(op->op1 == op2_imm) {
       // 2*n
       cycles += 2 * ((opcode >> 9) & 7);
-    }
-    else if(op->op1 == op2_Dn)
-    {
+    } else if(op->op1 == op2_Dn) {
       // 2*0-2*31
       cyclesmax += 126;
-    }
-    else
-    {
+    } else {
       // Shift one bit
       cycles = 8;
     }
   }
 
-  else if((op->code & 0xF000) == 0x6000) // Bcc
-  {
+  else if((op->code & 0xF000) == 0x6000) { // Bcc
     // Conditional branch
     cycles = 10;
     cyclesmax = op->size == 1 ? -2 : 2; // cyclesmax is difference when branch is not taken
   }
 
-  else if((op->code & 0xF0F8) == 0x50C8) // DBcc
-  {
+  else if((op->code & 0xF0F8) == 0x50C8) { // DBcc
     // Decrement and conditional branch
     cycles = 10;
     cyclesmax = 4;
   }
 
-  else if((op->code & 0xF1C0) == 0x81C0) // DIVS
-  {
+  else if((op->code & 0xF1C0) == 0x81C0) { // DIVS
     cycles = 126;
     cyclesmax = 14;
   }
 
-  else if((op->code & 0xF1C0) == 0x80C0) // DIVU
-  {
+  else if((op->code & 0xF1C0) == 0x80C0) { // DIVU
     cycles = 142;
     cyclesmax = 16;
   }
 
-  else if((op->code & 0xF0C0) == 0xC0C0) // MULS/MULU
-  {
+  else if((op->code & 0xF0C0) == 0xC0C0) { // MULS/MULU
     cycles = 38;
     cyclesmax = 32;
   }
 
-  else if((op->code & 0xF0C0) == 0x50C0) // Scc
-  {
-    if(op->code >> 3 & 7)
-    {
+  else if((op->code & 0xF0C0) == 0x50C0) { // Scc
+    if(op->code >> 3 & 7) {
       // Scc <M>
       cycles = 8;
-    }
-    else
-    {
+    } else {
       cycles = 4;
       cyclesmax = 2;
     }
@@ -980,15 +1008,17 @@ static void compute_base_cycles()
 
 static void d68k_pass()
 {
-  while(size && tsize && instructions)
-  {
+  while(size && tsize && instructions) {
     lsize = 0;
-    if(labels)
-    {
+
+    if(labels) {
       const char *l = getdsymat(address);
-      if(l)
+
+      if(l) {
         TPRINTF("%s", l);
+      }
     }
+
     TALIGN(8);
 
     --instructions;
@@ -996,48 +1026,47 @@ static void d68k_pass()
     baseaddr = address;
 
     u32 c;
-    for(c = 0; c < (sizeof(m68k_instr) / sizeof(struct instr)); ++c)
-    {
+
+    for(c = 0; c < (sizeof(m68k_instr) / sizeof(struct instr)); ++c) {
       op = &m68k_instr[c];
-      if((opcode & op->mask) != op->code)
-      {
+
+      if((opcode & op->mask) != op->code) {
         continue;
       }
+
       TPRINTF("%s", op->name);
 
       // Compute cycles
       cycles = op->cycles;
       cyclesmax = 0; // Upper range of cycles
-      if(cycles == -1)
-      {
+
+      if(cycles == -1) {
         compute_base_cycles();
       }
 
-      if(op->op1 != op_none)
-      {
+      if(op->op1 != op_none) {
         TALIGN(16);
         print_operand(op->op1);
       }
-      if(op->op2 != op_none)
-      {
+
+      if(op->op2 != op_none) {
         TPRINTF(", ");
         print_operand(op->op2);
       }
 
-      if(showcycles)
-      {
+      if(showcycles) {
         TALIGN(40);
         TPRINTF("; %d", cycles);
-        if(cyclesmax)
-        {
+
+        if(cyclesmax) {
           TPRINTF("-%d", cycles+cyclesmax);
         }
       }
 
       break;
     }
-    if(c == (sizeof(m68k_instr) / sizeof(struct instr)))
-    {
+
+    if(c == (sizeof(m68k_instr) / sizeof(struct instr))) {
       // Not found
       TPRINTF("DW");
       TALIGN(16);
@@ -1046,6 +1075,7 @@ static void d68k_pass()
       TPRINTF("; Illegal opcode");
       ++*suspicious;
     }
+
     TPRINTF("\n");
   }
 }
@@ -1067,16 +1097,15 @@ int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _ins
   *suspicious = 0;
 
   int errorcode;
-  if((errorcode = setjmp(error_jmp)))
-  {
+
+  if((errorcode = setjmp(error_jmp))) {
     return errorcode;
   }
 
   // Do first pass to find labels
   d68k_pass();
 
-  if(!labels)
-  {
+  if(!labels) {
     // One pass is enough to disassemble without labels
     return address;
   }
@@ -1096,3 +1125,5 @@ int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _ins
 
   return address;
 }
+
+// vim: ts=2 sw=2 sts=2 et

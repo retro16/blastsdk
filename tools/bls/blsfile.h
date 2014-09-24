@@ -7,3 +7,5 @@ extern size_t filecat(FILE *i, FILE *o);
 extern void filecopy(const char *src, const char *dst);
 extern void fileappend(const char *src, const char *dst);
 extern size_t filesize(const char *file);
+
+// vim: ts=2 sw=2 sts=2 et

@@ -3,9 +3,10 @@
 int main(int argc, char **argv)
 {
   char file[1024] = "blsbuild.ini";
-  if(argc >= 2)
-  {
+
+  if(argc >= 2) {
     const char *s = strrchr(argv[1], '/');
+
     if(!s) {
       // use file name as-is
       s = argv[1];
@@ -18,9 +19,11 @@ int main(int argc, char **argv)
       chdir(file);
       ++s; // Skip separator
     }
+
     strncpy(file, s, 1024);
     file[1023] = '\0';
   }
+
   printf("Building %s\n", file);
 
   mkdir(TMPDIR, 0777);
@@ -29,3 +32,5 @@ int main(int argc, char **argv)
 
   return 0;
 }
+
+// vim: ts=2 sw=2 sts=2 et

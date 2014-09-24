@@ -42,13 +42,13 @@ static void restore_prompt();
 static void usage()
 {
   fprintf(stderr, "Usage: bdb DEVICE\n"
-                  "The Blast ! debugger.\n"
-                  "Communicates to a SEGA Mega Drive / Genesis via an arduino.\n"
-                  "\n"
-                  "Options:"
-                  "\n"
-                  "      DEVICE   either a serial device (/dev/xxx) or an IP address.\n"
-  );
+          "The Blast ! debugger.\n"
+          "Communicates to a SEGA Mega Drive / Genesis via an arduino.\n"
+          "\n"
+          "Options:"
+          "\n"
+          "      DEVICE   either a serial device (/dev/xxx) or an IP address.\n"
+         );
 }
 
 static void goto_mainloop(int sig)
@@ -81,18 +81,24 @@ void on_breakpoint(int cpu, u32 address)
 void on_exception(int cpu, int ex)
 {
   erase_prompt();
+
   if(ex >= 0x20) {
     printf("%s CPU: TRAP #%02d\n", cpu ? "Sub" : "Main", ex - 0x20);
   } else {
     printf("%s CPU: Exception %02d triggered\n", cpu ? "Sub" : "Main", ex);
   }
+
   restore_prompt();
 }
 
 static void erase_prompt()
 {
   char *lb = rl_line_buffer;
-  while(*(lb++)) { printf("\b \b\b"); } // Erase readline line
+
+  while(*(lb++)) {
+    printf("\b \b\b");  // Erase readline line
+  }
+
   printf("\b\b\b\b\b\b\b       \b\b\b\b\b\b\b"); // Erase "bdb > " prompt
 }
 
@@ -105,12 +111,13 @@ static void restore_prompt()
 void parse_word(char *token, const char **line)
 {
   skipblanks(line);
-  while(**line > ' ')
-  {
+
+  while(**line > ' ') {
     *token = **line;
     ++token;
     ++*line;
   }
+
   *token = '\0';
   skipblanks(line);
 }
@@ -118,15 +125,16 @@ void parse_word(char *token, const char **line)
 void parse_token(char *token, const char **line)
 {
   skipblanks(line);
+
   while(
     (**line >= 'a' && **line <= 'z')
-  ||(**line >= 'A' && **line <= 'Z')
-  ||(**line >= '0' && **line <= '9'))
-  {
+    ||(**line >= 'A' && **line <= 'Z')
+    ||(**line >= '0' && **line <= '9')) {
     *token = **line;
     ++token;
     ++*line;
   }
+
   *token = '\0';
   skipblanks(line);
 }
@@ -140,14 +148,15 @@ void showreg(int cpu)
 
   int r;
   int t;
-  for(t = 0; t <= 8; t += 8)
-  {
-    for(r = 0; r < 8; ++r)
-    {
+
+  for(t = 0; t <= 8; t += 8) {
+    for(r = 0; r < 8; ++r) {
       printf("%s:%08X ", regname[r + t], regs[r + t]);
     }
+
     printf("\n");
   }
+
   printf("pc:%08X sr:%04X\n", regs[REG_PC], regs[REG_SR]);
 }
 
@@ -218,19 +227,19 @@ void boot_sp(u8 *image, int imgsize)
 // value is the target of the vector
 void gen_setvector(u32 v, u32 value)
 {
-  if(v == 0x70)
-  {
+  if(v == 0x70) {
     // LEVEL4/HBLANK interrupt
     char romid[17];
     romid[16] = '\0';
-    readmem(0, (u8*)romid, 0x120, 16);
-    if(strstr(romid, "BOOT ROM"))
-    {
+    readmem(0, (u8 *)romid, 0x120, 16);
+
+    if(strstr(romid, "BOOT ROM")) {
       printf("Sega CD detected : write the HBLANK vector at the special address\n");
-      if((value & 0x00FF0000) != 0x00FF0000)
-      {
+
+      if((value & 0x00FF0000) != 0x00FF0000) {
         printf("Warning : cannot set HBLANK outside main RAM for Sega CD.\n");
       }
+
       writelong(0, 0xA12006, value & 0xFFFF);
       return;
     }
@@ -238,8 +247,8 @@ void gen_setvector(u32 v, u32 value)
 
   // Fetch wrapper from genesis
   u32 wrapper = readlong(0, v) & 0x00FFFFFF;
-  if(wrapper < 0x200000)
-  {
+
+  if(wrapper < 0x200000) {
     // Not in RAM : cannot change vector
     printf("Warning : cannot set vector %02X : target not in RAM.\n", v);
     return;
@@ -252,8 +261,7 @@ void gen_setvector(u32 v, u32 value)
 
 void boot_ram(u8 *image, int imgsize)
 {
-  if(imgsize != 0xFF00)
-  {
+  if(imgsize != 0xFF00) {
     printf("Incorrect image size (must be 0xFF00)\n");
     return;
   }
@@ -264,15 +272,15 @@ void boot_ram(u8 *image, int imgsize)
   u32 pc = getint(image + 0xFC, 4);
 
   u32 v;
-  for(v = 0x08; v < 0xC0; v += 4)
-  {
+
+  for(v = 0x08; v < 0xC0; v += 4) {
     u32 value = getint(image + v, 4);
-    if(value != pc && value >= 0x200)
-    {
-      if(v == 0x68)
-      {
+
+    if(value != pc && value >= 0x200) {
+      if(v == 0x68) {
         printf("Warning : Image overrides level 2 (BDA/pad) interrupt\n");
       }
+
       gen_setvector(v, value);
     }
   }
@@ -292,27 +300,31 @@ void boot_img(const char *filename)
 {
   u8 *image;
   int imgsize = readfile(filename, &image);
-  if(imgsize < 0x200)
-  {
+
+  if(imgsize < 0x200) {
     printf("Image too small.\n");
     free(image);
     return;
   }
-  switch(getimgtype(image, imgsize))
-  {
-    case 0:
-      printf("Invalid image type.\n");
-      break;
-    case 1:
-      printf("Cannot boot ROM cartridges.\n");
-      break;
-    case 2:
-      boot_cd(image, imgsize);
-      break;
-    case 4:
-      boot_ram(image, imgsize);
-      break;
+
+  switch(getimgtype(image, imgsize)) {
+  case 0:
+    printf("Invalid image type.\n");
+    break;
+
+  case 1:
+    printf("Cannot boot ROM cartridges.\n");
+    break;
+
+  case 2:
+    boot_cd(image, imgsize);
+    break;
+
+  case 4:
+    boot_ram(image, imgsize);
+    break;
   }
+
   free(image);
 
   showreg(0);
@@ -322,24 +334,26 @@ void boot_sp_from_iso(const char *filename)
 {
   u8 *image;
   int imgsize = readfile(filename, &image);
-  if(imgsize < 0x200)
-  {
+
+  if(imgsize < 0x200) {
     printf("Image too small.\n");
     free(image);
     return;
   }
-  switch(getimgtype(image, imgsize))
-  {
-    case 0:
-    case 1:
-    case 3:
-    case 4:
-      printf("Invalid image type.\n");
-      break;
-    case 2:
-      boot_sp(image, imgsize);
-      break;
+
+  switch(getimgtype(image, imgsize)) {
+  case 0:
+  case 1:
+  case 3:
+  case 4:
+    printf("Invalid image type.\n");
+    break;
+
+  case 2:
+    boot_sp(image, imgsize);
+    break;
   }
+
   free(image);
 }
 
@@ -347,37 +361,40 @@ int parse_register(const char **line)
 {
   skipblanks(line);
   int r = -1;
-  if(**line == 's' || **line == 'S')
-  {
+
+  if(**line == 's' || **line == 'S') {
     ++*line;
-    if(**line == 'r' || **line == 'R')
-    {
+
+    if(**line == 'r' || **line == 'R') {
       ++*line;
       return 17;
     }
-  }
-  else if(**line == 'p' || **line == 'P')
-  {
+  } else if(**line == 'p' || **line == 'P') {
     ++*line;
-    if(**line == 'c' || **line == 'C')
-    {
+
+    if(**line == 'c' || **line == 'C') {
       ++*line;
       return 16;
     }
+  } else if(**line == 'd' || **line == 'D') {
+    r = 0;
+  } else if(**line == 'a' || **line == 'A') {
+    r = 8;
   }
-  else if(**line == 'd' || **line == 'D') r = 0;
-  else if(**line == 'a' || **line == 'A') r = 8;
 
-  if(r == -1) return -1;
+  if(r == -1) {
+    return -1;
+  }
 
   ++*line;
-  if(**line >= '0' && **line <= '7')
-  {
+
+  if(**line >= '0' && **line <= '7') {
     r += **line - '0';
     ++*line;
     skipblanks(line);
     return r;
   }
+
   return -1;
 }
 
@@ -389,14 +406,17 @@ u32 asmfile(const char *filename, u8 *target, u32 org)
   printf("%s\n", cmdline);
   FILE *a = popen(cmdline, "r");
   u32 codesize = 0;
-  while(!feof(a))
-  {
+
+  while(!feof(a)) {
     u32 readsize = fread(target, 1, 4096, a);
     codesize += readsize;
     target += readsize;
   }
-  if(pclose(a))
+
+  if(pclose(a)) {
     printf("Warning : asmx returned an error\n");
+  }
+
   return codesize;
 }
 
@@ -432,8 +452,7 @@ void on_line_input(char *l);
 
 int main(int argc, char **argv)
 {
-  if(argc < 2)
-  {
+  if(argc < 2) {
     fprintf(stderr, "Missing parameter.\n");
     usage();
     exit(1);
@@ -441,12 +460,11 @@ int main(int argc, char **argv)
 
   open_debugger(argv[1], on_unknown, on_breakpoint, on_exception);
 
-	printf("Blast ! debugger. Connected to %s\n", argv[1]);
+  printf("Blast ! debugger. Connected to %s\n", argv[1]);
 
-	cpu = 0;
+  cpu = 0;
 
-  if(argc >= 3)
-  {
+  if(argc >= 3) {
     printf("\n");
     boot_img(argv[2]);
   }
@@ -486,54 +504,56 @@ void on_line_input(char *line)
   rl_callback_handler_remove();
 
   do {
-    if(*l)
-    {
+    if(*l) {
       strcpy(lastline, l);
       add_history(l);
-    }
-    else
-    {
+    } else {
       // Replay last line
-      if(!lastline[0])
-      {
+      if(!lastline[0]) {
         continue;
       }
+
       l = lastline;
     }
 
     signal(SIGINT, goto_mainloop); // Handle Ctrl-C : jump back to prompt
 
     if(strncmp(l, "main", 4) == 0) {
-      if(cpu != 0) printf("Switch to main cpu\n");
+      if(cpu != 0) {
+        printf("Switch to main cpu\n");
+      }
+
       cpu = 0;
       l += 4;
     }
 
     if(strncmp(l, "sub", 3) == 0) {
-      if(cpu != 1) printf("Switch to sub cpu\n");
+      if(cpu != 1) {
+        printf("Switch to sub cpu\n");
+      }
+
       cpu = 1;
       l += 3;
     }
 
     parse_token(token, &l);
 
-    if(strcmp(token, "q") == 0)
-    {
+    if(strcmp(token, "q") == 0) {
       exit(0);
     }
 
-    if(strcmp(token, "cpu") == 0)
-    {
+    if(strcmp(token, "cpu") == 0) {
       printf("Working on %s cpu", cpu ? "sub" : "main");
       continue;
     }
 
-    if(strcmp(token, "asmx") == 0)
-    {
+    if(strcmp(token, "asmx") == 0) {
       parse_word(token, &l);
       u32 address = parse_int_skip(&l);
 
-      if(!address) address = cpu ? 0x006000 : 0xFF0000;
+      if(!address) {
+        address = cpu ? 0x006000 : 0xFF0000;
+      }
 
       u8 obj[65536];
       u32 osize = asmfile(token, obj, address);
@@ -545,84 +565,83 @@ void on_line_input(char *line)
       continue;
     }
 
-    if(strcmp(token, "r") == 0)
-    {
+    if(strcmp(token, "r") == 0) {
       parse_token(token, &l);
       u32 address = parse_int_skip(&l);
       u32 value;
-      switch(token[0])
-      {
-        case 'b':
-          value = readbyte(cpu, address);
-          break;
-        case 'w':
-          value = readword(cpu, address);
-          break;
-        case 'l':
-          value = readlong(cpu, address);
-          break;
+
+      switch(token[0]) {
+      case 'b':
+        value = readbyte(cpu, address);
+        break;
+
+      case 'w':
+        value = readword(cpu, address);
+        break;
+
+      case 'l':
+        value = readlong(cpu, address);
+        break;
       }
+
       printf("%06X: %08X\n", address, value);
       continue;
     }
 
-    if(strcmp(token, "w") == 0)
-    {
+    if(strcmp(token, "w") == 0) {
       parse_token(token, &l);
       u32 address = parse_int_skip(&l);
       u32 value = parse_int_skip(&l);
-      switch(token[0])
-      {
-        case 'b':
-          writebyte(cpu, address, value);
-          break;
-        case 'w':
-          writeword(cpu, address, value);
-          break;
-        case 'l':
-          writelong(cpu, address, value);
-          break;
+
+      switch(token[0]) {
+      case 'b':
+        writebyte(cpu, address, value);
+        break;
+
+      case 'w':
+        writeword(cpu, address, value);
+        break;
+
+      case 'l':
+        writelong(cpu, address, value);
+        break;
       }
+
       printf("%06X: %08X\n", address, value);
       continue;
     }
 
-    if(strcmp(token, "sendfile") == 0)
-    {
+    if(strcmp(token, "sendfile") == 0) {
       u32 address = parse_int_skip(&l);
       parse_word(token, &l);
       sendfile(cpu, token, address);
       continue;
     }
 
-    if(strcmp(token, "go") == 0)
-    {
+    if(strcmp(token, "go") == 0) {
       startcpu(cpu);
       continue;
     }
 
-    if(strcmp(token, "stop") == 0)
-    {
+    if(strcmp(token, "stop") == 0) {
       stopcpu(cpu);
       continue;
     }
 
-    if(strcmp(token, "bridge") == 0)
-    {
+    if(strcmp(token, "bridge") == 0) {
       u8 inp[3];
+
       if(bridgequery(inp)) {
         printf("OK !\n\n Protocol v%c\n Implementation v%c.%c\n", inp[0], inp[1], inp[2]);
       }
     }
 
-    if(strcmp(token, "reg") == 0)
-    {
+    if(strcmp(token, "reg") == 0) {
       showreg(cpu);
       continue;
     }
 
-    if(strcmp(token, "dump") == 0)
-    {
+    if(strcmp(token, "dump") == 0) {
       u32 address = parse_int_skip(&l);
       skipblanks(&l);
       u32 size = parse_int_skip(&l);
@@ -632,51 +651,49 @@ void on_line_input(char *line)
 
       skipblanks(&l);
 
-      if(*l)
-      {
+      if(*l) {
         FILE *f = fopen(l, "w");
-        if(!f)
-        {
+
+        if(!f) {
           printf("Cannot open file %s.\n", l);
           continue;
         }
 
         fwrite(data, 1, size, f);
         fclose(f);
-      }
-      else
-      {
+      } else {
         hexdump(data, size, address);
       }
+
       continue;
     }
 
-    if(strcmp(token, "showchr") == 0)
-    {
+    if(strcmp(token, "showchr") == 0) {
       u32 address = parse_int_skip(&l) * 32;
       u8 data[32];
       readvram(data, address, 32);
       int c, x, y;
       c = 0;
       printf(" --------\n");
-      for(y = 0; y < 8; ++y)
-      {
+
+      for(y = 0; y < 8; ++y) {
         printf("|");
-        for(x = 0; x < 4; ++x)
-        {
+
+        for(x = 0; x < 4; ++x) {
           u8 c1 = data[c] >> 4;
           u8 c2 = data[c] & 0xF;
           printf("%c", c1 ? (c1 > 9 ? c1 - 10 + 'A' : c1 + '0') : ' ');
           printf("%c", c2 ? (c2 > 9 ? c2 - 10 + 'A' : c2 + '0') : ' ');
           ++c;
         }
+
         printf("|\n");
       }
+
       printf(" --------\n");
     }
 
-    if(strcmp(token, "vdump") == 0)
-    {
+    if(strcmp(token, "vdump") == 0) {
       u32 address = parse_int_skip(&l);
       skipblanks(&l);
       u32 size = parse_int_skip(&l);
@@ -686,45 +703,44 @@ void on_line_input(char *line)
 
       skipblanks(&l);
 
-      if(*l)
-      {
+      if(*l) {
         FILE *f = fopen(l, "w");
-        if(!f)
-        {
+
+        if(!f) {
           printf("Cannot open file %s.\n", l);
           continue;
         }
 
         fwrite(data, 1, size, f);
         fclose(f);
-      }
-      else
-      {
+      } else {
         hexdump(data, size, address);
       }
+
       continue;
     }
 
-    if(strcmp(token, "blsgen") == 0)
-    {
+    if(strcmp(token, "blsgen") == 0) {
       system("blsgen");
       continue;
     }
 
-    if(strcmp(token, "d68k") == 0)
-    {
+    if(strcmp(token, "d68k") == 0) {
       u32 address = parse_int_skip(&l);
       u32 size = parse_int_skip(&l);
       int instructions = -1;
+
       if(!address) {
         address = readlong(cpu, REG_PC);
         size = 0;
         printf("Starting at PC (%08X)\n", address);
-       }
+      }
+
       if(!size) {
         size = 10;
         instructions = 1;
       }
+
       u8 *data = (u8 *)malloc(size);
       readmem(cpu, data, address, size);
 
@@ -736,75 +752,71 @@ void on_line_input(char *line)
       continue;
     }
 
-    if(strcmp(token, "set") == 0)
-    {
+    if(strcmp(token, "set") == 0) {
       int reg = parse_register(&l);
-      if(reg == -1)
-      {
+
+      if(reg == -1) {
         printf("Unknown register.\n");
         continue;
       }
+
       u32 value = parse_int_skip(&l);
       setreg(cpu, reg, value);
       showreg(cpu);
       continue;
     }
 
-    if(strcmp(token, "step") == 0 || strcmp(token, "s") == 0)
-    {
+    if(strcmp(token, "step") == 0 || strcmp(token, "s") == 0) {
       stepcpu(cpu);
       showreg(cpu);
       d68k_instr(cpu);
       continue;
     }
 
-    if(strcmp(token, "skip") == 0)
-    {
+    if(strcmp(token, "skip") == 0) {
       d68k_skip_instr(cpu);
       continue;
     }
 
-    if(strcmp(token, "boot") == 0)
-    {
+    if(strcmp(token, "boot") == 0) {
       parse_word(token, &l);
       boot_img(token);
       continue;
     }
 
-    if(strcmp(token, "bootsp") == 0)
-    {
+    if(strcmp(token, "bootsp") == 0) {
       parse_word(token, &l);
       boot_sp_from_iso(token);
       continue;
     }
 
-    if(strcmp(token, "break") == 0)
-    {
-      if(!*l)
-      {
+    if(strcmp(token, "break") == 0) {
+      if(!*l) {
         list_breakpoints(cpu);
         continue;
       }
+
       u32 address = parse_int_skip(&l);
       set_breakpoint(cpu, address);
       continue;
     }
 
-    if(strcmp(token, "delete") == 0)
-    {
+    if(strcmp(token, "delete") == 0) {
       u32 address = parse_int_skip(&l);
-      if(delete_breakpoint(cpu, address)) printf("Deleted a breakpoint at $%06X\n", address);
+
+      if(delete_breakpoint(cpu, address)) {
+        printf("Deleted a breakpoint at $%06X\n", address);
+      }
+
       continue;
     }
 
-    if(strcmp(token, "reset") == 0)
-    {
+    if(strcmp(token, "reset") == 0) {
       resetcpu(cpu);
       continue;
     }
 
-    if(strcmp(token, "bdpdump") == 0)
-    {
+    if(strcmp(token, "bdpdump") == 0) {
       int bdpdump = parse_int_skip(&l);
       printf("bdp debug trace %sabled.\n", bdpdump ? "en" : "dis");
       bdp_set_dump(bdpdump);
@@ -818,3 +830,5 @@ void on_line_input(char *line)
   rl_callback_handler_install(prompt, on_line_input);
 }
 
+
+// vim: ts=2 sw=2 sts=2 et

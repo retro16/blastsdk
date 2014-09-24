@@ -9,11 +9,14 @@ static void pack_open(const char *filename, FILE **i, FILE **o)
   snprintf(oname, 4096, BUILDDIR"/%s.phy", filename);
 
   *i = fopen(iname, "rb");
+
   if(!*i) {
     printf("Could not open %s for input\n", iname);
     exit(1);
   }
+
   *o = fopen(oname, "wb");
+
   if(!*o) {
     printf("Could not open %s for output\n", oname);
     exit(1);
@@ -34,7 +37,7 @@ size_t pack_raw(const char *filename)
   return filesize;
 }
 
-const char * sections_cat(group *bin, const char *binname)
+const char *sections_cat(group *bin, const char *binname)
 {
   FILE *i, *o;
   o = fopen(binname, "wb");
@@ -46,15 +49,18 @@ const char * sections_cat(group *bin, const char *binname)
     if(sec->physsize == 0 || sec->format == format_zero || sec->format == format_empty) {
       continue;
     }
+
     char secfile[4096];
     snprintf(secfile, 4096, BUILDDIR"/%s", sec->name);
     sec->physaddr = ftell(o);
     i = fopen(secfile, "rb");
     filecat(i, o);
     sec->physsize = ftell(i);
+
     if(sec->physsize & 1) {
       fputc('\x00', o); // Align sections to word in binary
     }
+
     fclose(i);
   }
 
@@ -63,3 +69,5 @@ const char * sections_cat(group *bin, const char *binname)
 
   return binname;
 }
+
+// vim: ts=2 sw=2 sts=2 et

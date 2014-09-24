@@ -39,9 +39,12 @@ extern BLSLL(symbol) *symbols;
 } while(0)
 
 
-static inline char * strdupnul(const char *s) {
-  if(!s)
+static inline char *strdupnul(const char *s)
+{
+  if(!s) {
     return 0;
+  }
+
   return strdup(s);
 }
 
@@ -80,7 +83,7 @@ typedef struct group {
   struct blsll_node_group *uses_binaries; // List of binaries used by this binary
   struct blsll_node_group *loads; // List of binaries loaded by this binary
 } group;
-group * group_new();
+group *group_new();
 void group_free(group *group);
 BLSLL_DECLARE(group, group_free)
 
@@ -90,7 +93,7 @@ typedef struct symbol {
   chipaddr value;
   struct section *section; // Section providing the symbol
 } symbol;
-symbol * symbol_new();
+symbol *symbol_new();
 void symbol_free(symbol *symbol);
 BLSLL_DECLARE(symbol, symbol_free)
 
@@ -116,7 +119,7 @@ typedef struct section {
 
   group *source;
 } section;
-section * section_new();
+section *section_new();
 void section_free(section *section);
 BLSLL_DECLARE(section, section_free)
 
@@ -128,7 +131,12 @@ typedef struct element {
   int physalign; // Alignment on physical medium
 
 } element;
-static inline void element_free(element *element) { (void)element; printf("Error: tried to free a generic element\n"); exit(1); }
+static inline void element_free(element *element)
+{
+  (void)element;
+  printf("Error: tried to free a generic element\n");
+  exit(1);
+}
 BLSLL_DECLARE(element, element_free)
 
 typedef struct output {
@@ -159,32 +167,32 @@ typedef struct output {
   BLSLL(group) *sol; // Section order lost
   BLSLL(group) *binaries; // Binaries to put in the image (in order)
 } output;
-output * output_new();
+output *output_new();
 void output_free(output *output);
 BLSLL_DECLARE(output, output_free)
 
 extern output mainout;
 
-group * source_find(const char *name);
-group * source_find_sym(const char *name);
-section * section_find(const char *name);
-section * section_find_ext(const char *name, const char *suffix);
-section * section_find_sym(const char *name);
-section * section_find_using(section *section);
-symbol * symbol_find(const char *name);
+group *source_find(const char *name);
+group *source_find_sym(const char *name);
+section *section_find(const char *name);
+section *section_find_ext(const char *name, const char *suffix);
+section *section_find_sym(const char *name);
+section *section_find_using(section *section);
+symbol *symbol_find(const char *name);
 sv symbol_get_addr(const char *name, bankconfig *bankconfig);
 chip symbol_get_chip(const char *name);
-group * binary_find(const char *name);
-group * binary_find_sym(const char *name);
-group * binary_find_providing(BLSLL(group) * glist, section *section);
+group *binary_find(const char *name);
+group *binary_find_sym(const char *name);
+group *binary_find_providing(BLSLL(group) * glist, section *section);
 
 int sections_overlap(section *s1, section *s2);
 int phys_overlap(element *s1, element *s2);
 
-symbol * symbol_def(BLSLL(symbol) **symlist, char *symname, section *section);
-symbol * symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
-symbol * symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
-symbol * symbol_set_addr(BLSLL(symbol) **symlist, char *symname, sv value, section *section);
+symbol *symbol_def(BLSLL(symbol) **symlist, char *symname, section *section);
+symbol *symbol_set(BLSLL(symbol) **symlist, char *symname, chipaddr value, section *section);
+symbol *symbol_set_bus(BLSLL(symbol) **symlist, char *symname, busaddr value, section *section);
+symbol *symbol_set_addr(BLSLL(symbol) **symlist, char *symname, sv value, section *section);
 
 void *merge_lists(void *target, void *source);
 
@@ -203,3 +211,5 @@ int findfile(char *out, const char *f);
 void tmpdir(char *out, const char *f); // Returns the file name in the temporary directory
 
 #endif
+
+// vim: ts=2 sw=2 sts=2 et

@@ -30,7 +30,7 @@
     for(; (list); (list) = next) { next = (list)->next; if((list)->data) freedata((list)->data); free(list); } } \
   static inline BLSLL(name) * blsll_copy_##name(BLSLL(name) *list, BLSLL(name) *append) { BLSLL(name) *prevnode = NULL, *node = NULL; \
     for(; (list); (list) = (list)->next) { node = (BLSLL(name) *)malloc(sizeof(BLSLL(name))); node->data = list->data; node->next = append; if(prevnode) prevnode->next = node; prevnode = node; } return node; } \
-
+ 
 #define BLSENUM(name, size) extern const char name##_names[][size];\
   static inline name name##_parse(const char *s) { if(!s) return (name)0; \
   int i; for(i = 0; i < name##_max; ++i) \
@@ -38,3 +38,5 @@
   return (name)0; }
 
 #endif
+
+// vim: ts=2 sw=2 sts=2 et

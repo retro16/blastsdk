@@ -51,3 +51,5 @@ extern void cleanup_breakpoints(int cpu);
 extern void list_breakpoints(int cpu);
 extern void set_breakpoint(int cpu, u32 address);
 extern int delete_breakpoint(int cpu, u32 address);
+
+// vim: ts=2 sw=2 sts=2 et

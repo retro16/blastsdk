@@ -25,8 +25,8 @@ extern const char *d68k_error(int code);
 
 // symtable.c
 extern void setdsym(const char *name, u32 val);
-extern u32 * getdsym(const char *name);
-extern const char * getdsymat(u32 val); // returns the first debug symbol matching val
+extern u32 *getdsym(const char *name);
+extern const char *getdsymat(u32 val);  // returns the first debug symbol matching val
 extern int parsedsym(const char *text);
 extern int parsedsymfile(const char *name);
 
@@ -68,3 +68,5 @@ extern void sendfile(const char *file, u32 address);
 extern void subsendfile(const char *path, u32 address);
 extern void open_debugger(const char *path);
 #endif
+
+// vim: ts=2 sw=2 sts=2 et

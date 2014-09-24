@@ -12,14 +12,14 @@
 void help()
 {
   fprintf(stderr, "Usage: d68k [-acl] [-o offset] [-s size] [-i instructions] FILE ADDRESS [SYMFILE]\n"
-  "Disassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n"
-  "    -a assemble FILE before disassembling\n"
-  "    -c shows cycles for each instruction.\n"
-  "    -l shows labels.\n"
-  "    -o offset in file.\n"
-  "    -s max number of bytes to dissasemble.\n"
-  "    -i max number of instructions to dissasemble.\n"
-  );
+          "Disassembles m68k binary FILE starting at ADDRESS, using optional SYMFILE.\n"
+          "    -a assemble FILE before disassembling\n"
+          "    -c shows cycles for each instruction.\n"
+          "    -l shows labels.\n"
+          "    -o offset in file.\n"
+          "    -s max number of bytes to dissasemble.\n"
+          "    -i max number of instructions to dissasemble.\n"
+         );
   exit(1);
 }
 
@@ -35,41 +35,40 @@ int main(int argc, char **argv)
   u32 offset = 0;
 
   int c;
-  while((c = getopt (argc, argv, "aclo:s:i:t:")) != -1)
-  {
-    switch(c)
-    {
-      case 'c':
+
+  while((c = getopt (argc, argv, "aclo:s:i:t:")) != -1) {
+    switch(c) {
+    case 'c':
       cycles = 1;
       break;
 
-      case 'l':
+    case 'l':
       labels = 1;
       break;
 
-      case 'a':
+    case 'a':
       assemble = 1;
       break;
 
-      case 'o':
+    case 'o':
       offset = parse_int(optarg);
       break;
 
-      case 's':
+    case 's':
       size = parse_int(optarg);
       break;
 
-      case 'i':
+    case 'i':
       instructions = parse_int(optarg);
       break;
 
-      case 't':
+    case 't':
       d68k_readsymbols(optarg);
       labels = 1;
       readsymbols = 0;
       break;
 
-      default:
+    default:
       help();
       break;
     }
@@ -79,8 +78,7 @@ int main(int argc, char **argv)
     d68k_readsymbols(NULL);
   }
 
-  if(argc < optind + 2 || argc > optind + 3)
-  {
+  if(argc < optind + 2 || argc > optind + 3) {
     help();
   }
 
@@ -89,8 +87,7 @@ int main(int argc, char **argv)
   char infilename[4096];
   strcpy(infilename, argv[optind + 0]);
 
-  if(assemble)
-  {
+  if(assemble) {
     snprintf(infilename, 4096, "%s.tmp", argv[optind + 0]);
     char cmdline[4096];
     snprintf(cmdline, 4096, "asmx -b 0x%08X -o %s -C 68000 %s > /dev/null 2>/dev/null", address, infilename, argv[optind + 0]);
@@ -99,18 +96,17 @@ int main(int argc, char **argv)
 
   u8 *data;
   u32 realsize = readfile(infilename, &data);
-  if(offset >= realsize)
-  {
+
+  if(offset >= realsize) {
     fprintf(stderr, "Offset out of bounds.\n");
     exit(1);
   }
-  if(offset + size > realsize)
-  {
+
+  if(offset + size > realsize) {
     size = realsize - offset;
   }
 
-  if(assemble)
-  {
+  if(assemble) {
     unlink(infilename);
   }
 
@@ -120,8 +116,7 @@ int main(int argc, char **argv)
   int64_t r = d68k(dasm, size * 40, data + offset, size, instructions, address, labels, cycles, &suspicious);
   free(data);
 
-  if(r < 0)
-  {
+  if(r < 0) {
     free(dasm);
     fprintf(stderr, "d68k error : %s\n", d68k_error(r));
     return 2;
@@ -132,3 +127,5 @@ int main(int argc, char **argv)
 
   return 0;
 }
+
+// vim: ts=2 sw=2 sts=2 et

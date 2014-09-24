@@ -14,3 +14,5 @@ extern size_t getsymname(char *output, const char *path);
 extern void hexdump(const u8 *data, int size, u32 offset);
 
 #endif
+
+// vim: ts=2 sw=2 sts=2 et

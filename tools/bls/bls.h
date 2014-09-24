@@ -88,21 +88,19 @@ static inline u32 getint(const u8 *data, int size)
 {
   u32 d = 0;
   int i;
-  for(i = 0; i < size; ++i)
-  {
+
+  for(i = 0; i < size; ++i) {
     d |= data[i] << ((size - 1 - i) * 8);
   }
+
   return d;
 }
 
 static inline void signext(int *v, int bits)
 {
-  if(*v & (1<<(bits-1)))
-  {
+  if(*v & (1<<(bits-1))) {
     *v |= (-1) << bits;
-  }
-  else
-  {
+  } else {
     *v &= (1L << bits) - 1;
   }
 }
@@ -110,20 +108,30 @@ static inline void signext(int *v, int bits)
 static inline void setint(u32 value, u8 *target, int size)
 {
   int i;
-  for(i = 0; i < size; ++i)
-  {
+
+  for(i = 0; i < size; ++i) {
     target[i] = value >> ((size - 1 - i) * 8);
   }
 }
 
-static inline sv neint(sv v) {
-  if(v < 0) return v;
+static inline sv neint(sv v)
+{
+  if(v < 0) {
+    return v;
+  }
+
   return (-v) & 0xFFFFFFFF;
 }
 
-static inline sv not_int(sv v) {
-  if(v < 0) return v;
+static inline sv not_int(sv v)
+{
+  if(v < 0) {
+    return v;
+  }
+
   return (~v) & 0xFFFFFFFF;
 }
 
 #endif//BLS_H
+
+// vim: ts=2 sw=2 sts=2 et

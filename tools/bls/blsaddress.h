@@ -71,3 +71,5 @@ sv tilemap_addr8(sv addr, sv width);
 sv align_value(sv value, sv step);
 
 #endif
+
+// vim: ts=2 sw=2 sts=2 et

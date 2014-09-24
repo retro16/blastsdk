@@ -1,4 +1,4 @@
 asm_symbol:
-	move.w d0, d1
+move.w d0, d1
 
-	BLS_LOAD_BINARY_COMMON_C
+BLS_LOAD_BINARY_COMMON_C

@@ -59,4 +59,6 @@ uninstall:
 	$(LD) $(LDFLAGS) $(LDFLAGS_$*) -o $@ $^ $(LDFLAGS_$*) $(LDFLAGS)
 
 
+# vim: ts=8 sw=8 sts=8 noet
+
 .PHONY: clean test all
