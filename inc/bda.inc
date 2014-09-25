@@ -37,7 +37,7 @@ bda_init                                        ; Call at console initialization
                 move.l  #int_trap07, d0
                 jsr     bda_set_int_vector
 
-        if TARGET == TARGET_SCD
+        if TARGET == TARGET_SCD1 || target == TARGET_SCD2
                 ; Disable write protection and access bank 0
                 move.b  #$00, GA_MM
 
@@ -76,7 +76,7 @@ bda_init                                        ; Call at console initialization
                 ; Release BUSREQ
                 move.w  #GA_NORESET, GA_RH
 
-        endif   ; TARGET == TARGET_SCD
+        endif   ; TARGET == TARGET_SCD1/2
         endif   ; TARGET != TARGET_GEN
 
                 ; Setup gamepad port in neutral state (TR low, all other pins input, enable interrupt)
@@ -397,7 +397,7 @@ bda_code_source_end
 
                 ; Sub CPU code
 
-        if TARGET == TARGET_SCD
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 BUS     set BUS_SUB
 bdasub_d0       set     $0000C0                 ; Place monitor after exception vectors
 
@@ -457,7 +457,7 @@ bda_sub_code_end
                 rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN
-        endif   ; TARGET == TARGET_SCD
+        endif   ; TARGET == TARGET_SCD1/2
 
         endif   ; BUS == BUS_MAIN
 

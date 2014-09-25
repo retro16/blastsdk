@@ -69,5 +69,5 @@ Output monitor
  - name **Monitor**
  - file monitor_scd_jp.iso
  - region J
- - target scd
+ - target scd1
 

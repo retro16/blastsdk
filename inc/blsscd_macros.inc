@@ -106,7 +106,14 @@ SET_INT_HANDLER macro   vector, target
                 move.l  #target, (a0)
                 endm
 
+SEND_WRAM_2M    macro
+                bset    #GA_DMNA_BIT, GA_MM + 1
+SEND_WRAM_2M\?
+                btst    #GA_DMNA_BIT, GA_MM + 1
+                beq.b   SEND_WRAM_2M\?
+                endm
+
+                include blsscd_read_macros.inc
 
 ; vim: ts=8 sw=8 sts=8 et
 
-; vim: ts=8 sw=8 sts=8 et

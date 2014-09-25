@@ -50,7 +50,7 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
     if(source->banks.bus == bus_none) {
       source->banks.bus = bus_sub;
     }
-  } else if(source->banks.bus == bus_none && maintarget != target_scd) {
+  } else if(source->banks.bus == bus_none && maintarget != target_scd1 && maintarget != target_scd2) {
     // For genesis, default to main bus
     source->banks.bus = bus_main;
   }
@@ -109,7 +109,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
         // first ORG declaration : map to address
         if(src->banks.bus == bus_none) {
           // Guess bus based on context
-          if(maintarget == target_scd && address < 0xA00000) {
+          if((maintarget == target_scd1 || maintarget == target_scd2) && address < 0xA00000) {
             src->banks.bus = bus_sub;
           } else {
             src->banks.bus = bus_main;
@@ -292,7 +292,7 @@ const char *gen_load_defines_asmx()
     getsymname(binname, bin->name);
     fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO\n", binname);
 
-    if(maintarget == target_scd) {
+    if(maintarget == target_scd1 || maintarget == target_scd2) {
       // Begin SCD transfer
       // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
 //      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
@@ -445,7 +445,7 @@ case bus_max:
 break;
 
 case bus_main:
-if(maintarget == target_scd) {
+if(maintarget == target_scd1 || maintarget == target_scd2) {
 sec->symbol->value.chip = chip_ram;
 } else {
 sec->symbol->value.chip = chip_cart;

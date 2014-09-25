@@ -1,42 +1,84 @@
-; Read d1 sectors starting at d0 into buffer in a0 (using Sub-CPU)
-ReadCD
-        movem.l d0-d1/a0-a1, -(sp)
-.0
-        move.w  #$0089, d0      ;CDCSTOP
-        jsr     $5F22.w         ;call CDBIOS function
+BLSCDR_COMM     equ     (GA_COMMWORDS + $10 - 4)        ; Last 2 main CPU commwords used for CDR
+BLSCDR          equ     $20
+BLSCDR_BIT      equ     5
 
-        movea.l sp, a0          ;ptr to 32 bit sector start and 32 bit sector count
-        move.w  #$0020, d0      ;ROMREADN
-        jsr     $5F22.w         ;call CDBIOS function
-.1
-        move.w  #$008A, d0      ;CDCSTAT
-        jsr     $5F22.w         ;call CDBIOS function
-        bcs.b   .1              ;no sectors in CD buffer
 
-        ;set CDC Mode destination device to Sub-CPU
-;       andi.w  #$F8FF, $8004.w
-;       ori.w   #$0300, $8004.w
-.2
-        move.w  #$008B, d0      ;CDCREAD
-        jsr     $5F22.w         ;call CDBIOS function
-        bcs.b   .2              ;not ready to xfer data
+BLSLOAD_PREPARE macro   sector, count
+        if BUS == BUS_MAIN
 
-        movea.l 8(sp), a0       ;data buffer
-        lea     12(sp), a1      ;header address
-        move.w  #$008C, d0      ;CDCTRN
-        jsr     $5F22.w         ;call CDBIOS function
-        bcs.b   .0              ;failed, retry
+        ; Main CPU load prepare
+        move.l  #(sector | (count << 24)), BLSCDR_COMM
+        bset    #BLSCDR_BIT, GA_COMMFLAGS_MAIN
+        SUB_INTERRUPT
 
-        move.w  #$008D, d0      ;CDCACK
-        jsr     $5F22.w         ;call CDBIOS function
+        else
 
-        addq.l  #1, (sp)        ;next sector
-        addi.l  #2048, 8(sp)    ;inc buffer ptr
-        subq.l  #1, 4(sp)       ;dec sector count
-        bne.b   .1
+        ; Sub CPU load prepare
+subload\?
+        move.l  #sector, BLSLOAD_SECTOR
+        move.w  #count, BLSLOAD_COUNT + 2
+        lea     BLSLOAD_SECTOR, a0
+        BIOS_ROMREADN
 
-        lea     16(sp), sp      ;cleanup stack
-        rts
+        endif
+        endm
 
+; Wait until data is ready and start transfer
+BLSLOAD_START           macro
+        lea     GA_MM + 1, a0
+        if BUS == BUS_MAIN
+        btst    #GA_MODE_BIT, (a0)
+        beq.b   BLSLOAD_START_MODE_2\?
+
+        ; Swap request
+        bclr    #GA_DMNA_BIT, (a0)
+BLSLOAD_WAIT_START_MODE_1\?
+        btst    #GA_DMNA_BIT, (a0)         ; Wait until swap finished
+        beq.b   BLSLOAD_WAIT_START_MODE_1\?
+        bra.b   BLSLOAD_READ_READY\?
+
+BLSLOAD_START_MODE_2\?
+        btst    #GA_RET_BIT, (a0)
+        beq.b   BLSLOAD_WAIT_START_MODE_2\?
+
+        ; Send 2M bank to sub CPU
+        bset    #GA_DMNA_BIT, (a0)
+        loopuntil btst #GA_DMNA_BIT, (a0)
+
+BLSLOAD_WAIT_START_MODE_2\?
+        ; Wait until memory returned to main cpu
+        loopuntil btst #GA_RET_BIT, (a0)
+        
+BLSLOAD_READ_READY\?
+        move.l  a2, -(a7)
+        lea     $200000, a2
+        else
+        endif
+        endm
+
+; Read size bytes from CD to addr
+BLSLOAD_READ    macro   addr, size
+        if BUS == BUS_SUB
+
+        move.l  #size, d0
+        lea     addr, a0
+        jsr     BLSLOAD_READ_CD
+
+        endif
+        endm
+
+BLSLOAD_FINISH  macro
+        if BUS == BUS_MAIN
+        move.l  (a7)+, a2       ; Restore data source register
+        else
+
+        ; Ack the last sector if needed
+        tst.w   BLSLOAD_SIZE
+        bne.b   BLSLOAD_FINISH_ACK\?
+        BIOS_CDCACK
+        clr.w   BLSLOAD_BUFOFF
+
+        endif
+        endm
 
 ; vim: ts=8 sw=8 sts=8 et

@@ -26,8 +26,9 @@ CHIP_PCM        equ     11
 
 ; Target constants
 TARGET_GEN  equ 0
-TARGET_SCD  equ 1
-TARGET_RAM  equ 2
+TARGET_SCD1 equ 1
+TARGET_SCD2 equ 2
+TARGET_RAM  equ 3
 
                 if BUS == BUS_MAIN
 ; Controllers

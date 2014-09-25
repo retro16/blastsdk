@@ -689,6 +689,7 @@ void print_ea(int mode, int reg)
       u32 addr = fetch(2); if(addr >= 0x8000) {
         addr |= 0xFF0000;
       }
+
       if(labels && addr >= startaddr && addr < endaddr) {
         print_label(addr);
       } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {

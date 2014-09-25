@@ -73,7 +73,8 @@ typedef int64_t sv;
 typedef enum target {
   target_unknown,
   target_gen,
-  target_scd,
+  target_scd1, // SCD in 1M mode
+  target_scd2, // SCD in 2M mode
   target_ram,
   target_max
 } target;

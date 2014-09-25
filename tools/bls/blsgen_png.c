@@ -69,7 +69,7 @@ void section_create_png(group *source, const mdconfnode *mdconf)
   s->source = source;
   s->align = 0x2000;
 
-  if(source->banks.bus == bus_none && maintarget != target_scd) {
+  if(source->banks.bus == bus_none && maintarget != target_scd1 && maintarget != target_scd2) {
     // For genesis, default to main bus
     source->banks.bus = bus_main;
   }

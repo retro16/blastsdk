@@ -69,5 +69,5 @@ Output monitor
  - name **Monitor**
  - file monitor_scd_eu.iso
  - region E
- - target scd
+ - target scd1
 

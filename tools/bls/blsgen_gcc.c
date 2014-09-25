@@ -11,7 +11,7 @@ void section_create_gcc(group *source, const mdconfnode *mdconf)
   (void)mdconf;
   section *s;
 
-  if(source->banks.bus == bus_none && maintarget != target_scd) {
+  if(source->banks.bus == bus_none && maintarget != target_scd1 && maintarget != target_scd2) {
     // For genesis, default to main bus
     source->banks.bus = bus_main;
   }
@@ -306,7 +306,7 @@ const char *gen_load_defines()
     getsymname(binname, bin->name);
     fprintf(out, "#define %s%s() do { ", binary_load_function, binname);
 
-    if(maintarget == target_scd) {
+    if(maintarget == target_scd1 || maintarget == target_scd2) {
       // Begin SCD transfer
       // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
 //      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
@@ -594,7 +594,7 @@ case bus_max:
 break;
 
 case bus_main:
-if(maintarget == target_scd) {
+if(maintarget == target_scd1 || maintarget == target_scd2) {
 text->symbol->value.chip = chip_ram;
 } else {
 text->symbol->value.chip = chip_cart;

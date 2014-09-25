@@ -672,7 +672,7 @@ void output_dump(FILE *out)
     fprintf(out, " - file `%s`\n", mainout.file);
   }
 
-  if(maintarget == target_scd) {
+  if(maintarget == target_scd1 || maintarget == target_scd2) {
     if(mainout.ip) {
       fprintf(out, " - ip `%s`\n", mainout.ip->name);
     }
@@ -801,7 +801,7 @@ void gen_bol(group *bin)
 
 void bls_gen_bol()
 {
-  if(maintarget == target_scd) {
+  if(maintarget == target_scd1 || maintarget == target_scd2) {
     gen_bol(mainout.ipbin);
     gen_bol(mainout.spbin);
   } else {
@@ -882,7 +882,8 @@ bls_find_entry_default_exit:
     break;
   }
 
-  case target_scd: {
+  case target_scd1:
+  case target_scd2: {
     symbol *sym;
     BLSLL(section) *secl;
     section *sec;
@@ -1026,7 +1027,7 @@ void bls_get_symbols()
     strcat(s, "_PHYSSIZE");
     symbol_set(&sec->intsym, s, nullca, sec);
 
-    if(maintarget != target_scd) {
+    if(maintarget != target_scd1 && maintarget != target_scd2) {
       nullca.chip = maintarget == target_ram ? chip_ram : chip_cart;
     }
 
@@ -1214,7 +1215,7 @@ void bls_map()
 
   printf("Map logical addresses.\n");
 
-  if(maintarget == target_scd) {
+  if(maintarget == target_scd1 || maintarget == target_scd2) {
     // Map IP and SP first, to pack them as tightly as possible in RAM
 
     secl = mainout.ipbin->provides;
@@ -1510,7 +1511,7 @@ void bls_finalize_binary_dependencies()
     }
   }
 
-  if(maintarget != target_scd) {
+  if(maintarget != target_scd1 && maintarget != target_scd2) {
     if(!mainout.mainstack) {
       sections = blsll_create_section(sections);
       mainout.mainstack = sections->data;
@@ -1673,7 +1674,7 @@ void bls_build_genesis_header(FILE *f)
     }
   } else if(maintarget == target_ram) {
     fprintf(f, "SEGA RAM PROGRAM");
-  } else if(maintarget == target_scd) {
+  } else if(maintarget == target_scd1 || maintarget == target_scd2) {
     fprintf(f, "SEGA CD         ");
   }
 
@@ -2167,7 +2168,7 @@ void output_dump_cd(FILE *f)
     }
 
     fseek(i, 0, SEEK_END);
-    fprintf(f, "    %08X %08X%s %s\n", (unsigned int)bin->physaddr, (unsigned int)bin->physsize, bin->physsize != ftell(i) ? " (wrong)" : "", bin->name);
+    fprintf(f, "\n    %08X %08X%s %s\n", (unsigned int)bin->physaddr, (unsigned int)bin->physsize, bin->physsize != ftell(i) ? " (wrong)" : "", bin->name);
 
     BLSLL(section) *secl = bin->provides;
     section *sec;
@@ -2194,7 +2195,7 @@ void confdump()
   FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
   blsconf_dump(f); // Dump full configuration for reference and debugging
 
-  if(maintarget == target_scd) {
+  if(maintarget == target_scd1 || maintarget == target_scd2) {
     output_dump_cd(f);
   } else {
     output_dump_cart(f);
@@ -2236,7 +2237,7 @@ int main(int argc, char **argv)
   bls_get_symbol_values();
   bls_compile(); // Compile with most values to get a good approximation of file sizes
 
-  if(maintarget != target_scd) {
+  if(maintarget != target_scd1 && maintarget != target_scd2) {
     bls_pack_sections(); // Pack once to find physical size for all files
     bls_physmap_cart(); // Map physical cartridge image
     bls_compile(); // Recompile with physical addresses

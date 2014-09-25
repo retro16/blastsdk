@@ -198,7 +198,8 @@ void output_parse(const mdconfnode *n, const char *name)
       strcat(n, ".bin");
       break;
 
-    case target_scd:
+    case target_scd1:
+    case target_scd2:
       strcat(n, ".iso");
       break;
 

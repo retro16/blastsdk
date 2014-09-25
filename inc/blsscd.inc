@@ -55,12 +55,18 @@ GA_CDC          set     GATE_ARRAY + $04        ; CDC
 GA_DD0          set     $0100
 GA_DD1          set     $0200
 GA_DD2          set     $0400
-GA_DD_MAINREAD  set     $0200
-GA_DD_SUBREAD   set     $0300
-GA_DD_PCMDMA    set     $0400
-GA_DD_WORDDMA   set     $0700
-GA_EDT          set     $8000
-GA_DSR          set     $4000
+GA_CDC_DEST     set     GA_CDC                  ; CDC data destination
+GA_CDC_DEST_MAINREAD    set     $02
+GA_CDC_DEST_SUBREAD     set     $03
+GA_CDC_DEST_PCMDMA      set     $04
+GA_CDC_DEST_PRAMDMA     set     $05
+GA_CDC_DEST_WRAMDMA     set     $07
+GA_CDC_DEST_DMA         set     $04             ; DMA flag
+GA_CDC_DEST_DMA_BIT     set     2               ; DMA flag bit
+GA_EDT          set     $8000                   ; End Data Transfert
+GA_EDT_BIT      set     7
+GA_DSR          set     $4000                   ; Data Set Ready
+GA_DSR_BIT      set     6
 GA_CDCRS1       set     GATE_ARRAY + $06        ; CDC register data
 GA_CDCHD        set     GATE_ARRAY + $08        ; CDC host data
 GA_CDCDMA       set     GATE_ARRAY + $0A        ; Target address for CDC DMA

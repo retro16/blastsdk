@@ -323,7 +323,7 @@ Main -> sub flags :
 
  - REQ: The main cpu requests the sub cpu to enter monitor mode. This flag is checked by the sub cpu in its level 2 exception routine.
 
- - CDR: CD read request. commwords 14-15 contain sector, commword 13 contains sector count.
+ - CDR: CD read request. commwords 14-15 contain count (1 byte) + sector (3 bytes).
    The sub cpu will read the specified sectors from cd and put them at the beginning of word ram. The sub cpu will release word ram once data is ready. This mechanism is used by blsgen binary loader.
 
  - SYN: main-sub synchronization

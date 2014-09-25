@@ -2,7 +2,7 @@
 
 const char bus_names[][8] = {"none", "main", "sub", "z80"};
 const char chip_names[][8] = {"none", "mstk", "sstk", "zstk", "cart", "bram", "zram", "vram", "cram", "ram", "pram", "wram", "pcm"};
-const char target_names[][8] = {"unknown", "gen", "scd", "ram"};
+const char target_names[][8] = {"unknown", "gen", "scd1", "scd2", "ram"};
 
 target maintarget = target_unknown;
 
@@ -71,7 +71,7 @@ chipaddr bus2chip(busaddr ba)
       return ca;
     }
 
-    if(maintarget == target_scd) {
+    if(maintarget == target_scd1 || maintarget == target_scd2) {
       if(ba.addr >= 0x020000 && ba.addr < 0x040000 && ba.bank >= 0 && ba.bank <= 3) {
         ca.chip = chip_pram;
         ca.addr = ba.bank * 0x020000 + ba.addr - 0x020000;
@@ -256,7 +256,8 @@ busaddr chip2bus(chipaddr ca, bus bus)
       case target_ram:
         break;
 
-      case target_scd:
+      case target_scd1:
+      case target_scd2:
         ba.addr = 0x200000 + ca.addr;
         return ba;
       }
@@ -322,8 +323,8 @@ target guesstarget(chip chip)
   case chip_pram:
   case chip_wram:
   case chip_pcm:
-    printf("Guessed SCD target\n");
-    return target_scd;
+    printf("Guessed SCD 1M target\n");
+    return target_scd1;
     break;
   }
 
