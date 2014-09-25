@@ -108,10 +108,15 @@ SET_INT_HANDLER macro   vector, target
 
 SEND_WRAM_2M    macro
                 bset    #GA_DMNA_BIT, GA_MM + 1
-SEND_WRAM_2M\?
-                btst    #GA_DMNA_BIT, GA_MM + 1
-                beq.b   SEND_WRAM_2M\?
+                loopuntil btst #GA_DMNA_BIT, GA_MM + 1
                 endm
+
+                if BUS == BUS_SUB
+SWAP_WRAM_1M    macro
+                bchg    #GA_RET_BIT, GA_MM + 1
+                loopwhile btst #GA_DMNA_BIT, GA_MM + 1
+                endm
+                endif
 
                 include blsscd_read_macros.inc
 

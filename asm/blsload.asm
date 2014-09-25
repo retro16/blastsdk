@@ -57,22 +57,36 @@ BLSLOAD_INTERRUPT_HANDLER
         move.b  BLSCDR_COMM, d1         ;
 
         movem.l d0/d1, BLSLOAD_SECTOR   ; Store data in ROMREADN format
+        lea     BLSLOAD_SECTOR, a0      ; Execute ROMREADN
+        BIOS_ROMREADN
 
+        if ..DEF BLSLOAD_DMA
         move.b  #GA_CDC_DEST_WRAMDMA, BLSLOAD_DEST      ; Set destination to word RAM
-
-        move.l  #.checkdma, BLSLOAD_INTERRUPT_HANDLER + 2
-.checkdma
-        ; Check if DMA finished
-        if TARGET == TARGET_SCD2
-
-        else
-        assert TARGET == TARGET_SCD1
-        endif
-        rts
 
 .reset_interrupt_handler
         move.l  #.checkflag, BLSLOAD_INTERRUPT_HANDLER + 2
         rts
+        
+        else    ; !BLSLOAD_DMA
+        ; Use simple blocking read
+        if TARGET == TARGET_SCD1
+        lea     $0C0000, a0
+        else
+        lea     $080000, a0
+        endif
+        move.l  d1, d0
+        lsl.l   #11, d0
+        jsr     BLSLOAD_READ_CD
+
+        ; Send WRAM back to main cpu
+        if TARGET == TARGET_SCD1
+        SWAP_WRAM_1M
+        else
+        assert TARGET == TARGET_SCD2
+        SEND_WRAM_2M
+        endif
+        rts
+        endif   ; !BLSLOAD_DMA
 
 
 
@@ -82,12 +96,10 @@ BLSLOAD_INTERRUPT_HANDLER
 ;  d1.l : number of words to read from current sector
 ;  d2.l : number of words in current transfer
 ;  a0.l : target address
-;  a2.l : BLSLOAD_* ram structure
 ; When done, a0 contains ending address
 BLSLOAD_READ_CD
-        movem.l d2/a2, -(sp)
-        lea     BLSLOAD_BUFOFF, a2      ; a2 points to BLSLOAD state structure
-        move.w  (a2), d1                ; d1 : remaining bytes in current sector
+        movem.l d2, -(sp)
+        move.w  BLSLOAD_BUFOFF, d1      ; d1 : remaining bytes in current sector
         bne.b   .cdctrn                 ; There is still some data in the read buffer
 
         ; Set CDC in sub cpu read mode
@@ -119,17 +131,17 @@ BLSLOAD_READ_CD
 .trn_one_sector
         ; Transfer data from CDC host data
         subq.w  #1, d2                  ; Adjust d2 for dbra
-        loopuntil btst #GA_DSR, GA_CDC
-        move.w  GA_CDCHD, (a0)+
-        dbra    d2, .trn_one_sector
+        loopuntil btst #GA_DSR, GA_CDC  ; Wait for data
+.trn    move.w  GA_CDCHD, (a0)+
+        dbra    d2, .trn
 
         BIOS_CDCACK                     ; Acknowledge sector
 
         tst.l   d0
         bne.b   .cdcstat                ; Read next sector
         
-        move.w  d1, (a2)
-        movem.l (sp)+, d2/a2
+        move.w  d1, BLSLOAD_BUFOFF
+        movem.l (sp)+, d2
         rts
         
 ; vim: ts=8 sw=8 sts=8 et

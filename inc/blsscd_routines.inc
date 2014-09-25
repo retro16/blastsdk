@@ -27,17 +27,19 @@ subload\?
 BLSLOAD_START           macro
         lea     GA_MM + 1, a0
         if BUS == BUS_MAIN
-        btst    #GA_MODE_BIT, (a0)
-        beq.b   BLSLOAD_START_MODE_2\?
+
+        if TARGET == TARGET_SCD1
 
         ; Swap request
         bclr    #GA_DMNA_BIT, (a0)
 BLSLOAD_WAIT_START_MODE_1\?
         btst    #GA_DMNA_BIT, (a0)         ; Wait until swap finished
         beq.b   BLSLOAD_WAIT_START_MODE_1\?
-        bra.b   BLSLOAD_READ_READY\?
 
-BLSLOAD_START_MODE_2\?
+        else
+        assert  TARGET == TARGET_SCD2
+
+        ; Check if WRAM is already available for sub cpu
         btst    #GA_RET_BIT, (a0)
         beq.b   BLSLOAD_WAIT_START_MODE_2\?
 
@@ -48,32 +50,40 @@ BLSLOAD_START_MODE_2\?
 BLSLOAD_WAIT_START_MODE_2\?
         ; Wait until memory returned to main cpu
         loopuntil btst #GA_RET_BIT, (a0)
+
+        endif
         
 BLSLOAD_READ_READY\?
+        bclr    #BLSCDR_BIT, GA_COMMFLAGS_MAIN
         move.l  a2, -(a7)
         lea     $200000, a2
+
         else
+        ; Nothing to do to prepare transfert
         endif
         endm
 
-; Read size bytes from CD to addr
+; Stream <size> bytes from CD to <addr>. <size> must be even and addr must be word aligned.
 BLSLOAD_READ    macro   addr, size
         if BUS == BUS_SUB
 
-        move.l  #size, d0
+        assert  (size & 1) == 0
+        move.l  #(size / 2), d0
         lea     addr, a0
         jsr     BLSLOAD_READ_CD
 
         endif
         endm
 
+
+; Call this to stop stream
 BLSLOAD_FINISH  macro
         if BUS == BUS_MAIN
         move.l  (a7)+, a2       ; Restore data source register
         else
 
         ; Ack the last sector if needed
-        tst.w   BLSLOAD_SIZE
+        tst.w   BLSLOAD_BUFOFF
         bne.b   BLSLOAD_FINISH_ACK\?
         BIOS_CDCACK
         clr.w   BLSLOAD_BUFOFF
