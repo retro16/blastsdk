@@ -1,5 +1,11 @@
 /* Blast! SDK main include
  */
+#ifndef BLS_H
+#define BLS_H
+
+typedef unsigned char u8
+typedef unsigned short u16
+typedef unsigned long u32
 
 // Bus constants
 #define BUS_NONE 0
@@ -43,4 +49,6 @@ asm volatile("\tmove.b %d0, -(%a7)\n" \
 #define VDPSECURITY() do {} while(0)
 #endif
 
-#endif // BUSS_MAIN
+#endif // BSS_MAIN
+
+#endif

@@ -270,6 +270,75 @@ void parse_symbols_asmx(group *src, int setvalues)
   fclose(f);
 }
 
+void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
+{
+  busaddr ba = chip2bus(sec->symbol->value, bus_main);
+
+  if(sec->format == format_empty || sec->size == 0) {
+    continue;
+  }
+
+  if(sec->format == format_zero) {
+    if(sec->symbol->value.chip == chip_ram) {
+      if(sec->size > 4) {
+        fprintf(out, "\tBLSFASTFILL_WORD\t$%08X, $%08X, 0\n", (unsigned int)ba.addr, (unsigned int)sec->size / 2);
+      } else if(sec->size == 4) {
+        fprintf(out, "\tCLR.L\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
+      } else if(sec->size >= 2) {
+        fprintf(out, "\tCLR.W\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
+      }
+
+      if(sec->size & 1) {
+        fprintf(out, "\tCLR.B\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
+      }
+    } else if(sec->symbol->value.chip == chip_vram) {
+      fprintf(out, "\tBLSVDP_CLEAR\t$%04X, $%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    } else {
+      printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
+    }
+
+    continue;
+  }
+
+  if(sec->format != format_raw) {
+    printf("Warning : %s format unsupported\n", format_names[sec->format]);
+    continue;
+  }
+
+  switch(sec->symbol->value.chip) {
+  case chip_none:
+  case chip_mstk:
+  case chip_sstk:
+  case chip_zstk:
+  case chip_cart:
+  case chip_bram:
+  case chip_pram:
+  case chip_wram:
+  case chip_pcm:
+  case chip_max:
+    break;
+
+  case chip_zram:
+    // TODO
+    break;
+
+  case chip_vram:
+    fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    break;
+
+  case chip_cram:
+    fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    break;
+
+  case chip_ram:
+    if(maintarget != target_ram && ba.addr != physba.addr) {
+      fprintf(out, "\tBLSFASTCOPY_ALIGNED\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+    }
+
+    break;
+  }
+}
+
 const char *gen_load_defines_asmx()
 {
   static char filename[4096];
@@ -293,79 +362,32 @@ const char *gen_load_defines_asmx()
     fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO\n", binname);
 
     if(maintarget == target_scd1 || maintarget == target_scd2) {
-      // Begin SCD transfer
-      // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
-//      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
+      if(bin->banks->bus == bus_main) {
+        // Load from WRAM
+        busaddr physba = {bus_main, 0x200000, -1};
+        fprintf(out, "\tBLSLOAD_PREPARE\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)(bin->physsize / CDBLOCKSIZE));
+        fprintf(out, "\tBLSLOAD_START\n");
+        secl = bin->provides;
+        BLSLL_FOREACH(sec,secl) {
+          // Load section from WRAM
+          gen_load_section(out, sec, physba);
+
+          // Compute offset of next section
+          physba.addr += sec->size;
+          if(physba.addr & 1) {
+            ++physba.addr;
+          }
+        }
+        fprintf(out, "\tBLSLOAD_FINISH\n");
+      } else {
+        // Load directly from CD
+      }
     } else {
       secl = bin->provides;
       BLSLL_FOREACH(sec, secl) {
         // Load each section
-        busaddr ba = chip2bus(sec->symbol->value, bus_main);
         busaddr physba = phys2bus(sec->physaddr, bus_main);
-
-        if(sec->format == format_empty || sec->size == 0) {
-          continue;
-        }
-
-        if(sec->format == format_zero) {
-          if(sec->symbol->value.chip == chip_ram) {
-            if(sec->size > 4) {
-              fprintf(out, "\tBLSFASTFILL_WORD\t$%08X, $%08X, 0\n", (unsigned int)ba.addr, (unsigned int)sec->size / 2);
-            } else if(sec->size == 4) {
-              fprintf(out, "\tCLR.L\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
-            } else if(sec->size >= 2) {
-              fprintf(out, "\tCLR.W\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
-            }
-
-            if(sec->size & 1) {
-              fprintf(out, "\tCLR.B\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
-            }
-          } else if(sec->symbol->value.chip == chip_vram) {
-            fprintf(out, "\tBLSVDP_CLEAR\t$%04X, $%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
-          } else {
-            printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
-          }
-
-          continue;
-        }
-
-        if(sec->format != format_raw) {
-          printf("Warning : %s format unsupported\n", format_names[sec->format]);
-          continue;
-        }
-
-        switch(sec->symbol->value.chip) {
-        case chip_none:
-        case chip_mstk:
-        case chip_sstk:
-        case chip_zstk:
-        case chip_cart:
-        case chip_bram:
-        case chip_pram:
-        case chip_wram:
-        case chip_pcm:
-        case chip_max:
-          break;
-
-        case chip_zram:
-          // TODO
-          break;
-
-        case chip_vram:
-          fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
-          break;
-
-        case chip_cram:
-          fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
-          break;
-
-        case chip_ram:
-          if(maintarget != target_ram && ba.addr != physba.addr) {
-            fprintf(out, "\tBLSFASTCOPY_ALIGNED\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
-          }
-
-          break;
-        }
+        gen_load_section(out, sec, physba);
       }
     }
 

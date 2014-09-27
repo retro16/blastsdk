@@ -168,6 +168,38 @@ VDPSETWRITE     macro   addr, ram       ; Setup VDP to write to address addr int
                 endif
                 endm
 
+                ; Read from data port to target
+VDPREADW        macro   target
+                if _VDPREG
+                move.w  (a4), target
+                else
+                move.w  VDPDATA, target
+                endif
+                endm
+VDPREADL        macro   target
+                if _VDPREG
+                move.l  (a4), target
+                else
+                move.l  VDPDATA, target
+                endif
+                endm
+
+                ; Write value to data port
+VDPWRITEW       macro   value
+                if _VDPREG
+                move.w  value, (a4)
+                else
+                move.w  value, VDPDATA
+                endif
+                endm
+VDPWRITEL       macro   value
+                if _VDPREG
+                move.l  value, (a4)
+                else
+                move.l  value, VDPDATA
+                endif
+                endm
+
 VDPSETREADVAR   macro   reg, ram        ; Setup VDP to read from address (reg.w) of specified ram
                 move.w  reg, -(a7)      ; Store register
                 ; Compute first half of the command
@@ -232,9 +264,15 @@ VDPDMASEND      macro   src, tgt, sz, ram       ; Copy sz words to vram address 
 
                 VDPSETDMASIZE sz        ; Set DMA size
 
+                if (src & $FFFFFF) >= $200000 && (src & $FFFFFF) < $240000
+SOFF            set     2
+                else
+SOFF            set     0
+                endif
+
                 ; Set DMA source address and copy mode
-                VDPSETREG2 21, ((src >> 1) & $FF), 22, ((src >> 9) & $FF)
-                VDPSETREG 23, ((src >> 17) & $7F)
+                VDPSETREG2 21, (((src+soff) >> 1) & $FF), 22, (((src+soff) >> 9) & $FF)
+                VDPSETREG 23, (((src+soff) >> 17) & $7F)
 
                 if _VDPREG
                 ; Set destination address and start DMA
@@ -250,6 +288,11 @@ VDPDMASEND      macro   src, tgt, sz, ram       ; Copy sz words to vram address 
                 move.w  (a7), VDPCTRL                                   ; Write destination address with word write
                 addq.l  #2, a7                                          ; (circumvents documented hardware flaws)
 
+                endif
+                if SOFF == 2
+                ; Circumvent hardware flaw in WRAM DMA
+                VDPSETWRITE tgt
+                VDPWRITEW src
                 endif
                 endm
 

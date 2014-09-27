@@ -1,3 +1,5 @@
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+
 ; Read d1 sectors starting at d0 into buffer in a0 (using Sub-CPU)
 ReadCD
         movem.l d0-d1/a0-a1, -(sp)
@@ -47,6 +49,7 @@ BLSLOAD_INTERRUPT_HANDLER
 .checkflag
         btst    #BLSCDR_BIT, GA_COMMFLAGS_MAIN
         bne.b   .loadquery
+.disable
         rts
 
 .loadquery      ; Main CPU asked for loading
@@ -68,6 +71,11 @@ BLSLOAD_INTERRUPT_HANDLER
         rts
         
         else    ; !BLSLOAD_DMA
+
+        ; Restore level 2 interrupts and disable BLSLOAD interrupt processing
+        move.l  #.disable, BLSLOAD_INTERRUPT_HANDLER + 2
+        move.w  #$2000, sr
+
         ; Use simple blocking read
         if TARGET == TARGET_SCD1
         lea     $0C0000, a0
@@ -85,6 +93,9 @@ BLSLOAD_INTERRUPT_HANDLER
         assert TARGET == TARGET_SCD2
         SEND_WRAM_2M
         endif
+
+        ; Restore BLSLOAD interrupt handling
+        move.l  #.checkflag, BLSLOAD_INTERRUPT_HANDLER + 2
         rts
         endif   ; !BLSLOAD_DMA
 
@@ -144,4 +155,6 @@ BLSLOAD_READ_CD
         movem.l (sp)+, d2
         rts
         
+        endif
+
 ; vim: ts=8 sw=8 sts=8 et
