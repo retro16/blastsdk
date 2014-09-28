@@ -362,12 +362,12 @@ const char *gen_load_defines_asmx()
     fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO\n", binname);
 
     if(maintarget == target_scd1 || maintarget == target_scd2) {
+      // Load from WRAM
+      fprintf(out, "\tBLSLOAD_PREPARE\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)(bin->physsize / CDBLOCKSIZE));
+      fprintf(out, "\tBLSLOAD_START\n");
+      secl = bin->provides;
       if(bin->banks->bus == bus_main) {
-        // Load from WRAM
         busaddr physba = {bus_main, 0x200000, -1};
-        fprintf(out, "\tBLSLOAD_PREPARE\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)(bin->physsize / CDBLOCKSIZE));
-        fprintf(out, "\tBLSLOAD_START\n");
-        secl = bin->provides;
         BLSLL_FOREACH(sec,secl) {
           // Load section from WRAM
           gen_load_section(out, sec, physba);
@@ -378,10 +378,15 @@ const char *gen_load_defines_asmx()
             ++physba.addr;
           }
         }
-        fprintf(out, "\tBLSLOAD_FINISH\n");
       } else {
-        // Load directly from CD
+        // Load from CD
+        BLSLL_FOREACH(sec,secl) {
+          // Load from CD
+          sv addr = chip2bank(sec->symbol.value, sec->source->banks);
+          fprintf(out, "\tBLSLOAD_READ\t%08X, %08X\n", addr, sec->size);
+        }
       }
+      fprintf(out, "\tBLSLOAD_FINISH\n");
     } else {
       secl = bin->provides;
       BLSLL_FOREACH(sec, secl) {

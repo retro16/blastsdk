@@ -2,17 +2,27 @@
 ; blsvdp_dma(void *dest, void *src, unsigned int len);
 ; Send data to VRAM using DMA
 blsvdp_dma_regs
+                ; Commands to set VDP registers
                 dw      $9300   ; R19 : DMA length LSB
                 dw      $9400   ; R20 : DMA length MSB
                 dw      $9500   ; R21 : DMA source MSB
                 dw      $9600   ; R22 : DMA source middle
                 dw      $9700   ; R23 : DMA source LSB
 blsvdp_dma
+                movem.l d2, -(sp)
+
+                if CHIP != CHIP_CART
                 lea     blsvdp_dma_regs(pc), a0    ; Point a0 at register settings
+                else
+                ; dma_regs in read-only memory : copy them before the stack
+                movem.l blsvdp_dma_regs, d0/d1/d2
+                lea     -12(sp), a0
+                movem.l d0/d1/d2, (a0)
+                endif
+
                 lea     VDPCTRL, a1     ; Point a1 at VDP control port
                
                 ; Read parameters
-                movem.l d2, -(sp)
                 movem.l 4(sp), d0-d2    ; d0 = dest, d1 = src, d2 = len
 
                 if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2

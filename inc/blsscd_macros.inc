@@ -101,7 +101,7 @@ SUB_INT_DISABLE macro
                 endm
 
 SET_INT_HANDLER macro   vector, target
-                movea.l vector, a0
+                move.l  vector, a0
                 move.w  #$4EF9, (a0)+
                 move.l  #target, (a0)
                 endm

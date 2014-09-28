@@ -148,6 +148,10 @@ VDPPREPAUTOINCR macro   s
                 VDPPREPREG 15, s
         endm
 
+VDPENABLE       macro   display, hint, vint, dma
+                VDPSETREG2 0, VDPR00 | VDPHVEN | (hint ? VDPHINT : 0), 1, VDPR01 | (display ? VDPDISPEN : 0) | (vint ? VDPVINT : 0) | (dma ? VDPDMAEN : 0)
+                endm
+
 VRAM            equ     $00000000
 CRAM            equ     $80000000
 VSRAM           equ     $00000010

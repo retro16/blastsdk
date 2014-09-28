@@ -67,7 +67,11 @@ GA_EDT          set     $8000                   ; End Data Transfert
 GA_EDT_BIT      set     7
 GA_DSR          set     $4000                   ; Data Set Ready
 GA_DSR_BIT      set     6
+                if BUS == BUS_MAIN
+GA_HINT         set     GATE_ARRAY + $06        ; H-INT address
+                else
 GA_CDCRS1       set     GATE_ARRAY + $06        ; CDC register data
+                endif
 GA_CDCHD        set     GATE_ARRAY + $08        ; CDC host data
 GA_CDCDMA       set     GATE_ARRAY + $0A        ; Target address for CDC DMA
 GA_STOPWATCH    set     GATE_ARRAY + $0C        ; Stopwatch (30.72 us)

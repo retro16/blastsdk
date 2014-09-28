@@ -448,3 +448,5 @@ mode_table
 		dw	$3
 		dw	$5
 		dw	$C
+
+; vim: ts=8 sw=8 sts=8 et
