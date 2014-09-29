@@ -275,7 +275,7 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
   busaddr ba = chip2bus(sec->symbol->value, bus_main);
 
   if(sec->format == format_empty || sec->size == 0) {
-    continue;
+    return;
   }
 
   if(sec->format == format_zero) {
@@ -297,12 +297,12 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
       printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
     }
 
-    continue;
+    return;
   }
 
   if(sec->format != format_raw) {
     printf("Warning : %s format unsupported\n", format_names[sec->format]);
-    continue;
+    return;
   }
 
   switch(sec->symbol->value.chip) {
@@ -366,11 +366,11 @@ const char *gen_load_defines_asmx()
       fprintf(out, "\tBLSLOAD_PREPARE\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)(bin->physsize / CDBLOCKSIZE));
       fprintf(out, "\tBLSLOAD_START\n");
       secl = bin->provides;
-      if(bin->banks->bus == bus_main) {
+      if(bin->banks.bus == bus_main) {
         busaddr physba = {bus_main, 0x200000, -1};
         BLSLL_FOREACH(sec,secl) {
           // Load section from WRAM
-          gen_load_section(out, sec, physba);
+          gen_load_section_asmx(out, sec, physba);
 
           // Compute offset of next section
           physba.addr += sec->size;
@@ -382,8 +382,8 @@ const char *gen_load_defines_asmx()
         // Load from CD
         BLSLL_FOREACH(sec,secl) {
           // Load from CD
-          sv addr = chip2bank(sec->symbol.value, sec->source->banks);
-          fprintf(out, "\tBLSLOAD_READ\t%08X, %08X\n", addr, sec->size);
+          sv addr = chip2bank(sec->symbol->value, &sec->source->banks);
+          fprintf(out, "\tBLSLOAD_READ\t%08X, %08X\n", (unsigned int)addr, (unsigned int)sec->size);
         }
       }
       fprintf(out, "\tBLSLOAD_FINISH\n");
@@ -392,7 +392,7 @@ const char *gen_load_defines_asmx()
       BLSLL_FOREACH(sec, secl) {
         // Load each section
         busaddr physba = phys2bus(sec->physaddr, bus_main);
-        gen_load_section(out, sec, physba);
+        gen_load_section_asmx(out, sec, physba);
       }
     }
 

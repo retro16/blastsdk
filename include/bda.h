@@ -2,7 +2,7 @@
 #define BLS_BDA_H
 
 #if BUS == BUS_MAIN
-extern BDA_INIT();
+extern void BDA_INIT();
 #endif
 
 #endif

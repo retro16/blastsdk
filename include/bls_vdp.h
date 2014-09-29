@@ -14,6 +14,80 @@
 #define VDPVRAM 0x80000000
 #define VDPVSRAM 0x00000010
 
+#define VDPST_EMPTY 0x0200   // VDP FIFO empty
+#define VDPST_FULL 0x0100   // VDP FIFO full
+#define VDPST_F 0x0080   // V interrupt happened
+#define VDPST_SOVR 0x0040   // Sprite overflow
+#define VDPST_C 0x0020   // Sprite collision
+#define VDPST_ODD 0x0010   // Odd frame in interlace mode
+#define VDPST_VB 0x0008   // 1 during vblank, 0 otherwise
+#define VDPST_HB 0x0004   // 1 during hblank, 0 otherwise
+#define VDPST_DMA 0x0002   // 1 if DMA is busy
+#define VDPST_PAL 0x0001   // 1 if PAL display mode, 0 if NTSC
+
+#define VDPR00 0x04             // VDP register #00
+#define VDPHINT 0x10             // Enable HBlank interrupt (level 4)
+#define VDPHVEN 0x02             // Enable read HV counter
+#define 
+#define VDPR01 0x04             // VDP register #01
+#define VDPDISPEN 0x40             // Display enable
+#define VDPVINT 0x20             // Enable VBlank interrupt (level 6)
+#define VDPDMAEN 0x10             // Enable DMA
+#define VDPV30 0x08             // Display 30 cells vertically (PAL only)
+#define 
+#define VDPR02 (PLANE_A >> 10 & 0x38)   // VDP register #02 - plane a name table
+#define VDPR03 0x00                     // VDP register #03 - window name table
+#define VDPR04 (PLANE_B >> 13)         // VDP register #04 - plane b name table
+#define VDPR05 (SPRAT >> 9 & 0x7E)      // VDP register #05 - sprite attrib table
+#define VDPR06 0x00             // VDP register #06
+#define VDPR07 0x00             // VDP register #07
+#define VDPR08 0x00             // VDP register #08
+#define VDPR09 0x00             // VDP register #09
+#define VDPR10 0x00             // VDP register #10
+#define 
+#define VDPR11 0x00             // VDP register #11
+#define VDPEINT 0x08             // Enable external interrupt (level 2)
+#define VDPVCELLSCROLL 0x04             // V scroll : 2 cells
+#define VDPHCELLSCROLL 0x02             // H scroll : per cell
+#define VDPHLINESCROLL 0x03             // H scroll : per line
+#define 
+#define VDPR12 0x00             // VDP register #12
+#define VDPH40 0x81             // Display 40 cells horizontally
+#define VDPSTE 0x40             // Enable shadow/hilight
+#define VDPILACE 0x02             // Interlace mode
+#define VDPILACEDBL 0x06             // Interlace mode (double resolution)
+#define 
+#define 
+#define VDPR13 (HSCROLL_TABLE >> 10 & 0x3F)     // VDP register #13 - hscroll table
+#define VDPR14 0x00             // VDP register #14
+#define VDPR15 0x00             // VDP register #15 : autoincrement
+#define 
+#define VDPR16 0x00             // VDP register #16
+#define VDPSCRV32 0x00             // VDP scroll 32 cells vertical
+#define VDPSCRV64 0x10             // VDP scroll 64 cells vertical
+#define VDPSCRV128 0x30             // VDP scroll 128 cells vertical
+#define VDPSCRH32 0x00             // VDP scroll 32 cells horizontal
+#define VDPSCRH64 0x01             // VDP scroll 64 cells horizontal
+#define VDPSCRH128 0x03             // VDP scroll 128 cells horizontal
+#define 
+#define VDPR17 0x00             // VDP register #17
+#define VDPWINRIGHT 0x80             // Window on the right hand side
+#define 
+#define VDPR18 0x00             // VDP register #18
+#define VDPWINBOT 0x80             // Window at the bottom of the screen
+
+
+enum hscroll_mode_e {
+  VDPVSCREENSCROLL = 0,
+  VDPVCELLSCROLL = 0x04
+};
+
+enum vscroll_mode_e {
+  VDPHSCREENSCROLL = 0,
+  VDPHCELLSCROLL = 0x02,
+  VDPHLINESCROLL = 0x03
+};
+
 #define VDPCMD(cmd, target, addr) ((cmd) | (target) | ((addr) & 0x00003FFF) | (((addr) << 2) & 0x00030000))
 
 // Defined in bls_vdp.asm
@@ -34,6 +108,10 @@ static inline void blsvdp_set_autoincrement(u8 incr)
   blsvdp_set_reg(15, incr);
 }
 
+static inline void blsvdp_enable(int display, int hint, int vint, int dma)
+{
+  blsvdp_set_reg2(0, VDPR00 | VDPHVEN | (hint ? VDPHINT : 0), 1, VDPR01 | (display ? VDPDISPEN : 0) | (vint ? VDPVINT : 0) | (dma ? VDPDMAEN : 0);
+}
 
 // Inline version of DMA copy. Faster for constant values, slower for variables.
 // Allows target to be specified (VDPVRAM, VDPCRAM or VDPVSRAM)

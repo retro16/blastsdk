@@ -180,6 +180,7 @@ static section *extract_section_elf(const group *src, const char *name, unsigned
 
 void parse_symtable_dump(section *s, FILE *in, int setvalues)
 {
+  (void) setvalues;
   const char *sname = strrchr(s->name, '.');
 
   while(!feof(in)) {

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-mdconfnode *mdconfappendsibling(mdconfnode *node)
+mdconfnode *mdconfcreatesibling(mdconfnode *node)
 {
   if(!node) {
     return NULL;
@@ -17,6 +17,7 @@ mdconfnode *mdconfappendsibling(mdconfnode *node)
   node->next = (mdconfnode *)malloc(sizeof(mdconfnode));
   node->next->key = NULL;
   node->next->value = NULL;
+  node->next->title = -1;
   node->next->prev = node;
   node->next->next = NULL;
   node->next->child = NULL;
@@ -24,24 +25,59 @@ mdconfnode *mdconfappendsibling(mdconfnode *node)
   return node->next;
 }
 
-mdconfnode *mdconfappendchild(mdconfnode *node)
+void mdconfappendsibling(mdconfnode *node, mdconfnode *sibling)
+{
+  if(!node) {
+    return;
+  }
+
+  while(node->next) {
+    node = node->next;
+  }
+
+  mdconfremove(sibling); // Detach sibling from existing tree
+
+  node->next = sibling;
+  node->next->prev = node;
+  node->next->parent = node->parent;
+}
+
+mdconfnode *mdconfcreatechild(mdconfnode *node)
 {
   if(!node) {
     return NULL;
   }
 
   if(node->child) {
-    return mdconfappendsibling(node->child);
+    return mdconfcreatesibling(node->child);
   }
 
   node->child = (mdconfnode *)malloc(sizeof(mdconfnode));
   node->child->key = NULL;
   node->child->value = NULL;
+  node->child->title = -1;
   node->child->prev = NULL;
   node->child->next = NULL;
   node->child->child = NULL;
   node->child->parent = node;
   return node->child;
+}
+
+void mdconfappendchild(mdconfnode *node, mdconfnode *child)
+{
+  if(!node) {
+    return;
+  }
+
+  if(node->child) {
+    mdconfappendsibling(node->child, child);
+    return;
+  }
+
+  mdconfremove(child); // Detach child from existing tree
+
+  node->child = child;
+  node->child->parent = node;
 }
 
 static int mdconfistoken(char c)
@@ -78,22 +114,26 @@ mdconfnode *mdconfcopy(const mdconfnode *node)
     copy->value = NULL;
   }
 
+  copy->title = node->title;
+
   copy->prev = NULL;
   copy->next = NULL;
   copy->parent = NULL;
 
+  mdconfnode *dest = copy;
+  
   if(node->child) {
-    copy->child = mdconfcopy(node->child);
-    copy->child->parent = copy;
-    copy = copy->child;
+    dest->child = mdconfcopy(node->child);
+    dest->child->parent = dest;
+    dest = dest->child;
     node = node->child;
 
     while(node->next) {
-      copy->next = mdconfcopy(node->next);
-      copy->next->prev = copy;
-      copy->next->parent = copy->parent;
+      dest->next = mdconfcopy(node->next);
+      dest->next->prev = dest;
+      dest->next->parent = dest->parent;
 
-      copy = copy->next;
+      dest = dest->next;
       node = node->next;
     }
   }
@@ -103,6 +143,11 @@ mdconfnode *mdconfcopy(const mdconfnode *node)
 
 void mdconffree(mdconfnode *root)
 {
+  // Find real root
+  while(root->parent) root = root->parent;
+  while(root->prev) root = root->prev;
+
+  // Free recursively
   while(root) {
     if(root->key) {
       free(root->key);
@@ -113,6 +158,7 @@ void mdconffree(mdconfnode *root)
     }
 
     if(root->child) {
+      root->child->parent = NULL; // Detach from tree
       mdconffree(root->child);
     }
 
@@ -120,6 +166,29 @@ void mdconffree(mdconfnode *root)
     root = root->next;
     free(tofree);
   }
+}
+
+mdconfnode * mdconfremove(mdconfnode *node) {
+  if(node->parent && node->parent->child == node) {
+    if(node->prev) node->parent->child = node->prev;
+    else if(node->prev) node->parent->child = node->next;
+    else {
+      node->parent->child = NULL;
+    }
+  }
+  node->parent = NULL;
+
+  if(node->prev) {
+    node->prev->next = node->next;
+    node->prev = NULL;
+  }
+
+  if(node->next) {
+    node->next->prev = node->prev;
+    node->next = NULL;
+  }
+
+  return node;
 }
 
 static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
@@ -207,18 +276,79 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
     if(*l) {
       // List of values : create a sibling node with the same key
       const char *key = node->key;
-      node = mdconfappendsibling(node);
+      int title = node->title;
+      node = mdconfcreatesibling(node);
       node->key = strdup(key);
+      node->title = title;
       line = l;
     } else {
+      // Check for include
+      while(node && strcasecmp(node->key, "include") == 0) {
+        printf("Include [%s] !!!\n", node->value);
+        mdconfnode *including = node;
+        mdconfnode *included = mdconfparsefile(node->value);
+        if(included) {
+          mdconfnode *root = node;
+          while(root->parent) root = root->parent;
+
+          mdconfnode *n;
+          // Append titles to current root
+          for(n = included->child; n; n = n->next) {
+            mdconfnode *copy = mdconfcopy(n);
+            if(n->title) {
+              mdconfappendchild(root, copy);
+            } else {
+              mdconfappendsibling(node, copy);
+              node = copy;
+            }
+          }
+
+          node = including->prev; // process previous include node
+          mdconfremove(including);
+          mdconffree(including);
+          mdconffree(included);
+          break;
+        }
+      }
       break;
     }
   }
 }
 
+char *mdconf_prefixes_default[4096] = {
+  ".",
+  NULL
+};
+char *(*mdconf_prefixes)[4096] = &mdconf_prefixes_default;
+
+static FILE * openfile(const char *f, const char *mode)
+{
+  char name[4096];
+  strncpy(name, f, 4096);
+
+  FILE *fp = fopen(name, mode);
+
+  if(fp) {
+    return fp;
+  }
+
+  unsigned int i;
+
+  for(i = 0; (*mdconf_prefixes)[i]; ++i) {
+    sprintf(name, "%s/%s", (*mdconf_prefixes)[i], f);
+    FILE *fp = fopen(name, mode);
+
+    if(fp) {
+      return fp;
+    }
+  }
+
+  return NULL;
+}
+
 mdconfnode *mdconfparsefile(const char *filename)
 {
-  FILE *f = fopen(filename, "r");
+  FILE *f = openfile(filename, "r");
 
   if(!f) {
     return NULL;
@@ -300,12 +430,13 @@ mdconfnode *mdconfparsefile(const char *filename)
           depthonewidth = listdepth;
 
           if(curdepth == 0) {
-            curnode = mdconfappendchild(curnode);
+            curnode = mdconfcreatechild(curnode);
           } else if(curdepth == 1) {
-            curnode = mdconfappendsibling(curnode);
+            curnode = mdconfcreatesibling(curnode);
           } else if(curdepth == 2) {
-            curnode = mdconfappendsibling(curnode->parent);
+            curnode = mdconfcreatesibling(curnode->parent);
           }
+          curnode->title = 0;
 
           curdepth = 1;
         } else {
@@ -313,10 +444,11 @@ mdconfnode *mdconfparsefile(const char *filename)
             mdconffree(root);
             return NULL;
           } else if(curdepth == 1) {
-            curnode = mdconfappendchild(curnode);
+            curnode = mdconfcreatechild(curnode);
           } else if(curdepth == 2) {
-            curnode = mdconfappendsibling(curnode);
+            curnode = mdconfcreatesibling(curnode);
           }
+          curnode->title = 0;
 
           curdepth = 2;
         }
@@ -340,7 +472,8 @@ mdconfnode *mdconfparsefile(const char *filename)
 
         if(!l[i]) {
           // Title found
-          curnode = mdconfappendchild(root);
+          curnode = mdconfcreatechild(root);
+          curnode->title = 1;
           mdconfparsekeyvalue(lastline, curnode);
           curdepth = 0;
           linebullet = 1;
@@ -473,6 +606,9 @@ const char *mdconfgetvalue(const mdconfnode *node, const char *path)
 
 void mdconfprint(const mdconfnode *root, int depth)
 {
+  if(root->prev) {
+    printf("%.*s[%s]: unexpected previous node\n", depth * 2, "                     ", root->key);
+  }
   while(root) {
     printf("%.*s[%s]: %s\n", depth * 2, "                     ", root->key, root->value ? root->value : "(null)");
 

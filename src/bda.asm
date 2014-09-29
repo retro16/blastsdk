@@ -145,7 +145,7 @@ bracall         macro   dest
 .\?
                 endm
 
-tailcall                macro   dest, tail
+tailcall        macro   dest, tail
                 lea     tail(pc), a4
                 bra.b   dest
                 endm
@@ -154,10 +154,10 @@ subret          macro
                 jmp     (a4)
                 endm
 
-waitack macro
-.\?     btst    d4, (a5)
-        beq.b   .\?
-        endm
+waitack         macro
+.\?             btst    d4, (a5)
+                beq.b   .\?
+                endm
 
 
 bda_recvbyte
@@ -460,6 +460,5 @@ BUS     set BUS_MAIN
         endif   ; TARGET == TARGET_SCD1/2
 
         endif   ; BUS == BUS_MAIN
-
 
 ; vim: ts=8 sw=8 sts=8 et

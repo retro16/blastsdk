@@ -211,8 +211,6 @@ make -C sgdk -f makelib.sgdk
 fi
 
 echo "Installing bls sources"
-installsrc inc /share/blastsdk
-installsrc asm /share/blastsdk
 installsrc include /share/blastsdk
 installsrc src /share/blastsdk
 

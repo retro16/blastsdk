@@ -1,7 +1,7 @@
 ; Provides Genesis / SCD initializatoin routines.
-; You must add bls_init.asm in the same binary.
+; You must include bls_init.md in the same binary.
 
-bls_init        macro   hint_handler, vint_handler
+bls_init        macro   hint_handler, vint_handler, two_pads
                 ccall2  bls_init hint_handler, vint_handler
                 endm
 

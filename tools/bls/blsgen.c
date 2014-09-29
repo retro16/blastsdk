@@ -2040,12 +2040,11 @@ void bls_build_cart_image()
 }
 
 
-char path_prefixes[][4096] = {
+char *path_prefixes[4096] = {
   ".", // Here comes the blsgen.md directory
-  BLSPREFIX "/share/blastsdk/asm",
-  BLSPREFIX "/share/blastsdk/inc",
   BLSPREFIX "/share/blastsdk/src",
-  BLSPREFIX "/share/blastsdk/include"
+  BLSPREFIX "/share/blastsdk/include",
+  NULL
 };
 
 char include_prefixes[4096];
@@ -2055,7 +2054,7 @@ void gen_include_prefixes()
   unsigned int i;
   *include_prefixes = 0;
 
-  for(i = 0; i < sizeof(path_prefixes)/sizeof(*path_prefixes); ++i) {
+  for(i = 0; path_prefixes[i]; ++i) {
     strcat(include_prefixes, " -I ");
     strcat(include_prefixes, path_prefixes[i]);
   }
@@ -2213,7 +2212,7 @@ int main(int argc, char **argv)
   if(argc > 1) {
     char arg[1024];
     strcpy(arg, argv[1]);
-    strncpy(path_prefixes[0], dirname(arg), sizeof(path_prefixes[0]));
+    strncpy(path_prefixes[0], dirname(arg), 4096);
     gen_include_prefixes();
     blsconf_load(argv[1]);
   } else {

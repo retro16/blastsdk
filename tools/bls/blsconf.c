@@ -227,10 +227,12 @@ void output_parse(const mdconfnode *n, const char *name)
 
 void blsconf_load(const char *file)
 {
+  mdconf_prefixes = &path_prefixes;
   mdconf = mdconfparsefile(file);
 
   if(!mdconf) {
     printf("Could not load file %s\n", file);
+    exit(1);
   }
 
   const mdconfnode *n;

@@ -196,7 +196,7 @@ symbol *symbol_set_addr(BLSLL(symbol) **symlist, char *symname, sv value, sectio
 
 void *merge_lists(void *target, void *source);
 
-extern char path_prefixes[][4096];
+extern char *path_prefixes[4096];
 extern char include_prefixes[4096];
 
 void skipblanks(const char **cp);

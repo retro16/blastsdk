@@ -16,18 +16,10 @@ bls_init
         VDPDMAFILL 0, 0, $10000         ; Start clearing VRAM
 
         move.b	#CSEL, CCTRL1		; Enable CSEL for gamepad 1
-        if ..DEF bda_init
-        jsr     bda_init                ; Init BDA if present
-        if BDACTRL == CCTRL3
-        move.b	#CSEL, CCTRL2		; BDA is on EXT : init gamepad 2
-        endif
-        else
-        move.b	#CSEL, CCTRL2		; Enable CSEL for gamepad 2
-        endif
+        move.b  #CSEL, CCTRL2           ; Enable CSEL for gamepad 2
 
-        if ..DEF beh_init
-        beh_init                        ; Init BEH if present
-        endif
+        jsr     bda_init                ; Init BDA
+        beh_init                        ; Init BEH
 
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
         move.l  INTV_VBLANK.w, a0
