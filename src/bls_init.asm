@@ -52,6 +52,9 @@ bls_init
         assert  BUS == BUS_SUB
         ; Initialize Sega CD part
 
+        ; Enable interrupts
+        move.w  #GA_IM_L1 | GA_IM_L2 | GA_IM_L3 | GA_IM_L4 | GA_IM_L5 | GA_IM_L6, GA_IMASK
+
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
         SYNC_MAIN_SUB
         endif

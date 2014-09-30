@@ -118,7 +118,5 @@ SWAP_WRAM_1M    macro
                 endm
                 endif
 
-                include blsscd_read_macros.inc
-
 ; vim: ts=8 sw=8 sts=8 et
 

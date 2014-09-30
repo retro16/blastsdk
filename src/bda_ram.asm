@@ -1,4 +1,4 @@
-                if SCD != 0
+                if TARGET != TARGET_GEN
                 org     $FFFDBE
                 ds      $1F8                    ; Final code place
                 else

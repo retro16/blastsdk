@@ -1,3 +1,7 @@
+BDP_OUT_BUFSIZE equ     $30     ; Address of data size in buffer
+BDP_OUT_BUFFER  equ     $32     ; Address of sub buffer
+BDP_OUT_MAXSIZE equ     $2E     ; Max number of bytes in buffer
+
                 if BUS == BUS_MAIN
 
 ; Set port used for communication
@@ -92,6 +96,8 @@ bdp_write_finished
                 rts
 
 
+                if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+
 ; Poll sub cpu state
 ; void bdp_sub_check();
 bdp_sub_check
@@ -139,21 +145,26 @@ bdp_sub_check
                 ; Request program ram bank 0
                 SUB_ACCESS_PRAM 0
 
+                tst.w   $020000 + BDP_OUT_BUFSIZE
+                beq.b   .emptybuf
+
                 ; Send data to the debugger
-                pea     #$020032        ; Push data address
+                pea.l   #$020000 + BDP_OUT_BUFFER      ; Push data buffer address
                 moveq   #0, d0  ; Push data size
-                move.w  $020030, d0
+                move.w  $020000 + BDP_OUT_BUFSIZE, d0
                 move.l  d0, -(a7)
                 jsr     bdp_write
 
                 ; Acknowledge to the sub cpu by resetting data size
-                clr.w   #$020030
+                clr.w   $020000 + BDP_OUT_BUFSIZE
 
                 ; Release sub cpu
-                SUB_RELEASE_PRAM
+.emptybuf       SUB_RELEASE_PRAM
 
-.noout
+                .noout
                 rts
+
+                endif
 
                 elsif BUS == BUS_SUB
 
@@ -161,16 +172,36 @@ bdp_sub_check
 bdp_write
 
                 ; Use the reserved exception vector area as a buffer
-BDP_OUT_BUFSIZE equ     $30
-BDP_OUT_BUFFER  equ     $32
-BDP_OUT_MAXSIZE equ     $2E
 
-                move.l  8(sp), d1       ; d1 = length
-                bne.b .data_present
+                move.l  8(sp), d1               ; d1 = length
+                bne.b   .data_present
+.finished
                 rts
 .data_present
-                move.l  4(sp), a0       ; a0 = source data
+                move.l  4(sp), a0               ; a0 = source data
 
+.next_block
+                move.w  #BDP_OUT_MAXLEN, d0
+                cmp.w   d0, d1
+                bhi.b   .big_data               ; Buffer smaller than data
+                move.w  d1, d0
+                beq.b   .finished               ; No more data to copy
+                moveq   #0, d1                  ; Last loop
+                bra.b   .copy_start
+.big_data       sub.w   d0, d1                  ; Compute number of bytes
+                                                ; remaining after copy
+
+.copy_start     move.w  d0, BDP_OUT_BUFSIZE     ; Tell main CPU current block size
+                subq.w  #1, d0                  ; Adjust d0 for dbra
+.copy_loop      move.b  (a0)+, (a1)+            ; Copy data to buffer
+                dbra    d0, .copy_loop
+
+                bset    #5, GA_COMMFLAGS_SUB    ; Tell main CPU that data is ready
+.wait_flush     tst.w   BDP_OUT_BUFSIZE
+                bne.b   .wait_flush             ; Wait until main cpu sent data
+                bclr    #5, GA_COMMFLAGS_SUB
+
+                bra.b   .next_block
 
                 endif
 

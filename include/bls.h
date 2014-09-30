@@ -28,9 +28,11 @@ typedef unsigned long u32
 #define CHIP_PCM 11
 
 // Target constants
-#define TARGET_GEN 0
-#define TARGET_SCD 1
-#define TARGET_RAM 2
+#define TARGET_UNKNOWN 0
+#define TARGET_GEN 1
+#define TARGET_SCD1 2
+#define TARGET_SCD2 2
+#define TARGET_RAM 4
 
 #define TRAP(t) asm volatile("\tTRAP #"#t)
 #define BLS_INT_CALLBACK __attribute__((interrupt))

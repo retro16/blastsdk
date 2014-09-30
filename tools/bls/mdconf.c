@@ -284,10 +284,11 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
     } else {
       // Check for include
       while(node && strcasecmp(node->key, "include") == 0) {
-        printf("Include [%s] !!!\n", node->value);
-        mdconfnode *including = node;
         mdconfnode *included = mdconfparsefile(node->value);
+        printf("Include [%s]: %s !!!\n", node->value, included ? "success" : "failure");
+
         if(included) {
+          mdconfnode *including = node;
           mdconfnode *root = node;
           while(root->parent) root = root->parent;
 
@@ -303,10 +304,12 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
             }
           }
 
+          printf("prev\n");
           node = including->prev; // process previous include node
           mdconfremove(including);
           mdconffree(including);
           mdconffree(included);
+        } else {
           break;
         }
       }
@@ -381,6 +384,17 @@ mdconfnode *mdconfparsefile(const char *filename)
     char line[4096];
 
     fgets(line, 4096, f);
+
+    if(line[0] == ' ' && line[1] == ' ' && line[2] == ' ' && line[3] == ' ') {
+      // Code block : ignore
+      lastlineempty = 0;
+      canbetitle = 0;
+      linebullet = 0;
+      lastlinebullet = 0;
+      lastcanbetitle = 0;
+      continue;
+    }
+
     char *l = line + strlen(line) - 1;
 
     while(l >= line) {

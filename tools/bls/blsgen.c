@@ -490,7 +490,7 @@ void group_dump(const group *grp, FILE *out)
 
     fprintf(out, " - provides ");
     BLSLL_FOREACH(sec, secl) {
-      fprintf(out, "`%s` (%p)", sec->name, (void *)sec);
+      fprintf(out, "`%s`", sec->name);
 
       if(secl->next) {
         fprintf(out, ", ");
@@ -505,7 +505,7 @@ void group_dump(const group *grp, FILE *out)
 
     fprintf(out, " - provides ");
     BLSLL_FOREACH(sec, secl) {
-      fprintf(out, "`%s` (%p)", sec->name, (void *)sec);
+      fprintf(out, "`%s`", sec->name);
 
       if(secl->next) {
         fprintf(out, ", ");
@@ -2212,7 +2212,7 @@ int main(int argc, char **argv)
   if(argc > 1) {
     char arg[1024];
     strcpy(arg, argv[1]);
-    strncpy(path_prefixes[0], dirname(arg), 4096);
+    path_prefixes[0] = strdup(dirname(arg));
     gen_include_prefixes();
     blsconf_load(argv[1]);
   } else {

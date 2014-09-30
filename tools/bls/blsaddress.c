@@ -396,7 +396,7 @@ sv chip2bank(chipaddr chipaddr, bankconfig *bankconfig)
 
 void bankreset(bankconfig *bankconfig)
 {
-  bankconfig->bus = -1;
+  bankconfig->bus = bus_none;
   unsigned int i;
 
   for(i = 0; i < chip_max; ++i) {

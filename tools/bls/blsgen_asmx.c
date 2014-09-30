@@ -123,7 +123,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
         chipaddr ca = bus2chip(ba);
 
         if(sec->symbol->value.chip != chip_none && ca.chip != sec->symbol->value.chip) {
-          printf("Error: ORG of source %s is not on the correct chip.\n", src->name);
+          printf("Error: ORG (%08X) of source %s (bus=%s) is not on the correct chip. Source is on chip %s and ORG is in %s\n", address, src->name, bus_names[ba.bus], chip_names[sec->symbol->value.chip], chip_names[ca.chip]);
           exit(1);
         }
 

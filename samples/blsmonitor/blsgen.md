@@ -21,8 +21,9 @@ Section font.png.img
 Binary main
 ===========
 
- - provides main.asm monitor.asm monitor_ram.asm font.png.img bda_ram.asm
+ - provides main.asm monitor.asm monitor_ram.asm font.png.img
  - bus main
+ - include bda.md beh.md
 
 Output monitor
 ==============
