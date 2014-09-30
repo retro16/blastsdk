@@ -147,9 +147,16 @@ A 68k disassembler.
 Documentation for the project
 
 
-### inc ###
+### include ###
 
-The assembler include directory. It is automatically installed by setup.sh. Provides assembler includes and macros.
+The assembler, C and blsgen include directory. It is automatically installed by setup.sh. Provides all the features you will access as a SDK user.
+
+See the *.md files inside for more info on how to use each part of the library.
+
+
+### src ###
+
+Sources of the SDK running on the console. Automatically handled by setup and *.md files in include directory.
 
 
 ### samples ###
@@ -165,7 +172,7 @@ Status
 Things that work as expected (ready to use) :
 
  * asmx2 patches
- * d68k (cycle count is still wrong in some cases)
+ * d68k (cycle count is still wrong in some cases, some instructions may be missing)
  * bdbridge (tested only on arduino duemilanove)
  * bda (now works really well and is very compact)
  * bdb (needs improvements on)
