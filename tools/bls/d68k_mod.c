@@ -120,6 +120,7 @@ struct instr m68k_instr[] = {
   {"AND.L", 0xC180, 0xF1C0, op2_Dn, op1_EA, 4, 8},
 
   {"ANDI", 0x023C, 0xFFFF, ope_imm, op_ccr, 1, 8},
+  {"ANDI", 0x027C, 0xFFFF, ope_imm, op_sr, 2, 8},
   {"ANDI.B", 0x0200, 0xFFC0, ope_imm, op1_EA, 1, 4},
   {"ANDI.W", 0x0240, 0xFFC0, ope_imm, op1_EA, 2, 4},
   {"ANDI.L", 0x0280, 0xFFC0, ope_imm, op1_EA, 4, 8},
@@ -309,6 +310,7 @@ struct instr m68k_instr[] = {
   {"OR.L", 0x8180, 0xF1C0, op2_Dn, op1_EA, 4, 8},
 
   {"ORI", 0x003C, 0xFFFF, ope_imm, op_ccr, 1, 8},
+  {"ORI", 0x007C, 0xFFFF, ope_imm, op_sr, 2, 8},
   {"ORI.B", 0x0000, 0xFFC0, ope_imm, op1_EA, 1, 4},
   {"ORI.W", 0x0040, 0xFFC0, ope_imm, op1_EA, 2, 4},
   {"ORI.L", 0x0080, 0xFFC0, ope_imm, op1_EA, 4, 8},
@@ -746,7 +748,7 @@ void print_ea(int mode, int reg)
 
     case 4: { /* #xxx */
       u32 data = fetch(op->size);
-      TPRINTF("#$%X", data);
+      TPRINTF("#$%0*X", op->size * 2, data);
       cycles += op->size == 4 ? 8 : 4;
       break;
     }
@@ -777,7 +779,7 @@ void print_operand(enum iop ot)
 
   case ope_imm:
     u = fetch(op->size);
-    TPRINTF("#$%X", u);
+    TPRINTF("#$%0*X", op->size * 2, u);
     cycles += 0;
     break;
 

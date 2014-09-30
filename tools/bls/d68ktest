@@ -31,6 +31,7 @@ cat > test1.asm <<'EOF'
         ANDI.B  #$23, D1
         ANDI.W  #$33A1, (A2)+
         ANDI.L  #$AA211121, -(A1)
+        ANDI    #$F8FF, SR
         ASL.B   #1, D0
         ASL.B   D1, D2
         ASL.W   #8, D3
@@ -107,7 +108,7 @@ cat > test1.asm <<'EOF'
         EOR.B   D3, (A1)
         EOR.W   D1, D2
         EOR.L   D1, D2
-        EORI    #$2, CCR
+        EORI    #$02, CCR
         EORI.B  #$12, (A3)
         EORI.W  #$1214, D1
         EORI.L  #$5512FFAE, -(A1)
@@ -175,9 +176,10 @@ cat > test1.asm <<'EOF'
         OR.L    (A1), D2
         OR.L    D1, (A2)
         ORI     #$22, CCR
-        ORI.B   #$14, (A3)
-        ORI.W   #$4412, D1
-        ORI.L   #$AAEAFFAE, (A3)+
+        ORI.B   #$04, (A3)
+        ORI.W   #$0012, D1
+        ORI.L   #$00000FAE, (A3)+
+        ORI     #$0700, SR
         ROR.B   #8, D0
         ROR.B   D2, D1
         ROR.W   #5, D1

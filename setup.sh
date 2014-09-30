@@ -28,7 +28,7 @@ cat <<EOF
 Please select the installation prefix for compilation tools.
 You can automate this step by setting the BLSPREFIX variable.
 
-(default = $DEFAULTPREFIX)
+(default BLSPREFIX=$DEFAULTPREFIX)
 EOF
 read BLSPREFIX
 if [ -z "$BLSPREFIX" ]; then
