@@ -327,6 +327,10 @@ void boot_img(const char *filename)
 
   free(image);
 
+  cpu = 0;
+  d68k_setbus(bus_main);
+  d68k_readsymbols(filename);
+
   showreg(0);
 }
 
@@ -428,7 +432,7 @@ void d68k_instr(int cpu)
 
   char out[256];
   int suspicious;
-  d68k(out, 256, data, 10, 1, address, 0, 1, &suspicious);
+  d68k(out, 256, data, 10, 1, address, 1, 1, &suspicious);
   printf("(next) %s", out);
 }
 
@@ -440,9 +444,28 @@ void d68k_skip_instr(int cpu)
 
   char out[256];
   int suspicious;
-  address = d68k(out, 256, data, 10, 1, address, 0, 1, &suspicious);
+  address = d68k(out, 256, data, 10, 1, address, 1, 1, &suspicious);
   printf("(skip) %s", out);
   setreg(cpu, REG_PC, address);
+  d68k_instr(cpu);
+}
+
+void d68k_next_instr(int cpu)
+{
+  u32 address = readreg(cpu, REG_PC);
+  u8 data[10];
+  readmem(cpu, data, address, 10);
+
+  char out[256];
+  int suspicious;
+  u32 targetaddress = d68k(out, 256, data, 10, 1, address, 1, 1, &suspicious);
+
+  int hasbp = has_breakpoint(cpu, targetaddress);
+  if(!hasbp) set_breakpoint(cpu, targetaddress);
+  reach_breakpoint(cpu);
+  if(!hasbp) delete_breakpoint(cpu, targetaddress);
+
+  showreg(cpu);
   d68k_instr(cpu);
 }
 
@@ -463,10 +486,13 @@ int main(int argc, char **argv)
   printf("Blast ! debugger. Connected to %s\n", argv[1]);
 
   cpu = 0;
+  d68k_setbus(bus_main);
 
   if(argc >= 3) {
     printf("\n");
     boot_img(argv[2]);
+  } else {
+    d68k_readsymbols(NULL);
   }
 
   sigsetjmp(mainloop_jmp, 1);
@@ -525,6 +551,8 @@ void on_line_input(char *line)
 
       cpu = 0;
       l += 4;
+
+      d68k_setbus(bus_main);
     }
 
     if(strncmp(l, "sub", 3) == 0) {
@@ -534,6 +562,8 @@ void on_line_input(char *line)
 
       cpu = 1;
       l += 3;
+
+      d68k_setbus(bus_sub);
     }
 
     parse_token(token, &l);
@@ -731,7 +761,7 @@ void on_line_input(char *line)
       int instructions = -1;
 
       if(!address) {
-        address = readlong(cpu, REG_PC);
+        address = readreg(cpu, REG_PC);
         size = 0;
         printf("Starting at PC (%08X)\n", address);
       }
@@ -770,6 +800,11 @@ void on_line_input(char *line)
       stepcpu(cpu);
       showreg(cpu);
       d68k_instr(cpu);
+      continue;
+    }
+
+    if(strcmp(token, "next") == 0 || strcmp(token, "n") == 0) {
+      d68k_next_instr(cpu);
       continue;
     }
 
@@ -822,6 +857,34 @@ void on_line_input(char *line)
       bdp_set_dump(bdpdump);
       continue;
     }
+
+    if(strcmp(token, "sym") == 0) {
+      u32 addr = parse_int_skip(&l);
+      const char *sym = getdsymat(addr);
+      if(sym) {
+        printf("$%06X: %s\n", addr & 0xFFFFFF, sym);
+      } else {
+        printf("$%06X: (no symbol)\n", addr & 0xFFFFFF);
+      }
+      continue;
+    }
+
+    if(strcmp(token, "p") == 0 || strcmp(token, "print") == 0) {
+      parse_word(token, &l);
+      sv addr = getdsymval(token);
+      if(addr == -1) {
+        printf("%s: symbol not found\n", token);
+      } else {
+        printf("%s = $%08X\n", token, (u32)addr);
+      }
+      continue;
+    }
+
+    if(strcmp(token, "symload") == 0) {
+      parse_word(token, &l);
+      d68k_readsymbols(token);
+    }
+
   } while(0);
 
   signal(SIGINT, SIG_DFL);

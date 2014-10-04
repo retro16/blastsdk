@@ -30,7 +30,7 @@ int main(int argc, char **argv)
   int labels = 0;
   int assemble = 0;
   int instructions = -1;
-  int readsymbols = 1;
+  int readsymbols = 0;
   u32 size = 0xFFFFFFF;
   u32 offset = 0;
 
@@ -44,6 +44,7 @@ int main(int argc, char **argv)
 
     case 'l':
       labels = 1;
+      readsymbols = 1;
       break;
 
     case 'a':
@@ -65,7 +66,6 @@ int main(int argc, char **argv)
     case 't':
       d68k_readsymbols(optarg);
       labels = 1;
-      readsymbols = 0;
       break;
 
     default:

@@ -1,43 +1,45 @@
 BDB commands :
 
-    q                        quit
-    asmx <file> [addr]       Assemble a file, send it to addr and point PC at it.
-    subasmx <file> [addr]    Assemble a file, send it to addr of the sub CPU and point sub CPU PC at it.
-    flush                    flush genesis input
+    main                     Switch to main CPU
+    sub                      Switch to sub CPU
     
-    r <b|w|l>[len] <addr>    read len bytes/words/longs at addr. N is in bytes. If ommited, reads one.
-    w <b|w|l> <addr> <val>   writes val at specified address.
+    r <b|w|l> <addr>         read 1 byte/word/long at addr
+    w <b|w|l> <addr> <val>   write 1 byte/word/long at addr
     
-    sr <b|w|l> <addr>        read 1 byte/word/long at addr from the sub CPU
-    sw <b|w|l> <addr> <val>  write 1 byte/word/long at addr from the sub CPU
-    
-    sendfile <addr> <file>   writes a file in RAM
     go                       resumes execution
-    ping                     handshake with the monitor
-    test                     handshake with the bridge (no data is sent to the Genesis)
+    stop                     stop execution
+    step / s                 execute one instruction
+    next / n                 execute until the next instruction (useful to skip loops/subroutines)
+    skip                     skip one instruction (the instruction is not executed)
+    reset                    reset the CPU
+    
     reg                      display value of all registers
-    subreg                   display value of all sub CPU registers
     dump <addr> <len> [file] dump <len> bytes of memory at <addr> (optionally writing to [file])
-    subdump <addr> <len> [file] dump <len> bytes of PRAM at <addr> (optionally writing to [file])
     showchr <index>          show character data from VRAM in ASCII art.
     vdump <addr> <len> [file] dump <len> bytes of VRAM at <addr> (optionally writing to [file])
-    blsgen                   run blsgen
+    sendfile <addr> <file>   writes a file in RAM
     d68k <address> <len>     disassemble memory at <address> for <len> bytes
-    subd68k <address> <len>  disassemble PRAM at <address> for <len> bytes
-    substop                  make the sub CPU enter monitor mode
-    subgo                    resume sub CPU execution
     set <register> <value>   set the value of a register
-    subset <register> <value> set the value of a register in the sub CPU
-    step / s                 execute one instruction
-    skip                     skip one instruction
-    substep / ss             execute one instruction on the sub CPU
-    subskip                  skip one instruction on the sub CPU
+    
     boot <file>              boot a RAM program or a CD image (runs its IP and SP)
-    bootsp <file>            boot SP from a CD image
+    bootsp <file>            boot only the SP from a CD image
+    blsgen                   run blsgen
+    asmx <file> [addr]       Assemble a file, send it to addr and point PC at it.
+    
     break <address>          place a breakpoint at <address>. If <address> is omitted, show a list of breakpoints.
     delete <address>         delete a breakpoint at <address>
-    subreset                 reset sub CPU
+    sym <address>            get the symbol of an address
+    print / p <sym>          print the value of a symbol
+    
+    q                        quit
+    bridge                   get info on bridge (no data is sent to the Genesis)
     bdpdump <0|1>            set to 1 to enable bdp low level dump
+    symload <file>           load the symbol table from <file> (should be build_blsgen/blsgen.md)
+
+All commands can be prefixed by main r sub to switch between CPUs.
+
+For example, **subreg** will switch to sub CPU and display its registers. The bdb prompt will tell if you work on the main cpu (m) or sub cpu (s).
+
 
 Naming conventions :
 

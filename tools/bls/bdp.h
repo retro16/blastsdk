@@ -42,6 +42,7 @@ extern void setregs(int cpu, u32 *regs);
 extern void startcpu(int cpu); // Enter run mode
 extern void stopcpu(int cpu); // Enter monitor mode
 extern void stepcpu(int cpu); // Execute only one instruction
+extern void reach_breakpoint(int cpu); // Run until a breakpoint is reached
 extern void resetcpu(int cpu);
 extern int is_running(int cpu);
 
@@ -52,6 +53,7 @@ extern void vdpsetreg(int reg, u8 value);
 extern void setup_breakpoints(int cpu);
 extern void cleanup_breakpoints(int cpu);
 extern void list_breakpoints(int cpu);
+extern int has_breakpoint(int cpu, u32 address);
 extern void set_breakpoint(int cpu, u32 address);
 extern int delete_breakpoint(int cpu, u32 address);
 

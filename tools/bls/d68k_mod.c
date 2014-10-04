@@ -8,6 +8,7 @@
 #include <setjmp.h>
 #include <string.h>
 #include <stdlib.h>
+#include <libgen.h>
 
 typedef uint16_t u16;
 typedef int16_t i16;
@@ -474,31 +475,60 @@ void setdsym(const char *name, chipaddr val)
   dsymtable = s;
 }
 
+void d68k_setbus(bus b)
+{
+  banks.bus = b;
+}
+
 const char *getdsymat(u32 val)
 {
   bankconfig bc = banks;
   dsymptr s;
-
   for(s = dsymtable; s; s = s->next) {
     sv addr = chip2bank(s->val, &bc);
-
-    if(addr == val) {
+    if((addr & 0xFFFFFF) == (val & 0xFFFFFF)) {
       if(s->val.chip != chip_none) {
         // Update current bank
         banks.bus = bc.bus;
         banks.bank[s->val.chip] = bc.bank[s->val.chip];
       }
-
       return s->name;
     }
   }
-
   return 0;
+}
+
+sv getdsymval(const char *name)
+{
+  dsymptr s;
+  for(s = dsymtable; s; s = s->next) {
+    if(strcmp(name, s->name) == 0) {
+      sv addr = chip2bank(s->val, &banks);
+      return addr;
+    }
+  }
+  return -1;
 }
 
 void d68k_readsymbols(const char *filename)
 {
-  FILE *f = fopen(filename, "r");
+  FILE *f = NULL;
+ 
+  if(filename) {
+    size_t fl = strlen(filename);
+    if(fl > 3 && filename[fl - 3] == '.' && filename[fl - 2] == 'm' && filename[fl - 1] == 'd') {
+      f = fopen(filename, "r");
+    }
+
+    if(!f) {
+      char fname[4096];
+      char buf[4096];
+      strncpy(buf, filename, 4095);
+      buf[4095] = '\0';
+      snprintf(fname, 4096, "%s/build_blsgen/blsgen.md", dirname(buf));
+      f = fopen(fname, "r");
+    }
+  }
 
   if(!f) {
     filename = "build_blsgen/blsgen.md";
@@ -522,6 +552,8 @@ void d68k_readsymbols(const char *filename)
     fgets(line, 4096, f);
   }
 
+  int scount=0;
+
   if(!feof(f)) {
     fgets(line, 4096, f);
 
@@ -543,12 +575,14 @@ void d68k_readsymbols(const char *filename)
           line[9] = '\0';
           chipaddr value = {chip_parse(chip), parse_int(&line[10])};
           setdsym(&line[30], value);
+          ++scount;
         }
       }
     }
   }
 
   fclose(f);
+  printf("Imported %d symbols.\n", scount);
 }
 
 void print_label(u32 addr)
@@ -694,7 +728,7 @@ void print_ea(int mode, int reg)
 
       if(labels && addr >= startaddr && addr < endaddr) {
         print_label(addr);
-      } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
+      } else if(labels && getdsymat(addr)) {
         // JMP to a known target
         print_label(addr);
       } else {
@@ -711,7 +745,7 @@ void print_ea(int mode, int reg)
 
       if(labels && addr >= startaddr && addr < endaddr) {
         print_label(addr);
-      } else if(labels && (op->code & 0xFF00) == 0x4E && getdsymat(addr)) {
+      } else if(labels && getdsymat(addr)) {
         // JMP to a known target
         print_label(addr);
       } else {
@@ -1108,7 +1142,7 @@ int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _ins
   // Do first pass to find labels
   d68k_pass();
 
-  if(!labels) {
+  if(labels) {
     // One pass is enough to disassemble without labels
     return address;
   }

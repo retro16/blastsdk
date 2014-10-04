@@ -104,6 +104,7 @@ void setregs(int cpu, u32 *regs);
 void startcpu(int cpu); // Enter run mode
 void stopcpu(int cpu); // Enter monitor mode
 void stepcpu(int cpu);
+void reach_breakpoint(int cpu);
 void resetcpu(int cpu);
 static void subexec(u32 opcode, u32 op1, u32 op1size, u32 op2, u32 op2size);
 int is_running(int cpu);
@@ -116,6 +117,7 @@ static void cpurelease(int cpu);
 void setup_breakpoints(int cpu);
 void cleanup_breakpoints(int cpu);
 void list_breakpoints(int cpu);
+int has_breakpoint(int cpu, u32 address);
 void set_breakpoint(int cpu, u32 address);
 int delete_breakpoint(int cpu, u32 address);
 static u32 breakpoint_reached(int cpu);
@@ -993,7 +995,7 @@ void stepcpu(int cpu)
   if(cpu) {
     // Wait for TRACE interrupt on sub CPU
     do {
-      usleep(50);
+      usleep(500);
     } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
   } else {
     // Wait for TRACE interrupt on main CPU
@@ -1010,9 +1012,49 @@ void stepcpu(int cpu)
 
   // CPU returned in its previous state
   cpustate[cpu] = oldstate;
+  cleanup_breakpoints(cpu);
 
   // Restore SR
   setreg(cpu, REG_SR, (readreg(cpu, REG_SR) & 0x00FF) | (oldsr & 0xFF00));
+
+  cpurelease(cpu);
+}
+
+
+// Run until a breakpoint is reached
+void reach_breakpoint(int cpu)
+{
+  cpumonitor(cpu);
+
+  // Run the CPU
+  int oldstate = cpustate[cpu];
+  setcpustate(cpu, 0);
+
+  if(cpu) {
+    // Wait for TRAP7 interrupt on sub CPU
+    do {
+      usleep(500);
+    } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+  } else {
+    // Wait for TRAP7 interrupt on main CPU
+    readdata();
+
+    if(inpl != 4
+        || inp[0] != CMD_HANDSHAKE
+        || inp[1] != 0x00
+        || inp[2] != 0x00
+        || inp[3] != 0x27) {
+      on_unknown(inp, inpl);
+    }
+  }
+
+  // CPU returned in its previous state
+  cpustate[cpu] = oldstate;
+  cleanup_breakpoints(cpu);
+
+  u32 pc = readreg(cpu, REG_PC) - 2;
+  printf("Interrupted at $%06X\n", pc);
+  setreg(cpu, REG_PC, pc); // Replace on instruction
 
   cpurelease(cpu);
 }
@@ -1314,6 +1356,22 @@ void list_breakpoints(int cpu)
 
     printf("%s CPU breakpoint at $%06X\n", cpu ? "Sub" : "Main", breakpoints[cpu][b][0]);
   }
+}
+
+
+int has_breakpoint(int cpu, u32 addr)
+{
+  int b;
+
+  for(b = 0; b < MAX_BREAKPOINTS; ++b) {
+    if(!breakpoints[cpu][b][0]) {
+      return 0;
+    }
+    if(breakpoints[cpu][b][0] == addr) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 
