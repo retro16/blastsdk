@@ -59,5 +59,5 @@ Or if you provide common.c:
 
 ---------------------------------------
 
- - provides beh.asm
+ - source beh.asm
 

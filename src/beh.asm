@@ -112,12 +112,6 @@ beh_vdp_regs
                 db      VDPR18                  ; #18
                 align   2
 
-beh_init macro
-                if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-                jsr beh_init_scd_vectors
-                endif
-                endm
-
                 if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 beh_init_scd_vectors
                 moveq   #(beh_scd_vectors_end - beh_scd_vectors)/6 - 1, d0  ; Loop count

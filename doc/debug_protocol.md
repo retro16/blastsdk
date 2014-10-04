@@ -340,3 +340,36 @@ Sub -> main flags :
 
 
 To output data (bdp_write) from the sub cpu, the routine places data length at $30 and data in $32-$60 range in the program ram, sets BUF flag and waits until data length at $30 is reset to 0 by the main cpu.
+
+
+Simulated CD-ROM operation
+==========================
+
+(this is not implemented, just ideas)
+
+The sub CPU sends packets using BDP_WRITE to request data, then the debugger
+pauses the 2 CPU and writes the sector in the $000200-$005800 area of PRAM.
+
+When booting using bdb 'boot' command, bdb installs a new BIOS in the sub CPU,
+reimplementing BIOS_* calls to use BDP instead of real CD-ROM calls.
+
+Sub CPU -> PC protocol :
+
+**ROMREAD / ROMREADN**
+
+    52 52 4E  '\0RR'
+    <3 bytes : CD-ROM sector>
+
+
+**CDREAD**
+
+    43 44 52  '\0CD'
+    <bdb writes sector at $000800 + sets a flag>
+
+
+**CDCACK**
+
+    <sub cpu clears the flag>
+
+Other calls can be ignored.
+

@@ -235,6 +235,8 @@ void blsconf_load(const char *file)
     exit(1);
   }
 
+  mdconfprint(mdconf, 0);
+
   const mdconfnode *n;
 
   n = mdconfsearch(mdconf->child, "output");
@@ -420,8 +422,8 @@ group *binary_parse(const mdconfnode *mdnode, const char *name)
 
   int explicitdeps = 0;
 
-  MDCONF_GET_ENUM(mdnode, bus, bus, bin->banks.bus);
   bankreset(&bin->banks);
+  MDCONF_GET_ENUM(mdnode, bus, bus, bin->banks.bus);
 
   for(n = mdnode; (n = mdconfsearch(n, "bank")); n = n->next) {
     const char *bank = strchr(n->value, ':');
@@ -471,7 +473,7 @@ group *binary_parse(const mdconfnode *mdnode, const char *name)
   for(n = mdnode; (n = mdconfsearch(n, "source")); n = n->next) {
     explicitdeps = 1;
     const char *name = n->value;
-    g = source_parse(NULL, name);
+    g = source_parse(n, name);
 
     if(bin->banks.bus != bus_none && g->banks.bus == bus_none) {
       g->banks = bin->banks;

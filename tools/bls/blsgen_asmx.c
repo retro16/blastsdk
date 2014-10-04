@@ -123,7 +123,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
         chipaddr ca = bus2chip(ba);
 
         if(sec->symbol->value.chip != chip_none && ca.chip != sec->symbol->value.chip) {
-          printf("Error: ORG (%08X) of source %s (bus=%s) is not on the correct chip. Source is on chip %s and ORG is in %s\n", address, src->name, bus_names[ba.bus], chip_names[sec->symbol->value.chip], chip_names[ca.chip]);
+          printf("Error: ORG (%08X) of source %s (bus=%s) is not on the correct chip. Source is on chip %s and ORG is in %s\n", (unsigned int)address, src->name, bus_names[ba.bus], chip_names[sec->symbol->value.chip], chip_names[ca.chip]);
           exit(1);
         }
 
@@ -422,7 +422,7 @@ void source_get_symbols_asmx(group *s)
     org = chip2bank(sec->symbol->value, &s->banks);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l "BUILDDIR"/%s.lst -o /dev/null %s", (unsigned int)org, include_prefixes, defs, s->banks.bus, maintarget, maintarget, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i %s -i bls.inc -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l " BUILDDIR "/%s.lst -o /dev/null %s", (unsigned int)org, include_prefixes, defs, s->banks.bus, maintarget, maintarget, s->name, srcname);
 printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
 system(cmdline);
 snprintf(cmdline, 4096, "cp "BUILDDIR"/%s.lst "BUILDDIR"/%s.lst.1", s->name, s->name);

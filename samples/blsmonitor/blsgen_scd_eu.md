@@ -56,6 +56,7 @@ Binary main
 
  - provides main.asm monitor.asm monitor_ram.asm font.png.img bda_ram.asm
  - bus main
+ - include bda.md beh.md
 
 Binary sub
 ==========
