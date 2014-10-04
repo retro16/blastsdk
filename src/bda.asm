@@ -127,7 +127,7 @@ sendhead        macro
 .\?
                 endm
 
-sendhead_then   macro tailcall
+sendhead_then   macro   tailcall
                 lea     tailcall(pc), a4
                 jmp     (a3)
 .\?
@@ -252,7 +252,7 @@ bda_enter
 
 bda_finishwrite
 
-        waitack
+                waitack
 
 bda_readcmd
                 ; Setup port in input mode
@@ -282,23 +282,23 @@ bda_escape
                 btst    #5, d3                  ; 001xxxxx = exit, 000xxxxx = handshake
                 bne.b   bda_exit
 
-                sendhead_then bda_finishwrite ; Pong : reply with the same command
+                sendhead_then bda_finishwrite   ; Pong : reply with the same command
 
 ; Exit from monitor
 bda_exit
                 move.l  #$20000000, (a7)
                 sendhead                        ; Signal that we leave monitor mode
 
-        ; Wait until the exit command has been acknowledged
-        waitack
+                ; Wait until the exit command has been acknowledged
+                waitack
 
-        ; Set pad pins back to neutral state
+                ; Set pad pins back to neutral state
                 move.b  #BDA_NEUTRALDATA, (a5)
                 move.b  #BDA_NEUTRALCTRL, (a6)
 
-                addq.l  #4, a7          ; Point a7 back to registers
+                addq.l  #4, a7                  ; Point a7 back to registers
                 movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
-                move.l  bda_a7.w, a7                    ; Restore stack pointer
+                move.l  bda_a7.w, a7            ; Restore stack pointer
                 subq.l  #6, a7                  ; Restore interrupt stack frame
                 move.w  bda_sr.w, (a7)          ; Restore SR
                 move.l  bda_pc.w, 2(a7)         ; Restore PC
@@ -354,41 +354,41 @@ bda_sendlongs   lsr.b   #2, d3                  ; Convert d3 from byte count to 
 ; Send the 4 byte header
 bda_sendhead
                 ; Setup port in output mode
-                move.b  #BDA_SENDDATA, (a5)             ; Raise TR
-                move.b  #BDA_SENDCTRL, (a6)  ; Set all pins except TH as output
+                move.b  #BDA_SENDDATA, (a5)     ; Raise TR
+                move.b  #BDA_SENDCTRL, (a6)     ; Set all pins except TH as output
 
                 moveq   #3, d2                  ; Write 4 bytes
                 move.l  a7, a0                  ; a0 points to data to be sent
 
 ; Send memory buffer (a0 = address, d2 = byte count)
 bda_sendbuf
-        move.b  (a0)+, d0
+                move.b  (a0)+, d0
                 move.b  d0, d1                  ; d1 is used as scratch register
                 lsr.b   #4, d1                  ; Prepare high nybble
-                ori.b   #CTL|CTR, d1    ;
+                ori.b   #CTL|CTR, d1            ;
 
-        waitack
+                waitack
 
 .1              move.b  d1, (a5)                ; Place value
                 eori.b  #CTL, d1
                 move.b  d1, (a5)                ; Pulse TL to low (clock)
 
-        ; Prepare low nybble
+                ; Prepare low nybble
                 and.b   d7, d0
                 ori.b   #CTR, d0
 
-.2      cmp.b   (a5), d1                ; Wait for ack (wait until TH = 0)
+.2              cmp.b   (a5), d1                ; Wait for ack (wait until TH = 0)
                 bne.b   .2
 
-        move.b  d0, (a5)    ; Set low nybble (ack will be handled on next write cycle)
-        eori.b  #CTL, d0
-        move.b  d0, (a5)    ; Pulse TL to high (clock)
+                move.b  d0, (a5)                ; Set low nybble (ack will be handled on next write cycle)
+                eori.b  #CTL, d0
+                move.b  d0, (a5)                ; Pulse TL to high (clock)
 
                 dbra    d2, bda_sendbuf
                 subret
 
 bda_code_end
-                assert bda_code_end <= $FFFFB6
+        assert bda_code_end <= $FFFFB6
         if TARGET != TARGET_GEN
                 rend
 bda_code_source_end

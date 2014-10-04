@@ -65,10 +65,17 @@ static void goto_mainloop(int sig)
 
 void on_unknown(const u8 inp[36], int inpl)
 {
+  // TODO : CD-ROM simulator hook here
+
   erase_prompt();
-  printf("Received unknown data from the genesis\n");
-  hexdump(inp, inpl, 0);
-  exit(1);
+  if(inpl == 4 && inp[0] >= 1 && inp[0] <= 3) {
+    printf("%.*s", (unsigned int)inp[0], &inp[1]);
+  } else {
+    printf("Received unknown data from the genesis\n");
+    hexdump(inp, inpl, 0);
+    exit(1);
+  }
+  restore_prompt();
 }
 
 void on_breakpoint(int cpu, u32 address)

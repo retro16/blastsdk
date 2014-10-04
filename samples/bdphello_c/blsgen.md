@@ -60,7 +60,8 @@ is caused by the ENTER_MONITOR macro call.
 Binary **main**
 ===============
 
- - provides main.c bdp.asm bda.asm bda_ram.asm
+ - provides main.c
+ - include bdp.md
 
 
 Output **bdphello_c**

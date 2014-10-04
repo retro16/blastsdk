@@ -1,7 +1,7 @@
 int_level6
-		btst	#BCUP, CDATA1		; Test up button
+		btst	#CUP_BIT, CDATA1		; Test up button
 		beq.b	go_up
-		btst	#BCDOWN, CDATA1
+		btst	#CDOWN_BIT, CDATA1
 		beq.b	go_down
 interrupt	rte
 

@@ -223,14 +223,22 @@ int bdp_readdata()
     // Main CPU started
     return 1;
   } else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] == 0x27) {
+    // TRAP #7
     u32 bpaddress;
+
+    // breakpoint_reached damages inp : save useful values before.
+    u8 c = inp[2];
+    u8 v = inp[3];
+
+    cpustate[c] = 1;
 
     if((bpaddress = breakpoint_reached(inp[2]))) {
       on_breakpoint(inp[2], bpaddress);
     } else {
-      on_unknown(inp, inpl);
+      on_exception(c, v);
     }
-  } else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] < 0x30) {
+  } else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] > 0x00 && inp[3] < 0x30) {
+    cpustate[inp[2]] = 1;
     on_exception(inp[2], inp[3]);
   } else {
     on_unknown(inp, inpl);

@@ -82,7 +82,7 @@ bdp_send_byte
 
                 ; Packet sent
                 subq.w  #3, d1  ; Compute remaining bytes to send
-                bgt.w   bdp_send_packet
+                bgt.b   bdp_send_packet
 
 bdp_write_finished
                 ; Put port back to neutral state

@@ -454,6 +454,8 @@ void d68k_freesymbols()
     n = s->next;
     free(s);
   }
+
+  dsymtable = 0;
 }
 
 void setdsym(const char *name, chipaddr val)
@@ -462,7 +464,6 @@ void setdsym(const char *name, chipaddr val)
 
   for(s = dsymtable; s; s = s->next) {
     if(strcmp(name, s->name) == 0) {
-      strcpy(s->name, name);
       s->val = val;
       return;
     }

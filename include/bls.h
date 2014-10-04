@@ -3,9 +3,9 @@
 #ifndef BLS_H
 #define BLS_H
 
-typedef unsigned char u8
-typedef unsigned short u16
-typedef unsigned long u32
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned long u32;
 
 // Bus constants
 #define BUS_NONE 0
@@ -85,48 +85,48 @@ static inline void blscopy_inline(void *dest, const void *src, u32 length)
   switch((u8)length & 0xFC) {
     case 32:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 28:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 24:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 20:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 16:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 12:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 8:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     case 4:
       *(u32 *)dest = *(u32 *)src;
-      ++(u32 *)dest;
-      ++(u32 *)src;
+      dest = &((u32 *)dest)[1];
+      src = &((u32 *)src)[1];
     default:
       break;
   }
   if(length & 2) {
     *(u16 *)dest = *(u16 *)src;
-    ++(u16 *)dest;
-    ++(u16 *)src;
+    dest = &((u16 *)dest)[1];
+    src = &((u16 *)src)[1];
   }
   if(length & 1) {
     *(u8 *)dest = *(u8 *)src;
-    ++(u8 *)dest;
-    ++(u8 *)src;
+    dest = &((u8 *)dest)[1];
+    src = &((u8 *)src)[1];
   }
 }
 
