@@ -1,5 +1,5 @@
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-
+        
 ; Read d1 sectors starting at d0 into buffer in a0 (using Sub-CPU)
 ReadCD
         movem.l d0-d1/a0-a1, -(sp)

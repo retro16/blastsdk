@@ -1,5 +1,9 @@
 ; Macros to call C functions
 
+CCALL   macro   routine
+                jsr     routine
+                endm
+
 CCALL1  macro   routine, p1
                 pea     p1
                 jsr     routine

@@ -1,3 +1,5 @@
+                if ..UNDEF VDPDATA
+
 ; VDP address mappings - can be changed to use registers
 VDPDATA         set     $C00000
 VDPCTRL         set     $C00004
@@ -149,7 +151,20 @@ VDPPREPAUTOINCR macro   s
         endm
 
 VDPENABLE       macro   display, hint, vint, dma
-                VDPSETREG2 0, VDPR00 | VDPHVEN | (hint ? VDPHINT : 0), 1, VDPR01 | (display ? VDPDISPEN : 0) | (vint ? VDPVINT : 0) | (dma ? VDPDMAEN : 0)
+R00\?           set     VDPR00 | VDPHVEN
+        if display
+R01\?           set     R01\? | VDPDISPEN
+        endif
+        if hint
+R00\?           set     R00\? | VDPHINT
+        endif
+        if vint
+R01\?           set     R01\? | VDPVINT
+        endif
+        if dma
+R01\?           set     R01\? | VDPDMAEN
+        endif
+                VDPSETREG2 0, R00\?, 1, R01\?
                 endm
 
 VRAM            equ     $00000000
@@ -398,6 +413,6 @@ VDPTILE_VMIR    equ     $1000
 VDPTILE_HMIR    equ     $0800
 
 
-
+                endif
 
 ; vim: ts=8 sw=8 sts=8 et

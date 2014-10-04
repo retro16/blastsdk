@@ -171,7 +171,7 @@ PSG             equ     $C00011
                 include bls_vdp.inc
                 endif
 
-                if TARGET != TARGET_GEN
+                if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
                 include blsscd.inc
                 endif
 
