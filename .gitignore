@@ -21,7 +21,7 @@
 *.ram
 /tools/asmx2/src/asmx
 /tools/bls/bdb
-/tools/bls/blsbuild
+/tools/bls/blsgen
 /tools/bls/d68k
 /tools/bls/scdupload
 /tools/bls/test_d68k
@@ -32,4 +32,7 @@
 
 # Build directories
 /build
-/samples/*/tmp
+/samples/*/build_blsgen
+
+# VIM status files
+.*.swp
