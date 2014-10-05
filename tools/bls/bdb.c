@@ -439,7 +439,7 @@ void d68k_instr(int cpu)
 
   char out[256];
   int suspicious;
-  d68k(out, 256, data, 10, 1, address, 1, 1, &suspicious);
+  d68k(out, 256, data, 10, 1, address, 1, 1, 1, &suspicious);
   printf("(next) %s", out);
 }
 
@@ -451,7 +451,7 @@ void d68k_skip_instr(int cpu)
 
   char out[256];
   int suspicious;
-  address = d68k(out, 256, data, 10, 1, address, 1, 1, &suspicious);
+  address = d68k(out, 256, data, 10, 1, address, 0, 0, 0, &suspicious);
   printf("(skip) %s", out);
   setreg(cpu, REG_PC, address);
   d68k_instr(cpu);
@@ -465,7 +465,7 @@ void d68k_next_instr(int cpu)
 
   char out[256];
   int suspicious;
-  u32 targetaddress = d68k(out, 256, data, 10, 1, address, 1, 1, &suspicious);
+  u32 targetaddress = d68k(out, 256, data, 10, 1, address, 0, 0, 0, &suspicious);
 
   int hasbp = has_breakpoint(cpu, targetaddress);
   if(!hasbp) set_breakpoint(cpu, targetaddress);
@@ -783,7 +783,7 @@ void on_line_input(char *line)
 
       char out[262144];
       int suspicious;
-      d68k(out, 262144, data, size, instructions, address, 1, 1, &suspicious);
+      d68k(out, 262144, data, size, instructions, address, 1, 1, 1, &suspicious);
       printf("%s\n", out);
 
       continue;

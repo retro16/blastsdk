@@ -372,6 +372,7 @@ static int size;
 static int instructions;
 static u32 address;
 static int labels;
+static int showaddresses;
 static int showcycles;
 static int *suspicious;
 static int cycles;
@@ -1060,6 +1061,7 @@ static void d68k_pass()
     TALIGN(8);
 
     --instructions;
+    u32 opaddress = address;
     opcode = fetch(2);
     baseaddr = address;
 
@@ -1092,12 +1094,18 @@ static void d68k_pass()
         print_operand(op->op2);
       }
 
-      if(showcycles) {
+      if(showaddresses || showcycles) {
         TALIGN(40);
-        TPRINTF("; %d", cycles);
+        TPRINTF(";");
+        if(showaddresses) {
+          TPRINTF(" %06X", opaddress & 0x00FFFFFF);
+        }
+        if(showcycles) {
+          TPRINTF(" %d", cycles);
 
-        if(cyclesmax) {
-          TPRINTF("-%d", cycles+cyclesmax);
+          if(cyclesmax) {
+            TPRINTF("-%d", cycles+cyclesmax);
+          }
         }
       }
 
@@ -1118,7 +1126,7 @@ static void d68k_pass()
   }
 }
 
-int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _instructions, u32 _address, int _labels, int _showcycles, int *_suspicious)
+int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _instructions, u32 _address, int _labels, int _showaddresses, int _showcycles, int *_suspicious)
 {
   targetdata = _targetdata;
   tsize = _tsize;
@@ -1127,6 +1135,7 @@ int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _ins
   instructions = _instructions;
   address = _address;
   labels = _labels;
+  showaddresses = _showaddresses;
   showcycles = _showcycles;
   suspicious = _suspicious;
   startaddr = address;

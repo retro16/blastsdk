@@ -26,6 +26,7 @@ void help()
 
 int main(int argc, char **argv)
 {
+  int showaddresses = 0;
   int cycles = 0;
   int labels = 0;
   int assemble = 0;
@@ -45,6 +46,7 @@ int main(int argc, char **argv)
     case 'l':
       labels = 1;
       readsymbols = 1;
+      showaddresses = 1;
       break;
 
     case 'a':
@@ -113,7 +115,7 @@ int main(int argc, char **argv)
   char *dasm = malloc(size * 40);
 
   int suspicious;
-  int64_t r = d68k(dasm, size * 40, data + offset, size, instructions, address, labels, cycles, &suspicious);
+  int64_t r = d68k(dasm, size * 40, data + offset, size, instructions, address, labels, showaddresses, cycles, &suspicious);
   free(data);
 
   if(r < 0) {
