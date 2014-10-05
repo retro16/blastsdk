@@ -119,6 +119,7 @@ mdconfnode *mdconfcopy(const mdconfnode *node)
   copy->prev = NULL;
   copy->next = NULL;
   copy->parent = NULL;
+  copy->child = NULL;
 
   mdconfnode *dest = copy;
   
@@ -191,7 +192,7 @@ mdconfnode * mdconfremove(mdconfnode *node) {
   return node;
 }
 
-static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
+static mdconfnode * mdconfparsekeyvalue(const char *line, mdconfnode *node)
 {
   unsigned int keysize = 0;
   const char *key = line;
@@ -212,7 +213,7 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
 
   if(!*line) {
     node->value = NULL;
-    return;
+    return node;
   }
 
   const char *l;
@@ -228,13 +229,13 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
 
     if(!*l) {
       // To end of line : invalid value
-      return;
+      return node;
     }
 
     node->value = (char *)malloc(l - line - 1);
     memcpy(node->value, line + 2, l - line - 2);
     node->value[l - line - 2] = '\0';
-    return;
+    return node;
   }
 
   if(*line == '`') {
@@ -248,13 +249,13 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
 
     if(!*l) {
       // To end of line : invalid value
-      return;
+      return node;
     }
 
     node->value = (char *)malloc(l - line);
     memcpy(node->value, line + 1, l - line - 1);
     node->value[l - line - 1] = '\0';
-    return;
+    return node;
   }
 
   for(;;) {
@@ -283,6 +284,7 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
       line = l;
     } else {
       // Check for include
+      mdconfnode *copy = NULL;
       while(node && strcasecmp(node->key, "include") == 0) {
         mdconfnode *included = mdconfparsefile(node->value);
         printf("Include [%s]: %s !!!\n", node->value, included ? "success" : "failure");
@@ -295,7 +297,7 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
           mdconfnode *n;
           // Append titles to current root
           for(n = included->child; n; n = n->next) {
-            mdconfnode *copy = mdconfcopy(n);
+            copy = mdconfcopy(n);
             if(n->title) {
               mdconfappendchild(root, copy);
             } else {
@@ -313,9 +315,12 @@ static void mdconfparsekeyvalue(const char *line, mdconfnode *node)
           break;
         }
       }
+      if(copy) node = copy;
       break;
     }
   }
+
+  return node;
 }
 
 char *mdconf_prefixes_default[4096] = {
@@ -361,6 +366,7 @@ mdconfnode *mdconfparsefile(const char *filename)
   mdconfnode *root = (mdconfnode *)malloc(sizeof(mdconfnode));
   root->key = strdup("file");
   root->value = strdup(filename);
+  root->prev = NULL;
   root->next = NULL;
   root->child = NULL;
   root->parent = NULL;
@@ -467,7 +473,7 @@ mdconfnode *mdconfparsefile(const char *filename)
           curdepth = 2;
         }
 
-        mdconfparsekeyvalue(l, curnode);
+        curnode = mdconfparsekeyvalue(l, curnode);
         linebullet = 1;
       }
     }
@@ -488,7 +494,7 @@ mdconfnode *mdconfparsefile(const char *filename)
           // Title found
           curnode = mdconfcreatechild(root);
           curnode->title = 1;
-          mdconfparsekeyvalue(lastline, curnode);
+          curnode = mdconfparsekeyvalue(lastline, curnode);
           curdepth = 0;
           linebullet = 1;
         }

@@ -103,6 +103,18 @@ static inline void blsvdp_set_reg2(u8 reg1, u8 value1, u8 reg2, u8 value2)
   *VDPCTRL_L = ((reg1 + 0x80) << 24) | (value1 << 16) | ((reg2 + 0x80) << 8) | value2;
 }
 
+static inline void blsvdp_set_regs(u8 regs[19])
+{
+  u16 r = 0x8000;
+  int i = 0;
+  for(i = 0; i < 19; ++i)
+  {
+    r = (r & 0xFF00 | regs[i]);
+    *VDPCTRL = r;
+    r += 0x100;
+  }
+}
+
 static inline void blsvdp_set_autoincrement(u8 incr)
 {
   blsvdp_set_reg(15, incr);

@@ -923,15 +923,26 @@ bls_find_entry_scd_ipbin_found:
     // Premap IP at fixed location
     secl = mainout.ipbin->provides;
     sv addr = IPOFFSET;
+    printf("Premapping IP binary\n");
     BLSLL_FOREACH(sec, secl) {
-      if(sec->symbol->value.chip == chip_ram && sec->format != format_empty && sec->format != format_zero && sec->size > 0) {
+      if(sec->symbol->value.chip != chip_ram) {
+        printf("Error: Bootloader binary must be in ram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
+        exit(1);
+      }
+      if(sec->format == format_raw && sec->size > 0) {
         if(sec->symbol->value.addr == -1) {
+          printf("Premapping section %s at %06X-%06X\n", sec->name, (u32)addr, (u32)(addr + sec->size - 1));
           sec->symbol->value.addr = addr;
-          addr += sec->size;
         } else if(sec->symbol->value.addr != addr) {
           printf("Error : invalid offset for section %s (set at %06X, should be %06X).\n", sec->name, (unsigned int)sec->symbol->value.addr, (unsigned int)addr);
           exit(1);
+        } else {
+          printf("Section %s already premapped at %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);
         }
+        addr += sec->size;
+      } else if(sec->size > 0 && sec->format != format_empty) {
+        printf("Error: format %s is not supported in bootloader binaries\n", format_names[sec->format]);
+        exit(1);
       }
     }
 
@@ -968,15 +979,28 @@ bls_find_entry_scd_spbin_found:
     // Premap SP at fixed location
     secl = mainout.spbin->provides;
     addr = SPOFFSET;
+    printf("Premapping SP binary\n");
     BLSLL_FOREACH(sec, secl) {
-      sec->symbol->value.chip = chip_pram;
-
-      if(sec->symbol->value.addr == -1) {
-        sec->symbol->value.addr = addr;
-        addr += sec->size;
-      } else if(sec->symbol->value.addr != addr) {
-        printf("Error : invalid offset for section %s.\n", sec->name);
+      if(sec->symbol->value.chip != chip_pram) {
+        printf("Error: Bootloader binary must be in pram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
         exit(1);
+      }
+      if(sec->format == format_raw && sec->size > 0) {
+        if(sec->symbol->value.addr == -1) {
+          printf("Premapping section %s at %06X-%06X\n", sec->name, (u32)addr, (u32)(addr + sec->size - 1));
+          sec->symbol->value.addr = addr;
+        } else if(sec->symbol->value.addr != addr) {
+          printf("Error : invalid offset for section %s (set at %06X, should be %06X).\n", sec->name, (unsigned int)sec->symbol->value.addr, (unsigned int)addr);
+          exit(1);
+        } else {
+          printf("Section %s already premapped at %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);
+        }
+        addr += sec->size;
+      } else if(sec->size > 0 && sec->format != format_empty) {
+        printf("Error: format %s is not supported in bootloader binaries\n", format_names[sec->format]);
+        exit(1);
+      } else {
+        printf("Skipping section %s\n", sec->name);
       }
     }
 
@@ -1214,20 +1238,6 @@ void bls_map()
   section *sec;
 
   printf("Map logical addresses.\n");
-
-  if(maintarget == target_scd1 || maintarget == target_scd2) {
-    // Map IP and SP first, to pack them as tightly as possible in RAM
-
-    secl = mainout.ipbin->provides;
-    BLSLL_FOREACH(sec, secl) {
-      bls_map_section(sec);
-    }
-    secl = mainout.spbin->provides;
-    BLSLL_FOREACH(sec, secl) {
-      bls_map_section(sec);
-    }
-  }
-
   secl = usedsections;
   BLSLL_FOREACH(sec, secl) {
     bls_map_section(sec);
@@ -1357,7 +1367,7 @@ void bls_physmap_cd()
   mainout.spbin->physaddr = align_value(mainout.ipbin->physaddr + mainout.ipbin->physsize, CDBLOCKSIZE) + SPHEADERSIZE;
 
   sv physstart = align_value(mainout.spbin->physaddr + mainout.spbin->physsize, CDBLOCKSIZE);
-  sv physend = MAXCDBLOCKS;
+  sv physend = MAXCDBLOCKS * CDBLOCKSIZE;
 
   BLSLL(group) *binl = usedbinaries;
   group *bin;
@@ -1381,41 +1391,12 @@ void bls_physmap_cd()
     bin->physaddr = physstart;
     printf("Binary %s : size=%04X physstart=%06X physend=%06X\n", bin->name, (unsigned int)bin->physsize, (unsigned int)physstart, (unsigned int)physend);
 
-    while(bin->physaddr + bin->physsize <= physend) {
-      BLSLL(group) *sl = usedbinaries;
-      group *s;
-      BLSLL_FOREACH(s, sl) {
-        if(s == bin || s->physsize == 0 || s->physaddr == -1) {
-          continue;
-        }
-
-        if(phys_overlap((element *)bin, (element *)s)) {
-          printf("YES : %06X => ", (unsigned int)bin->physaddr);
-          bin->physaddr = align_value(s->physaddr + s->physsize, CDBLOCKSIZE);
-
-          if(bin->physaddr < physstart || bin->physaddr + bin->physsize > physend) {
-            printf("Error : Physical address %06X out of range (%06X-%06X)\n", (unsigned int)bin->physaddr, (unsigned int)physstart, (unsigned int)physend);
-            exit(1);
-          }
-
-          printf("%06X\n", (unsigned int)bin->physaddr);
-          goto bls_map_next_binary_addr;
-        }
-      }
-      // Found
-      printf("NO\n");
-      goto bls_map_next_binary;
-bls_map_next_binary_addr:
-      continue;
-    }
-
     if(bin->physaddr + bin->physsize >= physend) {
-      printf("Error : could not map binary %s : not enough memory in cart\n", bin->name);
+      printf("Error : could not map binary %s : CD-ROM full\n", bin->name);
       exit(1);
     }
 
-bls_map_next_binary:
-    continue;
+    physstart = align_value(bin->physaddr + bin->physsize, CDBLOCKSIZE);
   }
 
   binl = usedbinaries;
@@ -2172,16 +2153,25 @@ void output_dump_cd(FILE *f)
     BLSLL(section) *secl = bin->provides;
     section *sec;
     u32 offset = 0;
-    BLSLL_FOREACH(sec, secl) {
-      if(sec->physsize <= 0) {
-        continue;
+    if(bin == mainout.ipbin || bin == mainout.spbin) {
+      BLSLL_FOREACH(sec, secl) {
+        if(sec->size == 0 || sec->format != format_raw) {
+          continue;
+        }
+        fprintf(f, "     -> %08X %08X %s\n", (unsigned int)sec->physaddr, (unsigned int)sec->physsize, sec->name);
       }
+    } else {
+      BLSLL_FOREACH(sec, secl) {
+        if(sec->physsize <= 0 || sec->format == format_zero || sec->format == format_empty) {
+          continue;
+        }
 
-      fprintf(f, "     -> %08X %08X %s\n", offset, (unsigned int)sec->physsize, sec->name);
-      offset += sec->physsize;
+        fprintf(f, "     -> %08X %08X %s\n", offset, (unsigned int)sec->physsize, sec->name);
+        offset += sec->physsize;
 
-      if(sec->physsize & 1) {
-        ++offset;
+        if(sec->physsize & 1) {
+          ++offset;
+        }
       }
     }
 

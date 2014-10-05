@@ -44,24 +44,75 @@ const char *sections_cat(group *bin, const char *binname)
 
   BLSLL(section) *secl = bin->provides;
   section *sec;
-  BLSLL_FOREACH(sec, secl) {
-    // Ignore null sections
-    if(sec->physsize == 0 || sec->format == format_zero || sec->format == format_empty) {
-      continue;
+
+  if(bin == mainout.ipbin || bin == mainout.spbin) {
+    sv minaddr = 0xFFFFFFFF;
+    sv maxaddr = 0;
+
+    // Compute maxaddr and minaddr
+    BLSLL_FOREACH(sec, secl) {
+      // Ignore null sections
+      if(sec->size == 0 || sec->format != format_raw) {
+        continue;
+      }
+      if(sec->symbol->value.addr < minaddr) {
+        minaddr = sec->symbol->value.addr;
+      }
+      if(sec->symbol->value.addr + sec->size > maxaddr) {
+        maxaddr = sec->symbol->value.addr + sec->size;
+      }
     }
 
-    char secfile[4096];
-    snprintf(secfile, 4096, BUILDDIR"/%s", sec->name);
-    sec->physaddr = ftell(o);
-    i = fopen(secfile, "rb");
-    filecat(i, o);
-    sec->physsize = ftell(i);
+    printf("minaddr=%X maxaddr=%X\n", (u32)minaddr, (u32)maxaddr);
 
-    if(sec->physsize & 1) {
-      fputc('\x00', o); // Align sections to word in binary
+    // Reserve space in the output file for the whole binary
+    sv binoffset = ftell(o);
+    sv c;
+    for(c = 0; c < maxaddr - minaddr; ++c) {
+      fputc('\0', o);
     }
 
-    fclose(i);
+    // Copy sections in their correct offset directly in the file
+    secl = bin->provides;
+    BLSLL_FOREACH(sec, secl) {
+      // Ignore null sections
+      if(sec->size == 0 || sec->format != format_raw) {
+        continue;
+      }
+
+      printf("%s : %X\n", sec->name, (u32)(binoffset + sec->symbol->value.addr - minaddr));
+      fseek(o, binoffset + sec->symbol->value.addr - minaddr, SEEK_SET);
+
+      char secfile[4096];
+      snprintf(secfile, 4096, BUILDDIR"/%s", sec->name);
+      sec->physaddr = ftell(o);
+      i = fopen(secfile, "rb");
+      filecat(i, o);
+      sec->physsize = ftell(i);
+    }
+
+    // Move cursor after the binary
+    fseek(o, binoffset + maxaddr - minaddr, SEEK_SET);
+  } else {
+    BLSLL_FOREACH(sec, secl) {
+      // Ignore null sections
+      if(sec->physsize == 0 || sec->format == format_zero || sec->format == format_empty) {
+        sec->physsize = 0;
+        continue;
+      }
+
+      char secfile[4096];
+      snprintf(secfile, 4096, BUILDDIR"/%s", sec->name);
+      sec->physaddr = ftell(o);
+      i = fopen(secfile, "rb");
+      filecat(i, o);
+      sec->physsize = ftell(i);
+      if(sec->physsize & 1) {
+        fputc('\x00', o); // Align sections to word in binary
+      }
+
+      fclose(i);
+    }
   }
 
   bin->physsize = ftell(o);
