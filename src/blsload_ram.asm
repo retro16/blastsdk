@@ -6,3 +6,5 @@ BLSLOAD_SECTOR  ds      4       ; Contains sector number
 BLSLOAD_COUNT   ds      4       ; Contains sector count
 BLSLOAD_DEST    ds      1
         align   2
+
+; vim: ts=8 sw=8 sts=8 et

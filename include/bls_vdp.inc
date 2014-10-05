@@ -151,20 +151,21 @@ VDPPREPAUTOINCR macro   s
         endm
 
 VDPENABLE       macro   display, hint, vint, dma
-R00\?           set     VDPR00 | VDPHVEN
+.R00\?          set     VDPR00
+.R01\?          set     VDPR01
         if display
-R01\?           set     R01\? | VDPDISPEN
+.R01\?          set     .R01\? | VDPDISPEN
         endif
         if hint
-R00\?           set     R00\? | VDPHINT
+.R00\?          set     .R00\? | VDPHINT
         endif
         if vint
-R01\?           set     R01\? | VDPVINT
+.R01\?          set     .R01\? | VDPVINT
         endif
         if dma
-R01\?           set     R01\? | VDPDMAEN
+.R01\?          set     .R01\? | VDPDMAEN
         endif
-                VDPSETREG2 0, R00\?, 1, R01\?
+                VDPSETREG2 0, .R00\?, 1, .R01\?
                 endm
 
 VRAM            equ     $00000000

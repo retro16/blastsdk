@@ -19,24 +19,6 @@ BDA_SENDCTRL    set (CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
 ; Level 2 interrupts must be enabled within VDP
 bda_init                                        ; Call at console initialization
         if TARGET != TARGET_GEN
-                ; Copy monitor code from source to RAM
-                lea     bda_code_source(pc), a1 ; Source
-                lea     bda_code.w, a0          ; Destination at the end of RAM
-                move.w  #(bda_code_source_end-bda_code_source) / 2 - 1, d0
-.1              move.w  (a1)+, (a0)+
-                dbra    d0, .1
-
-                ; Initialize main CPU interrupt vectors
-                lea     $24, a0
-                move.l  #int_trace, d0
-                jsr         bda_set_int_vector
-                lea     $68, a0
-                move.l  #int_pad, d0
-                jsr     bda_set_int_vector
-                lea     $9C, a0
-                move.l  #int_trap07, d0
-                jsr     bda_set_int_vector
-
         if TARGET == TARGET_SCD1 || target == TARGET_SCD2
                 ; Disable write protection and access bank 0
                 move.b  #$00, GA_MM
@@ -58,8 +40,12 @@ bda_init                                        ; Call at console initialization
 .3              move.w  (a1)+, (a0)+
                 dbra    d0, .3
 
-        ; Copy current level 2 exception vector to the new sub code handler
-        move.l  $020068, bda_l2_jmp + 2 + $20000
+                cmpi.l  #$200, $020068
+                blo.b   .damaged_l2
+
+                ; Copy current level 2 exception vector to the new sub code handler
+                move.l  $020068, bda_l2_jmp + 2 + $20000
+.damaged_l2
 
                 ; Set level 2 exception vector for sub CPU
                 move.l  #bda_sub_l2, $020068
@@ -79,6 +65,24 @@ bda_init                                        ; Call at console initialization
         endif   ; TARGET == TARGET_SCD1/2
         endif   ; TARGET != TARGET_GEN
 
+                ; Initialize main CPU interrupt vectors
+                lea     $24, a0
+                move.l  #int_trace, d0
+                jsr     bda_set_int_vector
+                lea     $68, a0
+                move.l  #int_pad, d0
+                jsr     bda_set_int_vector
+                lea     $9C, a0
+                move.l  #int_trap07, d0
+                jsr     bda_set_int_vector
+
+                ; Copy monitor code from source to RAM
+                lea     bda_code_source(pc), a1 ; Source
+                lea     bda_code.w, a0          ; Destination at the end of RAM
+                move.w  #(bda_code_source_end-bda_code_source) / 2 - 1, d0
+.1              move.w  (a1)+, (a0)+
+                dbra    d0, .1
+
                 ; Setup gamepad port in neutral state (TR low, all other pins input, enable interrupt)
                 move.b  #BDA_NEUTRALDATA, BDADATA               ; Set all high except TR low
                 move.b  #BDA_NEUTRALCTRL, BDACTRL       ; Enable level 2 interrupts and set TL+TR as output
@@ -90,7 +94,7 @@ bda_set_int_vector
                 cmp.l   (a0), d0
                 beq.b   .vector_already_set
                 move.l  (a0), a0                ; Point at exception handler
-                move.w  #$4EF9, (a0)+   ; Write JMP instruction
+                move.w  #$4EF9, (a0)+           ; Write JMP instruction
                 move.l  d0, (a0)                ; Write JMP target
 .vector_already_set
                 rts
@@ -205,7 +209,7 @@ bda_writelongs
                 dbra    d2, .2
                 move.l  d0, (a0)+               ; Do the write
                 dbra    d3, .1                  ; Write next long
-                bra.b   bda_readcmd
+                bra.w   bda_readcmd
 
 bda_writebytes
                 subq.b  #1, d3
@@ -228,6 +232,7 @@ int_trap07
                 move.l  #$27, bda_pkt_header.w  ; Send TRAP 7 code once entered monitor
 bda_enter
                 move.w  #$2700, sr              ; Disable all interrupts
+                VDPSETBG $800
 
                 move.w  (a7), bda_sr.w          ; Copy SR value to a fixed address
                 move.l  2(a7), bda_pc.w         ; Copy PC to a fixed address
@@ -295,6 +300,8 @@ bda_exit
                 ; Set pad pins back to neutral state
                 move.b  #BDA_NEUTRALDATA, (a5)
                 move.b  #BDA_NEUTRALCTRL, (a6)
+
+                VDPSETBG $000
 
                 addq.l  #4, a7                  ; Point a7 back to registers
                 movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
@@ -409,13 +416,14 @@ BDA_COMM_MAIN   set             $FF800E
 BDA_COMM_SUB    set             $FF800F
 
 bda_sub_code_source
-                rorg    bdasub_sr + 2   ; Place code after CPU state
+                rorg    bdasub_sr + 2           ; Place code after CPU state
 bda_sub_code
 
 bda_sub_l2
                 btst    #7, BDA_COMM_MAIN
-                bne.b   bda_sub_wait    ; If the bit is set : go to monitor mode
-bda_l2_jmp      jmp     bda_l2_default.l                ; The JMP target will be patched by bda_init to jump at the official L2 handler
+                bne.b   bda_sub_wait            ; If the bit is set : go to monitor mode
+
+bda_l2_jmp      jmp     $5F7C.l                 ; The JMP target will be patched by bda_init to jump at the official L2 handler
 
 bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
                 move.w  (a7), bdasub_sr.w       ; Copy SR value to a fixed address
@@ -441,19 +449,19 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
                 andi.b  #$3F, BDA_COMM_SUB
 
                 movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
-                move.l  bdasub_sp.w, a7 ; Pop SP
+                move.l  bdasub_sp.w, a7         ; Pop SP
                 subq.l  #6, a7                  ; Restore interrupt stack frame
                 move.w  bdasub_sr.w, (a7)       ; Restore SR in case it was changed by the monitor
                 move.l  bdasub_pc.w, 2(a7)      ; Restore PC
-bda_l2_default
+
                 rte
 
 bda_sub_trace   ; Voluntary interruption
                 bset    #6, BDA_COMM_SUB
-                jmp             bda_sub_wait
+                jmp     bda_sub_wait
 
 bda_sub_code_end
-                assert  bda_sub_code_end <= $1F0        ; Ensure subcode fits in header, before comm buffer
+                assert  bda_sub_code_end <= $1F0 ; Ensure subcode fits in header, before comm buffer
                 rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN

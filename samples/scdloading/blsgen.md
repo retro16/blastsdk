@@ -26,8 +26,11 @@ Sub CPU binaries
 Binary sub
 ----------
 
- - provides sub.asm blsload.asm
+ - provides sub.asm
  - bus sub
+
+ - include blsload_sub.md
+ - include bls_init_sub.md
 
 --------------------------------------
 

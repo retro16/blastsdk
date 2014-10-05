@@ -1,6 +1,4 @@
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-
-                include cdbios.inc
         
 ; Read d1 sectors starting at d0 into buffer in a0 (using Sub-CPU)
 ReadCD
@@ -85,8 +83,7 @@ BLSLOAD_INTERRUPT_HANDLER
                 lea     $080000, a0
         endif
                 move.l  d1, d0
-                lsl.l   #8, d0                  ; TODO : optimize slow shift
-                lsl.l   #3, d0
+                lsl.l   #11, d0
                 jsr     BLSLOAD_READ_CD_ASM
 
         ; Send WRAM back to main cpu
@@ -115,7 +112,6 @@ BLSLOAD_START_READ
 ; void BLSLOAD_READ_CD(u32 bytes, u32 target);
 BLSLOAD_READ_CD
                 movem.l (sp), d0/a0             ; Read C parameters to registers
-                lsr.l   #1, d0                  ; Convert bytes to words
 
 
 ; Stream d0 words from CD-ROM to address starting at a0

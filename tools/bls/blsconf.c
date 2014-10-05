@@ -325,11 +325,21 @@ section *section_parse(const mdconfnode *md, const char *srcname, const char *na
       ((char *)srcname)[c - name] = '\0';
     }
 
-    s->source = source_parse(NULL, srcname);
     s->datafile = symname(name);
   } else if(!md) {
     return s;
   }
+
+  char *sname;
+
+  if(s->symbol) {
+    sname = strdup(s->symbol->name);
+  } else {
+    sname = symname(name);
+  }
+
+  s->symbol = symbol_parse(md, sname);
+  free(sname);
 
   const mdconfnode *n;
 
@@ -348,16 +358,9 @@ section *section_parse(const mdconfnode *md, const char *srcname, const char *na
   MDCONF_GET_INT(md, size, s->size);
   MDCONF_GET_STR(md, datafile, s->datafile);
 
-  char *sname;
-
-  if(s->symbol) {
-    sname = strdup(s->symbol->name);
-  } else {
-    sname = symname(name);
+  if(!s->source) {
+    s->source = source_parse(NULL, srcname);
   }
-
-  s->symbol = symbol_parse(md, sname);
-  free(sname);
 
   return s;
 }

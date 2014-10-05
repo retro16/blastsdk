@@ -228,14 +228,14 @@ int bdp_readdata()
 
     // breakpoint_reached damages inp : save useful values before.
     u8 c = inp[2];
-    u8 v = inp[3];
 
     cpustate[c] = 1;
 
-    if((bpaddress = breakpoint_reached(inp[2]))) {
-      on_breakpoint(inp[2], bpaddress);
+    cleanup_breakpoints(c);
+    if((bpaddress = breakpoint_reached(c))) {
+      on_breakpoint(c, bpaddress);
     } else {
-      on_exception(c, v);
+      on_exception(c, 0x27);
     }
   } else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] > 0x00 && inp[3] < 0x30) {
     cpustate[inp[2]] = 1;
@@ -980,6 +980,20 @@ void setregs(int cpu, u32 *regs)
 
 void startcpu(int cpu)
 {
+  u32 pc = readreg(cpu, REG_PC);
+  if(has_breakpoint(cpu, pc)) {
+    // Step after the current breakpoint
+    stepcpu(cpu);
+    pc = readreg(cpu, REG_PC);
+  }
+
+  if(has_breakpoint(cpu, pc)) {
+    // Stepped on a breakpoint
+    on_breakpoint(cpu, pc);
+    return;
+  }
+
+  setup_breakpoints(cpu);
   setcpustate(cpu, 0);
 }
 
@@ -987,6 +1001,7 @@ void startcpu(int cpu)
 void stopcpu(int cpu)
 {
   setcpustate(cpu, 1);
+  cleanup_breakpoints(cpu);
 }
 
 
@@ -1020,7 +1035,6 @@ void stepcpu(int cpu)
 
   // CPU returned in its previous state
   cpustate[cpu] = oldstate;
-  cleanup_breakpoints(cpu);
 
   // Restore SR
   setreg(cpu, REG_SR, (readreg(cpu, REG_SR) & 0x00FF) | (oldsr & 0xFF00));
@@ -1036,31 +1050,42 @@ void reach_breakpoint(int cpu)
 
   // Run the CPU
   int oldstate = cpustate[cpu];
-  setcpustate(cpu, 0);
-
-  if(cpu) {
-    // Wait for TRAP7 interrupt on sub CPU
-    do {
-      usleep(500);
-    } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
-  } else {
-    // Wait for TRAP7 interrupt on main CPU
-    readdata();
-
-    if(inpl != 4
-        || inp[0] != CMD_HANDSHAKE
-        || inp[1] != 0x00
-        || inp[2] != 0x00
-        || inp[3] != 0x27) {
-      on_unknown(inp, inpl);
-    }
+  u32 pc = readreg(cpu, REG_PC);
+  if(has_breakpoint(cpu, pc)) {
+    // Step after the current breakpoint
+    stepcpu(cpu);
+    pc = readreg(cpu, REG_PC);
   }
 
-  // CPU returned in its previous state
-  cpustate[cpu] = oldstate;
-  cleanup_breakpoints(cpu);
+  if(!has_breakpoint(cpu, pc)) {
+    // Next instruction is not a breakpoint : run the CPU normally
+    setup_breakpoints(cpu);
+    setcpustate(cpu, 0);
 
-  u32 pc = readreg(cpu, REG_PC) - 2;
+    if(cpu) {
+      // Wait for TRAP7 interrupt on sub CPU
+      do {
+        usleep(500);
+      } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+    } else {
+      // Wait for TRAP7 interrupt on main CPU
+      readdata();
+
+      if(inpl != 4
+          || inp[0] != CMD_HANDSHAKE
+          || inp[1] != 0x00
+          || inp[2] != 0x00
+          || inp[3] != 0x27) {
+        on_unknown(inp, inpl);
+      }
+    }
+
+    // CPU returned in its previous state
+    cpustate[cpu] = oldstate;
+    cleanup_breakpoints(cpu);
+  }
+
+  pc = readreg(cpu, REG_PC) - 2;
   printf("Interrupted at $%06X\n", pc);
   setreg(cpu, REG_PC, pc); // Replace on instruction
 
@@ -1073,11 +1098,12 @@ void resetcpu(int cpu)
   cpumonitor(cpu);
 
   if(cpu) {
+    cpumonitor(0);
     setup_breakpoints(cpu);
     subreset();
     cpustate[cpu] = 0;
+    cpurelease(0);
   } else {
-    cpumonitor(cpu);
     // Write RESET instruction in REG_A7 (since it will be overwritten by the operation anyway)
     setreg(cpu, REG_SP, 0x4E704E70);
     // Execute instruction at REG_A7
@@ -1164,7 +1190,9 @@ void setcpustate(int cpu, int newstate)
 {
   if(!cpustate[cpu] != !newstate) {
     if(newstate) {
+      // Stop CPU
       if(cpu) {
+        // Stop sub CPU
         cpumonitor(0);
         writebyte(0, 0xA1200E, readbyte(0, 0xA1200E) | 0x80); // Set COMMFLAG 15
         writebyte(0, 0xA12000, 0x01); // Trigger L2 interrupt on sub CPU
@@ -1173,6 +1201,7 @@ void setcpustate(int cpu, int newstate)
 
         cpurelease(0);
       } else {
+        // Stop main CPU
         sendcmd(CMD_HANDSHAKE, 0);
         waitack();
         readdata();
@@ -1181,13 +1210,13 @@ void setcpustate(int cpu, int newstate)
           on_unknown(inp, inpl);
         }
       }
-
-      cleanup_breakpoints(cpu);
     } else {
-      setup_breakpoints(cpu);
+      // Start CPU
       busrelease(cpu);
 
       if(cpu) {
+        // Start sub CPU
+        
         // Generate a falling edge on comm flag 15
         cpumonitor(0);
         u8 commflag = readbyte(0, 0xA1200E);
@@ -1195,6 +1224,7 @@ void setcpustate(int cpu, int newstate)
         writebyte(0, 0xA1200E, commflag & ~0x80);
         cpurelease(0);
       } else {
+        // Start main CPU
         sendcmd(CMD_EXIT, 0);
         waitack();
         readdata();
@@ -1449,7 +1479,6 @@ u32 breakpoint_reached(int cpu)
 
     if(breakpoints[cpu][b][0] == pc) {
       // We hit a breakpoint and not a simple TRAP #7
-      cleanup_breakpoints(cpu);
       cpustate[cpu] = 1;
       // Place PC on the instruction
       setreg(cpu, REG_PC, pc);

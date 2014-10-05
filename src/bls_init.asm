@@ -19,24 +19,26 @@ bls_init
                 VDPSETADDRREG                   ; Use a4-a5 for VDP access
 
                 VDPENABLE 0, 0, 0, 1            ; Enable DMA only
-                VDPSETAUTOINCR 2                ; VDPDMAFILL requires 2
+                VDPSETAUTOINCR 1                ; VDPDMAFILL requires 1
                 VDPDMAFILL 0, 0, $10000         ; Start clearing VRAM
 
                 move.b	#CSEL, CCTRL1		; Enable CSEL for gamepad 1
-                move.b  #CSEL, CCTRL2           ; Enable CSEL for gamepad 2
 
                 bda_init                        ; Init BDA
                 beh_init                        ; Init BEH
 
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-                move.l  INTV_VBLANK.w, a0
+                move.l  INTV_VBLANK.w, a0       ; Set VBLANK interrupt
                 move.w  #$4EF9, (a0)+
-                move.l  8(sp), (a0)
-                move.w  14(sp), GA_HINT
+                move.l  16(sp), (a0)
+                move.w  14(sp), GA_HINT         ; Set HBLANK interrupt
         endif
 
                 VDPDMAWAIT                      ; Wait for VRAM cleaning
-        
+
+                andi    #$F8FF, SR              ; Enable interrupts
+
+                VDPSETAUTOINCR 2
                 VDPSETWRITE 0, CRAM             ; Clear CRAM
                 moveq   #0, d0
                 moveq   #31, d1                 ; 64 colors to clear
@@ -52,18 +54,7 @@ bls_init
                 movem.l (sp)+, a4-a5
 
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-                SYNC_MAIN_SUB
-        endif
-
-        else
-                assert  BUS == BUS_SUB
-                ; Initialize Sega CD part
-
-                ; Enable interrupts
-                move.w  #GA_IM_L1 | GA_IM_L2 | GA_IM_L3 | GA_IM_L4 | GA_IM_L5 | GA_IM_L6, GA_IMASK
-
-        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-                SYNC_MAIN_SUB
+                ;SYNC_MAIN_SUB
         endif
 
         endif   ; BUS == MAIN

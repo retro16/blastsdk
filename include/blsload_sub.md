@@ -3,8 +3,15 @@ resident or most binary loading operations will cease to work.
 
  - provides blsload.asm blsload_ram.asm
 
+
+Section blsload.asm.bin
+=======================
+
+ - chip pram
+
+
 Section blsload_ram.asm.bin
 ===========================
 
- - chip ram
+ - chip pram
 

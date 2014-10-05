@@ -1,8 +1,7 @@
 #ifndef BLS_INIT_H
 #define BLS_INIT_H
 
-#if BUS == BIS_MAIN
-extern void bls_init();
+extern void bls_init(bls_int_callback hint, bls_int_callback vint);
 
 static void bls_init_vdp(int hint, int vint, int plane_w, int plane_h, u32 plane_a_addr, u32 window_addr, u32 plane_b_addr, u32 sprites_addr, u32 hscroll_addr, enum hscroll_mode_e hscroll_mode, enum vscroll_mode_e vscroll_mode, int window_x, int window_y, int shadow, int interlace)
 {
@@ -29,6 +28,5 @@ static void bls_init_vdp(int hint, int vint, int plane_w, int plane_h, u32 plane
   };
   bls_vdp_set_regs(regs);
 }
-#endif
 
 #endif

@@ -81,13 +81,13 @@ CCALL8  macro   routine, p1, p2, p3, p4, p5, p6, p7, p8
                 endm
 
 LOOPWHILE       macro   instruction, p2
-WHILE_LOOP\?    instruction ,p2
-                bne.b   WHILE_LOOP\?
+.WHILE_LOOP\?   instruction ,p2
+                bne.b   .WHILE_LOOP\?
                 endm
 
 LOOPUNTIL       macro   instruction, p2
-UNTIL_LOOP\?    instruction ,p2
-                bne.b   UNTIL_LOOP\?
+.UNTIL_LOOP\?   instruction ,p2
+                bne.b   .UNTIL_LOOP\?
                 endm
 
 ENTER_MONITOR   macro
