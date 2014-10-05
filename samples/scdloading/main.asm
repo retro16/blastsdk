@@ -5,11 +5,10 @@
 MAIN
 IP_MAIN
                 bls_init 0, INT_VBLANK
-                ;bda_init
-                andi    #$F8FF, SR
+                bls_enable_interrupts
                 VDPSETBG $080
                 ENTER_MONITOR
-                ;bls_init_vdp 0, 1, 64, 64, $C000, 0, $E000, $B000, $BE00, 0, 0, 0, 0, 0, 0, 0
+                bls_init_vdp 0, 1, 64, 64, $C000, 0, $E000, $B000, $BE00, 0, 0, 0, 0, 0, 0, 0
 .1              bra.b .1
 
 

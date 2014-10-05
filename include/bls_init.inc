@@ -23,7 +23,7 @@ reg_init_vdp\?
         if hint
 		db	VDPR00 | VDPHINT ; #00
         else
-		db	VDPR00 |         ; #00
+		db	VDPR00           ; #00
         endif
         if vint
 		db	VDPR01 | VDPDISPEN | VDPVINT | VDPDMAEN ; #01

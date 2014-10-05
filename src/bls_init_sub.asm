@@ -10,11 +10,7 @@ bls_init_sub
                 ;move.w  #GA_IM_L1 | GA_IM_L2 | GA_IM_L3 | GA_IM_L4 | GA_IM_L5 | GA_IM_L6, GA_IMASK
                 move.w  #GA_IM_L2, GA_IMASK
 
-                andi    #$F8FF, SR
-
-        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-                SYNC_MAIN_SUB
-        endif
+                ;SYNC_MAIN_SUB
 
                 rts
 

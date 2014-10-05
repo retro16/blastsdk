@@ -29,7 +29,6 @@ Binary sub
  - provides sub.asm
  - bus sub
 
- - include blsload_sub.md
  - include bls_init_sub.md
 
 --------------------------------------
@@ -41,4 +40,5 @@ Output monitor
  - file monitor_scd_eu.iso
  - region E
  - target scd1
+ - binaries main sub
 

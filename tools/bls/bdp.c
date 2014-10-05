@@ -841,7 +841,7 @@ void writebyte(int cpu, u32 address, u32 b)
       // Access PRAM from main CPU
       cpumonitor(0);
       busreq(cpu, address);
-      writebyte(0, (address & 0x20000) + 0x20000, b);
+      writebyte(0, (address & 0x1FFFF) + 0x20000, b);
       cpurelease(0);
     } else {
       // Execute an instruction to move the value in PRAM
@@ -867,7 +867,7 @@ void writeword(int cpu, u32 address, u32 w)
       // Access PRAM from main CPU
       cpumonitor(0);
       busreq(cpu, address);
-      writeword(0, (address & 0x20000) + 0x20000, w);
+      writeword(0, (address & 0x1FFFF) + 0x20000, w);
       cpurelease(0);
     } else {
       // Execute an instruction to move the value in PRAM
@@ -894,7 +894,7 @@ void writelong(int cpu, u32 address, u32 l)
       // Access PRAM from main CPU
       cpumonitor(0);
       busreq(cpu, address);
-      writelong(0, (address & 0x20000) + 0x20000, l);
+      writelong(0, (address & 0x1FFFF) + 0x20000, l);
       cpurelease(0);
     } else {
       // Execute an instruction to move the value in PRAM
@@ -1256,7 +1256,8 @@ static void subreq()
 {
   ga_status = readbyte(0, 0xA12001);
   ga_status |= readword(0, 0xA12002) << 16;
-  writeword(0, 0xA12000, 0x0003);
+  writebyte(0, 0xA12001, 0x03);
+  while(readbyte(0, 0xA12001) & 0x03 != 0x03);
 }
 
 
