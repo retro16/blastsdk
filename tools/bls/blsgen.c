@@ -1194,7 +1194,7 @@ void bls_map_section(section *sec)
   sv chipstart = chip_start(sec->symbol->value.chip);
   sv chipend = chipstart + chip_size(sec->symbol->value.chip);
   sec->symbol->value.addr = chipstart;
-  printf("Section %s : size=%04X chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->size, (unsigned int)chipstart, (unsigned int)chipend);
+  printf("Section %s : size=%04X chip=%s chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->size, chip_names[sec->symbol->value.chip], (unsigned int)chipstart, (unsigned int)chipend);
 
   while(sec->symbol->value.addr + sec->size <= chipend) {
     BLSLL(section) *sl = usedsections;
@@ -1217,7 +1217,7 @@ void bls_map_section(section *sec)
       }
     }
     // Found
-    goto bls_map_next_section;
+    return;
 bls_map_next_section_addr:
     continue;
   }
@@ -1227,8 +1227,6 @@ bls_map_next_section_addr:
     exit(1);
   }
 
-bls_map_next_section:
-  return;
 }
 
 void bls_map()
@@ -1805,10 +1803,10 @@ void bls_build_cd_image()
     spinit = spmain;
   }
 
-  sv spl2 = symbol_get_bus("G_SUB_HWINT_LEVEL2", bus_sub);
+  sv spl2 = symbol_get_bus("SUB_HWINT_LEVEL2", bus_sub);
 
   if(spl2 == -1) {
-    spl2 = symbol_get_bus("G_SUB_INT_LEVEL2", bus_sub);
+    spl2 = symbol_get_bus("SUB_INT_LEVEL2", bus_sub);
   }
 
   if(spinit > 0x6020 + 0xFFFF) {

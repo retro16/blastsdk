@@ -7,10 +7,8 @@ bls_init_sub
                 ; Initialize Sega CD part
 
                 ; Enable interrupt mask
-                ;move.w  #GA_IM_L1 | GA_IM_L2 | GA_IM_L3 | GA_IM_L4 | GA_IM_L5 | GA_IM_L6, GA_IMASK
-                move.w  #GA_IM_L2, GA_IMASK
-
-                ;SYNC_MAIN_SUB
+                move.w  #GA_IM_L1 | GA_IM_L2 | GA_IM_L3 | GA_IM_L4 | GA_IM_L5 | GA_IM_L6, GA_IMASK
+                ;move.w  #GA_IM_L2, GA_IMASK
 
                 rts
 

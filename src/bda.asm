@@ -209,7 +209,7 @@ bda_writelongs
                 dbra    d2, .2
                 move.l  d0, (a0)+               ; Do the write
                 dbra    d3, .1                  ; Write next long
-                bra.w   bda_readcmd
+                bra.b   bda_readcmd
 
 bda_writebytes
                 subq.b  #1, d3
@@ -232,7 +232,6 @@ int_trap07
                 move.l  #$27, bda_pkt_header.w  ; Send TRAP 7 code once entered monitor
 bda_enter
                 move.w  #$2700, sr              ; Disable all interrupts
-                VDPSETBG $800
 
                 move.w  (a7), bda_sr.w          ; Copy SR value to a fixed address
                 move.l  2(a7), bda_pc.w         ; Copy PC to a fixed address
@@ -300,8 +299,6 @@ bda_exit
                 ; Set pad pins back to neutral state
                 move.b  #BDA_NEUTRALDATA, (a5)
                 move.b  #BDA_NEUTRALCTRL, (a6)
-
-                VDPSETBG $000
 
                 addq.l  #4, a7                  ; Point a7 back to registers
                 movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
@@ -412,8 +409,8 @@ bdasub_sp       set     bdasub_d0 + 15*4
 bdasub_pc       set     bdasub_d0 + 16*4
 bdasub_sr       set     bdasub_d0 + 17*4
 
-BDA_COMM_MAIN   set             $FF800E
-BDA_COMM_SUB    set             $FF800F
+BDA_COMM_MAIN   set     $FF800E
+BDA_COMM_SUB    set     $FF800F
 
 bda_sub_code_source
                 rorg    bdasub_sr + 2           ; Place code after CPU state

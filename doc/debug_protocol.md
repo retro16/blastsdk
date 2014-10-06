@@ -357,14 +357,14 @@ Sub CPU -> PC protocol :
 
 **ROMREAD / ROMREADN**
 
-    52 52 4E  '\0RR'
     <3 bytes : CD-ROM sector>
 
 
 **CDREAD**
 
-    43 44 52  '\0CD'
-    <bdb writes sector at $000800 + sets a flag>
+    0F FF FF
+
+    <bdb grabs PRAM, writes sector at $000200 and sets the flag at $000A00>
 
 
 **CDCACK**

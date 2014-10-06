@@ -185,23 +185,23 @@ void boot_cd(u8 *image, int imgsize)
 
   printf("CD-ROM image. IP=%04X-%04X (%d bytes). SP=%04X-%04X (%d bytes).\n", (u32)(ip_start-image), (u32)(ip_start - image + ipsize - 1), ipsize, (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
+  printf("Entering monitor mode on both CPUs\n");
   stopcpu(0);
   stopcpu(1);
 
   printf("Uploading IP (%d bytes) ...\n", ipsize);
   writemem(0, 0xFF0000 + seccodesize, ip_start, ipsize);
-
-  printf("Uploading SP (%d bytes) ...\n", spsize);
-  writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
-  printf("Set sub CPU reset vector to beginning of sub code.\n");
-  writelong(1, 0x000004, 0x6000 + SPHEADERSIZE);
-  printf("Set main CPU registers.\n%06X PC=%08X\n%06X SP=%08X\n%06X SR=%04X\n", REG_PC, 0xFF0000 + seccodesize, REG_SP, 0xFFD000, REG_SR, 0x2700);
+  printf("Setting main CPU registers.\n");
   setreg(0, REG_PC, 0xFF0000 + seccodesize);
   setreg(0, REG_SP, 0xFFD000);
   setreg(0, REG_SR, 0x2700);
 
-  printf("Resetting sub CPU.\n");
-  resetcpu(1);
+  printf("Uploading SP (%d bytes) ...\n", spsize);
+  writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
+  printf("Setting sub CPU registers.\n");
+  setreg(1, REG_PC, 0x6000 + SPHEADERSIZE);
+  setreg(1, REG_SP, 0x5E80);
+  setreg(1, REG_SR, 0x2700);
 
   printf("Ready to boot.\n");
 }
@@ -216,18 +216,17 @@ void boot_sp(u8 *image, int imgsize)
 
   printf("CD-ROM image. SP=%04X-%04X (%d bytes).\n", (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
-  printf("Requesting sub CPU ...\n");
+  printf("Stopping sub CPU ...\n");
   stopcpu(1);
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
   writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
-  printf("Set sub CPU reset vector to beginning of sub code.\n");
-  writelong(1, 0x000004, 0x6000 + SPHEADERSIZE);
+  printf("Setting sub CPU registers.\n");
+  setreg(1, REG_PC, 0x6000 + SPHEADERSIZE);
+  setreg(1, REG_SP, 0x5E80);
+  setreg(1, REG_SR, 0x2700);
 
-  printf("Resetting sub CPU.\n");
-  resetcpu(1);
-
-  printf("New SP code running.\n");
+  printf("New SP program loaded.\n");
 }
 
 // v is the vector offset (0x08-0xBC)

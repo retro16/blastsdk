@@ -18,8 +18,8 @@ ReadCD
                 bcs.b   .1              ;no sectors in CD buffer
 
                 ;set CDC Mode destination device to Sub-CPU
-        ;       andi.w  #$F8FF, $8004.w
-        ;       ori.w   #$0300, $8004.w
+                andi.w  #$F8FF, $FFFF8004.w
+                ori.w   #$0300, $FFFF8004.w
 .2
                 move.w  #$008B, d0      ;CDCREAD
                 jsr     $5F22.w         ;call CDBIOS function
@@ -61,8 +61,9 @@ BLSLOAD_INTERRUPT_HANDLER
                 moveq   #0, d1                  ; Get sector count from main CPU
                 move.b  BLSCDR_COMM, d1         ;
 
-                movem.l d0/d1, BLSLOAD_SECTOR   ; Store data in ROMREADN format
-                lea     BLSLOAD_SECTOR, a0      ; Execute ROMREADN
+                BIOS_CDCSTOP
+                lea     BLSLOAD_SECTOR, a0
+                movem.l d0/d1, (a0)             ; Store data in ROMREADN format
                 BIOS_ROMREADN
 
         if ..DEF BLSLOAD_DMA
@@ -85,9 +86,9 @@ BLSLOAD_INTERRUPT_HANDLER
                 lea     $080000, a0
         endif
                 move.l  d1, d0
-                lsl.l   #8, d0                  ; TODO : optimize slow shift
-                lsl.l   #3, d0
-                jsr     BLSLOAD_READ_CD_ASM
+;FIXME                lsl.l   #8, d0                  ; TODO : optimize slow shift
+;                lsl.l   #3, d0
+;                jsr     BLSLOAD_READ_CD_ASM
 
         ; Send WRAM back to main cpu
         if TARGET == TARGET_SCD1
@@ -106,72 +107,157 @@ BLSLOAD_INTERRUPT_HANDLER
 ; void BLSLOAD_START_READ(u32 sector, u32 count);
 BLSLOAD_START_READ
                 BIOS_CDCSTOP
-                clr.l   BLSLOAD_BUFOFF
-                move.l  sp, a0
+                move.w  #$800, BLSLOAD_BUFOFF
+                lea     BLSLOAD_COUNT, a0
+                move.l  8(sp), (a0)
+                move.l  4(sp), -(a0)
                 BIOS_ROMREADN
                 rts
 
 
 ; void BLSLOAD_READ_CD(u32 bytes, u32 target);
 BLSLOAD_READ_CD
-                movem.l (sp), d0/a0             ; Read C parameters to registers
-                lsr.l   #1, d0                  ; Convert bytes to words
 
-
-; Stream d0 words from CD-ROM to address starting at a0
+; Stream <bytes> from CD-ROM to <target> address
 ; Registers :
-;  d0.l : number of words to copy
-;  d1.l : number of words to read from current sector
-;  d2.l : number of words in current transfer
-;  a0.l : target address
-; When done, a0 contains ending address
-BLSLOAD_READ_CD_ASM
-                movem.l d2, -(sp)
-                move.w  BLSLOAD_BUFOFF, d1      ; d1 : remaining bytes in current sector
-                bne.b   .cdctrn                 ; There is still some data in the read buffer
+;  a3.l : target address (must be word aligned)
+;  d5.l : number of bytes to copy (must be even)
+;  d4.w : sector size in bytes
+;  d3.l : offset in intermediate data buffer
+;  a2.l : transfert address for retry
+; Returns :
+;  When done, a2 contains ending address
+                movem.l a2/a3/d3/d4/d5, -(sp)
+                movem.l 24(sp), d5/a3           ; Read C parameters to registers
+                move.w  #$800, d4               ; Constant
 
-                ; Set CDC in sub cpu read mode
-                move.b  #GA_CDC_DEST_SUBREAD, GA_CDC_DEST
+                move.w  BLSLOAD_BUFOFF, d3      ; Update value from RAM
+                cmp.w   d4, d3
+                blo.w   .flush                  ; There is still some data in the read buffer
 
 .cdcstat
                 BIOS_CDCSTAT                    ; Wait until data is in CD-ROM cache
                 bcs.b   .cdcstat
 
+                ; Set CDC in sub cpu read mode
+                move.b  #GA_CDC_DEST_SUBREAD, GA_CDC_DEST
+
 .cdcread
                 BIOS_CDCREAD                    ; Trigger a read from CD-ROM
                 bcs.b   .cdcread
-                move.l  #$400, d1               ; Set amount of data to be read in current sector
 
-.cdctrn
-                ; Compute if sector data or target size is the smallest
-                cmp.l   d0, d1
-                blo.b   .smallcopy
+                cmp.w   d4, d5
+                blo.b   .indirect               ; Copy will leave data in the buffer
 
-                ; Number of bytes to copy is greater than data remaining in the current sector
-                move.l  d1, d2                  ; Use remaining bytes as iterator
-                sub.l   d2, d0                  ; Update copy size already
-                bra.b   .trn_one_sector
+                ; Direct transfert
+                lea     BLSLOAD_HEADER(pc), a1
+                move.l  a3, a2
+                move.l  a3, a0
+                BIOS_CDCTRN                     ; a0 will be updated by the routine
+                bcc.b   .success_direct
+                jsr     .retry
+.success_direct
+                move.l  a0, a3                  ; Update target address
+                addi.l  #1, -12(a1)             ; Update BLSLOAD_SECTOR
+                subi.l  #1, -8(a1)              ; Update BLSLOAD_COUNT
 
-.smallcopy
-                move.l  d0, d2                  ; Use target size as iterator
-                sub.l   d2, d1                  ; Update remaining size already
+                move.w  d4, d3                  ; Buffer is considered empty after a full transfert
+                sub.w   d4, d5                  ; Update remaining data
+                bra.b   .ack
 
-.trn_one_sector
-                ; Transfer data from CDC host data
-                subq.w  #1, d2                  ; Adjust d2 for dbra
-                loopuntil btst #GA_DSR, GA_CDC  ; Wait for data
-.trn            move.w  GA_CDCHD, (a0)+         ; Read data from CD buffer RAM
-                dbra    d2, .trn
+                ; Indirect transfert (read from buffer)
+.indirect
+                lea     BLSLOAD_DATA(pc), a0
+                lea     -4(a0), a1
+                move.l  a0, a2
+                BIOS_CDCTRN                     ; Send data to the intermediate buffer
+                bcc.b   .success_indirect
+                jsr     .retry
+.success_indirect
+                addi.l  #1, -12(a1)             ; Update BLSLOAD_SECTOR
+                subi.l  #1, -8(a1)              ; Update BLSLOAD_COUNT
+                moveq   #0, d3                  ; Reset buffer index
 
+.flush          ; Copy data from BLSLOAD_DATA buffer
+
+                move.w  d4, d0
+                sub.w   d3, d0                  ; d0 = $800-d3 : remaining bytes in the buffer
+                cmp.w   d5, d0
+                bls.b   .large                  ; d0 <= d5 : the whole buffer will be copied
+                move.w  d5, d0                  ; too much data in the buffer : copy only what the caller requested
+.large
+                
+                ; d0 == number of bytes to be copied in the current buffer
+
+                lea     BLSLOAD_DATA(pc), a1    ; a1 <- offset in data
+                lea     (a1, d3.w), a1
+
+                ; Update byte count registers
+                add.w   d0, d3                  ; Move the cursor
+                sub.w   d0, d5                  ; Update copy amount
+  movem.l d0-d7/a0-a7, $7F00         ; DEBUG
+                lsr.w   #2, d0                  ; Convert to long count
+                bcc.b   .long_aligned           ; Second bit clear : even number of words
+                move.w  (a1)+, (a3)+            ; Copy first word
+                tst.w   d0                      ; Restore CC on d0
+.long_aligned
+                beq.b   .ack                    ; Transfer was only 2 bytes !
+                subq    #1, d0                  ; Adjust for dbra
+
+  movem.l d0-d7/a0-a7, $7F80         ; DEBUG
+.copy_loop
+                move.l  (a1)+, (a3)+
+                dbra    d0, .copy_loop
+
+.ack
                 BIOS_CDCACK                     ; Acknowledge sector
 
-                tst.l   d0
-                bne.b   .cdcstat                ; Read next sector
+                tst.l   d5
+                bne.w   .cdcstat                ; Read next sector
         
-                move.w  d1, BLSLOAD_BUFOFF
-                movem.l (sp)+, d2
+                move.w  d3, BLSLOAD_BUFOFF
+                movem.l (sp)+, a2/a3/d3/d4/d5
                 rts
-        
+
+
+                ; Retry routine
+.track
+                dc.b    1                       ; Read TOC from track #1
+                dc.b    255                     ; Read all tracks
+
+.tries          dc.w    5                       ; Retries before reinit
+
+.reinit         ; Reinitialize drive if needed and retry read
+                subi.w  #1, .tries
+                bne.b   .retry
+
+                ; 5 retries : reinitialize
+                lea     .track(pc), a0
+                BIOS_DRVINIT
+                move.w  #5, .tries              ; Reset retry counter
+
+                ; Retry a failed read (d2 = dest address)
+.retry
+                BIOS_CDCSTOP
+
+                lea     BLSLOAD_SECTOR, a0
+                BIOS_ROMREADN
+
+.retry_stat     BIOS_CDCSTAT
+                bcs.b   .retry_stat
+
+.retry_read     BIOS_CDCREAD
+                bcs.b   .retry_read
+
+                move.l  a2, a0
+                lea     BLSLOAD_HEADER, a1
+                BIOS_CDCTRN
+                bcs.b   .reinit                 ; Failed again : reinitialize the drive and retry
+
+                move.w  #5, .tries              ; Reset retry counter
+
+                rts
+
         endif
 
 ; vim: ts=8 sw=8 sts=8 et

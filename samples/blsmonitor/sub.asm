@@ -14,3 +14,6 @@ SP_MAIN
 INDICATOR		dl		0
 		hex		DEADBEEF
 INTMASK		dw		$FFFF
+
+SUB_INT_LEVEL2
+		rts

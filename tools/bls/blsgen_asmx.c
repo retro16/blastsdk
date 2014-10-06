@@ -39,6 +39,10 @@ void section_create_asmx(group *source, const mdconfnode *mdconf)
       s->symbol->value.chip = chip_pram;
     }
 
+    if(s->format == format_auto) {
+      s->format = format_empty;
+    }
+
     if(source->banks.bus == bus_none) {
       source->banks.bus = bus_sub;
     }

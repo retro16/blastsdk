@@ -53,10 +53,6 @@ bls_init
                 VDPUSEADDR
                 movem.l (sp)+, a4-a5
 
-        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-                ;SYNC_MAIN_SUB
-        endif
-
         endif   ; BUS == MAIN
 
                 rts
