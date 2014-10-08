@@ -20,6 +20,6 @@ Output properties:
  - copyright **(C)2014 RETRO16**
  - target ram
  - region JUE
- - file bdphello.bin
+ - file bdphello.ram
 
 

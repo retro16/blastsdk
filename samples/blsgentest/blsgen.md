@@ -27,6 +27,6 @@ Output properties:
  - copyright **(C)2014 RETRO16**
  - target ram
  - region JUE
- - file blsgentest.bin
+ - file blsgentest.ram
 
 

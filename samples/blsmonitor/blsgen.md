@@ -30,7 +30,7 @@ Output monitor
 
  - name **BLS MONITOR**
  - copyright **(C)2014 RETRO16**
- - file monitor.bin
+ - file monitor.gen
  - region JUE
  - target gen
 

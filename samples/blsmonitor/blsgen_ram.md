@@ -59,7 +59,7 @@ Output monitor
 
  - name **BLS MONITOR**
  - copyright **(C)2014 RETRO16**
- - file monitor_ram.bin
+ - file monitor_ram.ram
  - region JUE
  - target ram
 
