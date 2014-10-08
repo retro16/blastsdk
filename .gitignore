@@ -17,9 +17,9 @@
 *.exe
 *.out
 *.app
-*.iso
-*.gen
-*.ram
+/samples/*/*.iso
+/samples/*/*.gen
+/samples/*/*.ram
 /tools/asmx2/src/asmx
 /tools/bls/bdb
 /tools/bls/blsgen
