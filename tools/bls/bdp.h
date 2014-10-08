@@ -13,6 +13,7 @@ extern void close_debugger();
 extern void bdp_set_dump(int newdump);
 extern int bdp_readdata();
 extern int bridgequery(u8 *data);
+extern void update_bda_sub(const u8 *image, int imgsize);
 
 // Memory read
 extern void readmem(int cpu, u8 *target, u32 address, u32 length);
@@ -35,6 +36,7 @@ extern void writeword(int cpu, u32 address, u32 w);
 extern void writelong(int cpu, u32 address, u32 l);
 
 // CPU access
+extern void subfreeze();
 extern u32 readreg(int cpu, int reg); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
 extern void readregs(int cpu, u32 *regs); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
 extern void setreg(int cpu, int reg, u32 value);

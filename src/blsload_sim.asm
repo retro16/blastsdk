@@ -18,15 +18,14 @@ BDP_OUT_BUFSIZE equ     $30                     ; Address of data size in buffer
 BDP_OUT_BUFFER  equ     $32                     ; Address of sub buffer
 BDP_OUT_MAXSIZE equ     $2E                     ; Max number of bytes in buffer
 
-SECBUF  set             $200                    ; Sector buffer
-SECHEAD set             $A00                    ; Sector header in CDCTRN format
+SECBUF          set     $004800                 ; Sector buffer
+SECHEAD         set     $005000                 ; Sector header in CDCTRN format
 
-                org     $A04
+                org     $000200                 ; BIOS boot entry point
 
 BOOT            ; Simulated BIOS boot program
 
                 ; Disable interrupts
-                move    #$2700, sr
                 SUB_INT_DISABLE
 
                 ; Init stack pointer
@@ -40,10 +39,10 @@ BOOT            ; Simulated BIOS boot program
                 clr.l   GA_COMMOUT + 12
 
                 ; Initialize word ram to 2M mode, accessible from main cpu
-                move.b  #$00, GA_MM + 1         ; Switch to 2M mode
+                move.b  #$01, GA_MM + 1         ; Switch to 2M mode
 .wait_2m
-                move.b  #$02, GA_MM + 1         ; Give access to main cpu
-                cmi.b   #$01, GA_MM + 1         ; Wait until switch is done
+                move.b  #$01, GA_MM + 1         ; Give access to main cpu
+                cmpi.b  #$01, GA_MM + 1         ; Wait until switch is done
                 bne.b   .wait_2m
 
                 ; Clear all BIOS entry points
@@ -51,6 +50,10 @@ BOOT            ; Simulated BIOS boot program
                 move.w  #($6000 - $5E80) / 2 - 1, d0
 .clear_entry    move.w  #$4E73, (a0)+           ; Write RTE instructions all over the place
                 dbra    d0, .clear_entry
+
+                ; Set BIOS call entry point
+                move.w  #$4EF9, $5F22.w         ; JMP xxx.L
+                move.l  #BLSLOAD_SIM_ENTRY, $5F24.w
 
                 ; Read SP entry table offset
                 movea.l $6018.w, a0             ; Read entry table offset
@@ -60,10 +63,13 @@ BOOT            ; Simulated BIOS boot program
                 ; Setup level 2 interrupt
                 moveq   #0, d1
                 move.w  4(a0), d1
+                beq.b   .no_l2
                 add.l   d0, d1
                 ; d1 contains address to level 2 interrupt
                 move.w  #$4EF9, $5F7C           ; JMP xxx.L
-                move.l  d1, $5F7E               ; Target address
+                move.l  #L2_HANDLER, $5F7E      ; Target address
+                move.l  d0, L2_JUMP + 2         ; Patch handler with target address
+.no_l2
 
                 ; Compute address to SP_MAIN
                 moveq   #0, d1
@@ -88,6 +94,13 @@ BOOT            ; Simulated BIOS boot program
 call_sp_main
                 jsr     RETURN_NOW.l            ; Target address patched by setup code
                 bra.b   call_sp_main
+
+L2_HANDLER
+                movem.l d0-d7/a0-a6, -(sp)
+L2_JUMP         jsr     RETURN_NOW.l
+                movem.l (sp)+, d0-d7/a0-a6
+                rte
+
 
 BLSLOAD_SIM_ENTRY
                 cmp.b   #$8A, d0
@@ -150,7 +163,7 @@ BDP_WRITE_BUF
 CDCREAD
                 movem.l a0/a1, -(sp)
                 move.l  #$0F0F0F0F, BDP_OUT_BUFFER.w
-                jsr             BDP_WRITE_BUF(PC)
+                jsr     BDP_WRITE_BUF(PC)
                 movem.l (sp)+, a0/a1
 .wait_sector
                 move.l  SECHEAD.w, d0           ; Test header, move it to d0 and clear carry
@@ -159,7 +172,7 @@ CDCREAD
 
 CDCTRN
                 movem.l d0/a1, -(sp)
-                lea             SECBUF.w, a1
+                lea     SECBUF.w, a1
                 move.w  #$1FF, d0
 .trn_copy
                 move.l  (a1)+, (a0)+

@@ -96,8 +96,8 @@ SUB_INTERRUPT   macro
                 endm
 
 SUB_INT_ENABLE  macro
-                move.b  #GA_IM_L1|GA_IM_L2|GA_IM_L3|GA_IM_L4|GA_IM_L5|GA_IM_L6, GA_IMASK + 1
                 move    #$2000, SR
+                move.b  #GA_IM_L1|GA_IM_L2|GA_IM_L3|GA_IM_L4|GA_IM_L5|GA_IM_L6, GA_IMASK + 1
                 endm
 
 SUB_INT_DISABLE macro

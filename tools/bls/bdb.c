@@ -89,7 +89,7 @@ static void on_bdp_comm(const u8 *data, int len)
       buf[CDBLOCKSIZE] = (offset / CDBLOCKSIZE) % (75 * 60); // ff
       buf[CDBLOCKSIZE] = 1; // md (0 = audio, 1 = mode 1, 2 = mode 2)
 
-      writemem(1, 0x800, buf, sizeof(buf));
+      writemem(1, 0x4000, buf, sizeof(buf));
     }
   } else {
     printf("%.*s", len, data);
@@ -144,7 +144,7 @@ static void erase_prompt()
 
 static void restore_prompt()
 {
-  printf("bdb %c> %s", cpu ? 's' : 'm', rl_line_buffer); // Restore readline line display
+  printf("bdb %c> %s", (cpu ? 'S' : 'M') + (is_running(cpu) ? 0 : 0x20), rl_line_buffer); // Restore readline line display
   fflush(stdout);
 }
 
@@ -213,8 +213,6 @@ void showreg(int cpu)
 
 void boot_cd(u8 *image, int imgsize)
 {
-  (void)imgsize;
-
   const u8 *ip_start;
   int ipsize;
   ipsize = getipoffset(image, &ip_start);
@@ -225,33 +223,37 @@ void boot_cd(u8 *image, int imgsize)
 
   u32 seccodesize = detect_region(image);
 
-  u32 spinit = getspinit(image);
-  u32 spmain = getspmain(image);
-  u32 spl2 = getspl2(image);
-
-  // TODO : upload BIOS simulator and setup simulator callback
-
   printf("CD-ROM image. IP=%04X-%04X (%d bytes). SP=%04X-%04X (%d bytes).\n", (u32)(ip_start-image), (u32)(ip_start - image + ipsize - 1), ipsize, (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
-  printf("Entering monitor mode on both CPUs\n");
+  printf("Entering monitor mode on main CPU\n");
   stopcpu(0);
-  stopcpu(1);
+
+  printf("Freezing sub CPU\n");
+  subfreeze();
+
+  printf("Clearing communication flags ...\n");
+  u8 clear[0x10];
+  memset(clear, '\0', sizeof(clear));
+  writemem(0, 0xA12010, clear, sizeof(clear)); // Clear other comm words
 
   printf("Uploading IP (%d bytes) ...\n", ipsize);
   writemem(0, 0xFF0000 + seccodesize, ip_start, ipsize);
   printf("Setting main CPU registers.\n");
-  setreg(0, REG_PC, 0xFF0000 + seccodesize);
-  setreg(0, REG_SP, 0xFFD000);
+  setreg(0, REG_PC, 0xFFFF0000 + seccodesize);
+  setreg(0, REG_SP, 0xFFFFD000);
   setreg(0, REG_SR, 0x2700);
 
-  printf("Uploading SP (%d bytes) ...\n", spsize);
-  writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
-  printf("Setting sub CPU registers.\n");
-  setreg(1, REG_PC, 0xA04);
-  setreg(1, REG_SR, 0x2700);
-
   printf("Uploading simulated BIOS ...\n");
-  writemem(1, 0xA04, blsload_sim_bin, sizeof(blsload_sim_bin));
+  writemem(1, 0x200, blsload_sim_bin, sizeof(blsload_sim_bin));
+
+  update_bda_sub(image, imgsize);
+
+  printf("Uploading SP (%d bytes) ...\n", spsize);
+  writemem(1, 0x6000, sp_start, spsize);
+  printf("Setting sub CPU registers.\n");
+  setreg(1, REG_PC, 0x00000200);
+  setreg(1, REG_SP, readlong(1, 0));
+  setreg(1, REG_SR, 0x2700);
 
   printf("Ready to boot.\n");
 }
@@ -266,16 +268,20 @@ void boot_sp(u8 *image, int imgsize)
 
   printf("CD-ROM image. SP=%04X-%04X (%d bytes).\n", (u32)(sp_start - image), (u32)(sp_start - image + spsize - 1), spsize);
 
-  printf("Stopping sub CPU ...\n");
-  stopcpu(1);
+  printf("Freezing sub CPU\n");
+  subfreeze();
+
+  printf("Uploading simulated BIOS ...\n");
+  writemem(1, 0x200, blsload_sim_bin, sizeof(blsload_sim_bin));
+
+  update_bda_sub(image, imgsize);
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
-  writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
+  writemem(1, 0x6000, sp_start, spsize);
   printf("Setting sub CPU registers.\n");
-  setreg(1, REG_PC, 0x6000 + SPHEADERSIZE);
-  setreg(1, REG_SP, 0x5E80);
+  setreg(1, REG_PC, 0x00000200);
+  setreg(1, REG_SP, readlong(1, 0));
   setreg(1, REG_SR, 0x2700);
-
   printf("New SP program loaded.\n");
 }
 
@@ -557,7 +563,7 @@ int main(int argc, char **argv)
   signal(SIGINT, SIG_DFL);
 
   char prompt[16];
-  snprintf(prompt, 16, "bdb %c> ", cpu ? 's' : 'm');
+  snprintf(prompt, 16, "bdb %c> ", (cpu ? 'S' : 'M') + (is_running(cpu) ? 0 : 0x20));
   rl_callback_handler_install(prompt, on_line_input);
 
   for(;;) {
@@ -961,7 +967,7 @@ void on_line_input(char *line)
 
   signal(SIGINT, SIG_DFL);
   char prompt[16];
-  snprintf(prompt, 16, "bdb %c> ", cpu ? 's' : 'm');
+  snprintf(prompt, 16, "bdb %c> ", (cpu ? 'S' : 'M') + (is_running(cpu) ? 0 : 0x20));
   rl_callback_handler_install(prompt, on_line_input);
 }
 

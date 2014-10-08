@@ -1,12 +1,11 @@
-                include bls_init_sub.inc
                 include blsload_sub.inc
                 include cdbios.inc
                 include bdp.inc
 
-SP_MAIN
-                bls_init_sub
-                bls_enable_interrupts
+SP_INIT
+                rts
 
+SP_MAIN
                 SYNC_MAIN_SUB
 .0              bra.b   .0
                 trap    #7

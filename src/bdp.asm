@@ -101,17 +101,13 @@ bdp_write_finished
 ; Poll sub cpu state
 ; void bdp_sub_check();
 bdp_sub_check
-                andi.b  #$A0, GA_COMMFLAGS_SUB  ; Quickly check sub CPU flags
-                bne.b   .int
-                rts
-
-.int
                 btst    #6, GA_COMMFLAGS_SUB
                 beq.b   .bda_check_end
 
-                bset    #6, GA_COMMFLAGS_MAIN   ; Ack the event
+                ori.b   #$C0, GA_COMMFLAGS_MAIN ; Ack the event
 .wait_trap_ack  btst    #6, GA_COMMFLAGS_SUB
                 bne.b   .wait_trap_ack
+                bclr    #6, GA_COMMFLAGS_MAIN   ; Clear ack
 
                 ; mask interrupts
                 move    sr, d0

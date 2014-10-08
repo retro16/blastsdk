@@ -233,9 +233,8 @@ int_trap07
 bda_enter
                 move.w  #$2700, sr              ; Disable all interrupts
 
-                move.w  (a7), bda_sr.w          ; Copy SR value to a fixed address
-                move.l  2(a7), bda_pc.w         ; Copy PC to a fixed address
-                addq.l  #6, a7                  ; Pop interrupt stack frame
+                move.w  (a7)+, bda_sr.w         ; Copy SR value to a fixed address
+                move.l  (a7)+, bda_pc.w         ; Copy PC to a fixed address
                 move.l  a7, bda_a7.w            ; Store application stack value
                 lea     bda_a7.w, a7            ; Use monitor stack
                 movem.l d0-d7/a0-a6, -(a7)      ; Push registers to bda_regs
@@ -272,9 +271,10 @@ bda_readcmd
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
                 btst    #6, (a0)
                 beq.b   .nosub
-                bset    #6, -1(a0)              ; Acknowledge
+                ori.b   #$C0, -1(a0)            ; Acknowledge
 .waitack        btst    #6, (a0)                ; Wait until flag is reset
                 bne.b   .waitack
+                bclr    #6, -1(a0)              ; Clear ack flag
                 move.l  #$00000127, (a7)
                 sendhead_then bda_finishwrite
 .nosub
@@ -318,9 +318,8 @@ bda_exit
                 addq.l  #4, a7                  ; Point a7 back to registers
                 movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
                 move.l  bda_a7.w, a7            ; Restore stack pointer
-                subq.l  #6, a7                  ; Restore interrupt stack frame
-                move.w  bda_sr.w, (a7)          ; Restore SR
-                move.l  bda_pc.w, 2(a7)         ; Restore PC
+                move.l  bda_pc.w, -(a7)         ; Restore PC
+                move.w  bda_sr.w, -(a7)         ; Restore SR
 
                 rte                             ; Return from interrupt
 ; End of monitor main loop
@@ -427,26 +426,27 @@ bdasub_sr       set     bdasub_d0 + 17*4
 BDA_COMM_MAIN   set     $FF800E
 BDA_COMM_SUB    set     $FF800F
 
+                ; Mark the beginning of bda sub code
+                ; Used by update_bda_sub in bdp.c
+                hex     0000 1234 DEAD BEEF
+                asciiz  'BDA_SUB'
+
 bda_sub_code_source
                 rorg    bdasub_sr + 2           ; Place code after CPU state
 bda_sub_code
 
-bda_sub_l2
-                btst    #7, BDA_COMM_MAIN
-                bne.b   bda_sub_wait            ; If the bit is set, go to monitor mode
-
-bda_l2_jmp      jmp     $5F7C.l                 ; The JMP target will be patched by bda_init to jump at the official L2 handler
-
 bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
-                move.w  (a7), bdasub_sr.w       ; Copy SR value to a fixed address
-                move.l  2(a7), bdasub_pc.w      ; Copy PC to a fixed address
-                addq.l  #6, a7                  ; Pop interrupt stack frame
-                move.l  a7, bdasub_sp.w         ; Store application stack value
-                lea     bdasub_sp.w, a7         ; Use monitor stack
-                movem.l d0-d7/a0-a6, -(a7)      ; Push registers to bda_regs
+                move.w  (a7)+, bdasub_sr.w      ; Copy SR value to a fixed address
+                move.l  (a7)+, bdasub_pc.w      ; Copy PC to a fixed address
+                movem.l d0-d7/a0-a7, bdasub_d0.w; Push registers to bda_regs
 
                 ; Enable pause flag
                 bset    #7, BDA_COMM_SUB
+
+                ; Wait until main sets the flag
+                ; It can be clear in case of voluntary exception
+.0              btst    #7, BDA_COMM_MAIN
+                beq.b   .0
 
                 ; Pause in monitor mode
 
@@ -454,6 +454,7 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
                 beq.b   .1
                 bclr    #6, BDA_COMM_SUB        ; Main CPU acknowledged trap: clear the flag
 .1
+                addi.w  #1, $1FE.w
                 btst    #7, BDA_COMM_MAIN       ; Wait until main CPU releases pause
                 bne.b   .2
 
@@ -462,13 +463,20 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
                 ; Clear pause and trap flags
                 andi.b  #$3F, BDA_COMM_SUB
 
-                movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
-                move.l  bdasub_sp.w, a7         ; Pop SP
-                subq.l  #6, a7                  ; Restore interrupt stack frame
-                move.w  bdasub_sr.w, (a7)       ; Restore SR in case it was changed by the monitor
-                move.l  bdasub_pc.w, 2(a7)      ; Restore PC
+                movem.l bdasub_d0.w, d0-d7/a0-a7; Pop registers
+                move.l  bdasub_pc.w, -(a7)      ; Restore PC
+                move.w  bdasub_sr.w, -(a7)      ; Restore SR
 
                 rte
+
+                ; WARNING : code below is interpreted by bdb in function update_bda_sub
+
+bda_sub_l2
+                btst    #7, BDA_COMM_MAIN
+                bne.b   bda_sub_wait            ; If the bit is set, go to monitor mode
+
+bda_l2_jmp      jmp     $5F7C.l                 ; The JMP target will be patched by bda_init to jump at the official L2 handler
+
 
 bda_sub_trap    ; Voluntary interruption
                 bset    #6, BDA_COMM_SUB
@@ -479,6 +487,9 @@ bda_sub_code_end
                 rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN
+
+                ; Marker for the end of bda sub code
+                hex     CAFE BABE
         endif   ; TARGET == TARGET_SCD1/2
 
         endif   ; BUS == BUS_MAIN

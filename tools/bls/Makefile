@@ -43,8 +43,8 @@ blsload_sim.bin.c: blsload_sim.bin
 	bin2c blsload_sim.bin
 
 blsload_sim.bin: ../../src/blsload_sim.asm
-	asmx -b 0xA04 -C 68000 -o "$@" "$^" -I ../../include -i bls.inc -d BUS:=2 -d CHIP:=9 -d TARGET:=2
-	#asmx -b 0xA04 -C 68000 -w -e -l /dev/stdout -o "$@" "$^" -I ../../include -i bls.inc -d BUS:=2 -d CHIP:=9 -d TARGET:=2
+	#asmx -b 0x200 -C 68000 -o "$@" "$^" -I ../../include -i bls.inc -d BUS:=2 -d CHIP:=9 -d TARGET:=2
+	asmx -b 0x200 -C 68000 -w -e -l /dev/stdout -o "$@" "$^" -I ../../include -i bls.inc -d BUS:=2 -d CHIP:=9 -d TARGET:=2
 
 
 install: $(TARGETS)

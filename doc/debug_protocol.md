@@ -364,7 +364,7 @@ Sub CPU -> PC protocol :
 
     0F 0F 0F
 
-    <bdb grabs PRAM, writes sector at $000200 and sector header at $000A00>
+    <bdb grabs PRAM, writes sector at $004000 and sector header at $004800>
 
 
 **CDCACK**
@@ -383,17 +383,11 @@ simulator enabled, the memory map is as following :
     -------- 0000 --------
     | Reset SP / PC      |
     -------- 0008 --------
-    |                    |
     | Interrupt vectors  |
-    |                    |
     -------- 0030 --------
-    |                    |
     | BDP buffer         |
-    |                    |
     -------- 0060 --------
-    |                    |
     | Interrupt vectors  |
-    |                    |
     -------- 00C0 --------
     |                    |
     | BDA registers      |
@@ -402,25 +396,10 @@ simulator enabled, the memory map is as following :
     |                    |
     | BDA code           |
     |                    |
+    -------- 01F0 --------
+    | BDA scratchpad     |
     -------- 0200 --------
-    |                    |
-    |                    |
-    |                    |
-    | CD-ROM sector      |
-    | buffer             |
-    |                    |
-    |                    |
-    -------- 0A00 --------
-    |                    |
-    | CD-ROM header      |
-    | buffer             |
-    |                    |
-    -------- 0A04 --------
-    |                    |
-    | Startup entry      |
-    | point              |
-    |                    |
-    | - - - - - - - - - -|
+    | Sim BIOS entry     |
     |                    |
     |                    |
     |                    |
@@ -428,7 +407,18 @@ simulator enabled, the memory map is as following :
     |                    |
     |                    |
     |                    |
-    -------- 5000 --------
+    -------- 4000 --------
+    |                    |
+    |                    |
+    |                    |
+    | CD-ROM sector      |
+    | buffer             |
+    |                    |
+    |                    |
+    |                    |
+    -------- 4800 --------
+    | CD sector header   |
+    -------- 4804 --------
     |                    |
     |                    |
     |                    |
@@ -439,11 +429,8 @@ simulator enabled, the memory map is as following :
     | BIOS entry points  |
     |                    |
     |                    |
-    |                    |
     -------- 6000 --------
-    |                    |
     | SP header          |
-    |                    |
     | - - - - - - - - - -|
     |                    |
     | User RAM           |

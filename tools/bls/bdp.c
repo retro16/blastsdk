@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
+#include <assert.h>
 #include "bls.h"
 #include "bdp.h"
 
@@ -56,6 +57,7 @@ void close_debugger();
 void bdp_set_dump(int newdump);
 int bdp_readdata();
 int bridgequery(u8 *data);
+void update_bda_sub(const u8 *image, int imgsize);
 
 // Low level packet reading
 static int packetlen(u8 header);
@@ -97,6 +99,7 @@ static void busreq(int cpu, u32 address);
 static void busrelease(int cpu);
 
 // CPU access
+void subfreeze();
 u32 readreg(int cpu, int reg); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
 void readregs(int cpu, u32 *regs);
 void setreg(int cpu, int reg, u32 value);
@@ -267,6 +270,70 @@ int bridgequery(u8 *data)
   data[1] = inp[2];
   data[2] = inp[3];
   return 1;
+}
+
+
+void update_bda_sub(const u8 *image, int imgsize)
+{
+#define TRAP7_INT_OFFSET 10
+#define LEVEL2_INT_OFFSET 24
+
+  const u8 *bdabeg = NULL;
+  const u8 *bdaend = NULL;
+  int i;
+
+  cpumonitor(0);
+
+  for(i = 0; i < imgsize - 28; i += 2) {
+    // Find start marker
+    if(!bdabeg && getint(&image[i], 4) == 0x00001234
+        && getint(&image[i + 4], 4) == 0xDEADBEEF
+        && strncmp((const char *)&image[i + 8], "BDA_SUB", 8) == 0)
+    {
+      i += 16;
+      // Found the beginning of code
+      bdabeg = &image[i];
+    }
+
+    // Find end marker
+    if(bdabeg && getint(&image[i], 4) == 0xCAFEBABE) {
+      // Found the end of code
+      bdaend = &image[i];
+      break;
+    }
+  }
+
+  u32 code_size = bdaend - bdabeg;
+
+  if(!bdabeg || !bdaend) return; // BDA not found, stop now
+
+  // Write sub code after registers memory
+  u32 bda_sub_code = 0x0000C0 + 17*4 + 2;
+
+  printf("BDA sub code found (%04X bytes), upload it at %06X and reset CPU\n", code_size, bda_sub_code);
+
+  writemem(1, bda_sub_code, bdabeg, bdaend - bdabeg);
+
+  // Update exception vectors
+  printf("TRACE vector at %08X\n", bda_sub_code);
+  writelong(1, 0x000024, bda_sub_code); // TRACE
+  printf("LEVEL2 vector at %08X\n", bda_sub_code + code_size - LEVEL2_INT_OFFSET);
+  writelong(1, 0x000068, bda_sub_code + code_size - LEVEL2_INT_OFFSET); // L2
+  printf("TRAP #7 vector at %08X\n", bda_sub_code + code_size - TRAP7_INT_OFFSET);
+  writelong(1, 0x00009C, bda_sub_code + code_size - TRAP7_INT_OFFSET); // TRAP #7
+
+  // Reset the sub CPU in the new bda monitor
+  writebyte(0, 0xA1200E, readbyte(0, 0xA1200E) | 0x80); // Stay in monitor
+  u32 oldresetvector = readlong(1, 0x000004);
+  writelong(1, 0x000004, bda_sub_code);
+  subreset();
+//  writelong(1, 0x000004, oldresetvector);
+
+  if(!cpustate[1]) {
+    cpustate[1] = 1;
+  }
+
+  cpurelease(0);
 }
 
 
@@ -1021,6 +1088,7 @@ void stepcpu(int cpu)
     do {
       usleep(500);
     } while((readbyte(0, 0xA1200F) & 0x80) != 0x80);
+    writebyte(0, 0xA1200E, readbyte(0, 0xA1200E) | 0x80);
   } else {
     // Wait for TRACE interrupt on main CPU
     readdata();
@@ -1192,7 +1260,7 @@ static void subexec(u32 opcode, u32 op1, u32 op1size, u32 op2, u32 op2size)
 
 int is_running(int cpu)
 {
-  return cpustate[cpu];
+  return !cpustate[cpu];
 }
 
 
@@ -1262,21 +1330,38 @@ static void cpurelease(int cpu)
 }
 
 
+void subfreeze()
+{
+  cpumonitor(0);
+
+  ga_status = 0x01;
+  busstate[1] = 1;
+  cpustate[1] = 1;
+  writelong(0, 0xA12000, 0x00030000);
+  writebyte(0, 0xA1200E, (readbyte(0, 0xA1200E) & 0xBF) | 0x80);
+
+  cpurelease(0);
+}
+
+
 static void subreq()
 {
+  printf("subreq\n");
+  assert(ga_status == 0xFFFF);
+
   ga_status = readbyte(0, 0xA12001);
   ga_status |= readword(0, 0xA12002) << 16;
+  if(ga_status & 0x0002) {
+    printf("Already in busreq mode.\n");
+  }
   writebyte(0, 0xA12001, 0x03);
-  while(readbyte(0, 0xA12001) & 0x03 != 0x03);
+  while((readbyte(0, 0xA12001) & 0x03) != 0x03);
 }
 
 
 static void subsetbank(int bank)
 {
-  if(ga_status == 0xFFFF) {
-    // This should never happen
-    subreq();
-  }
+  assert(ga_status != 0xFFFF);
 
   if(ga_status & SCD_1M) {
     writeword(0, 0xA12002, ((bank - 1) << 6) | 0x0002);
@@ -1286,8 +1371,11 @@ static void subsetbank(int bank)
 }
 
 
-void subrelease()
+static void subrelease()
 {
+  printf("subrelease\n");
+  assert(ga_status != 0xFFFF);
+
   if(!(ga_status & 0x0002)) {
     writebyte(0, 0xA12001, 0x01);  // Release busreq if bus was not taken.
   }
@@ -1304,13 +1392,20 @@ void subrelease()
 
 void subreset()
 {
+  cpumonitor(0);
+
+  u32 neutral = (busstate[1]) ? 0x03 : readbyte(0, 0xA12001);
+
+  writebyte(0, 0xA12001, 0x01); // Bring reset high
   usleep(1000);
-  writebyte(0, 0xA12001, 0x01); // Release reset high
-  usleep(20000);
   writebyte(0, 0xA12001, 0x00); // Bring reset low
-  usleep(20000);
-  writebyte(0, 0xA12001, 0x01); // Release reset high
   usleep(1000);
+  writebyte(0, 0xA12001, 0x01); // Bring reset high
+  usleep(20000);
+  writebyte(0, 0xA12001, neutral); // Restore neutral status
+  usleep(1000);
+
+  cpurelease(0);
 }
 
 
