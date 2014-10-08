@@ -20,7 +20,7 @@ bls_init
 
                 VDPENABLE 0, 0, 0, 1            ; Enable DMA only
                 VDPSETAUTOINCR 1                ; VDPDMAFILL requires 1
-                VDPDMAFILL 0, 0, $10000         ; Start clearing VRAM
+                VDPDMAFILL #0, 0, $10000        ; Start clearing VRAM
 
                 move.b	#CSEL, CCTRL1		; Enable CSEL for gamepad 1
 

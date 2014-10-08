@@ -1,6 +1,6 @@
 ; void bdp_write(char *data, int length);
 bdp_write       macro   data, length
-                CCALL2  data, length
+                CCALL2  BDP_WRITE, data, length
                 endm
 
                 if BUS == BUS_MAIN

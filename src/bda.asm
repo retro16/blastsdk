@@ -51,10 +51,10 @@ bda_init                                        ; Call at console initialization
                 move.l  #bda_sub_l2, $020068
 
                 ; Set TRACE exception vector for sub CPU
-                move.l  #bda_sub_trace, $020024
+                move.l  #bda_sub_wait, $020024
 
                 ; Set TRAP #7 exception vector for sub CPU
-                move.l  #bda_sub_wait, $02009C
+                move.l  #bda_sub_trap, $02009C
 
                 ; Reset output buffer size
                 clr.w   $020030
@@ -264,8 +264,23 @@ bda_readcmd
                 move.b  #BDA_RECVCTRL, (a6)     ; Set ack to output
 
                 ; Wait the sender to pull TH
-.1              btst    d4, (a5)
-                bne.b   .1
+                ; or sub CPU to enter monitor
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+                lea     GA_COMMFLAGS + 1, a0
+        endif
+.waitevt          
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+                btst    #6, (a0)
+                beq.b   .nosub
+                bset    #6, -1(a0)              ; Acknowledge
+.waitack        btst    #6, (a0)                ; Wait until flag is reset
+                bne.b   .waitack
+                move.l  #$00000127, (a7)
+                sendhead_then bda_finishwrite
+.nosub
+        endif
+                btst    d4, (a5)
+                bne.b   .waitevt
 
                 ; Read the incoming command + address (4 bytes)
                 moveq   #3, d2
@@ -418,7 +433,7 @@ bda_sub_code
 
 bda_sub_l2
                 btst    #7, BDA_COMM_MAIN
-                bne.b   bda_sub_wait            ; If the bit is set : go to monitor mode
+                bne.b   bda_sub_wait            ; If the bit is set, go to monitor mode
 
 bda_l2_jmp      jmp     $5F7C.l                 ; The JMP target will be patched by bda_init to jump at the official L2 handler
 
@@ -435,14 +450,16 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
 
                 ; Pause in monitor mode
 
-.1              btst    #7, BDA_COMM_MAIN       ; Wait until main CPU produces a falling edge
-                beq.b   .1                      ; on bit 15 of COMMFLAGS
-.2              btst    #7, BDA_COMM_MAIN       ; Wait until main CPU releases pause
+.2              btst    #6, BDA_COMM_MAIN       ; Manage ack
+                beq.b   .1
+                bclr    #6, BDA_COMM_SUB        ; Main CPU acknowledged trap: clear the flag
+.1
+                btst    #7, BDA_COMM_MAIN       ; Wait until main CPU releases pause
                 bne.b   .2
 
                 ; Execution resumed
 
-                ; Clear pause, trace and trap flags
+                ; Clear pause and trap flags
                 andi.b  #$3F, BDA_COMM_SUB
 
                 movem.l (a7)+, d0-d7/a0-a6      ; Pop registers
@@ -453,7 +470,7 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
 
                 rte
 
-bda_sub_trace   ; Voluntary interruption
+bda_sub_trap    ; Voluntary interruption
                 bset    #6, BDA_COMM_SUB
                 jmp     bda_sub_wait
 

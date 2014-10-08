@@ -1,24 +1,25 @@
                 include bls_init_sub.inc
                 include blsload_sub.inc
                 include cdbios.inc
+                include bdp.inc
 
 SP_MAIN
                 bls_init_sub
                 bls_enable_interrupts
 
-                ;moveq   #1, d1
-                ;moveq   #0, d0
-                ;lea     $6800, a0
-                ;jsr     ReadCD
+                SYNC_MAIN_SUB
+.0              bra.b   .0
+                trap    #7
+.2              bra.b   .2
+                BDP_WRITE hello, 5
 
-                BLSLOAD_START_READ 0, 1         ; Read first sector
-                BLSLOAD_READ_CD 4, target_data(pc) ; Read 4 bytes
-                BLSLOAD_READ_CD 4, $7000
+                ;BLSLOAD_START_READ 2, 1         ; Read sector #2
+                ;BLSLOAD_READ_CD 4, target_data(pc) ; Read 4 bytes
 
 .1              bra.b   .1                      ; Endless loop
 
 counter         dl      0
-                db      'HELLO '
+hello           db      'HELLO '
 target_data     ds      4               ; Will contain 'SEGA' if successful
                 db      ' WORLD'
 debug_out       ds      100

@@ -16,6 +16,7 @@ Binary main
  - bus main
 
  - include bls_init.md
+ - include bdp.md
 
 --------------------------------------
 
@@ -29,7 +30,7 @@ Binary sub
  - provides sub.asm
  - bus sub
 
- - include bls_init_sub.md blsload_sub.md
+ - include blsload_sub.md
 
 --------------------------------------
 

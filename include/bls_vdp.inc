@@ -110,13 +110,16 @@ VDPWINBOT       set     $80             ; Window at the bottom of the screen
                 ; Destroys d0-d1/a0
 VDPSETALLREGS   macro   reg_table
                 lea     reg_table, a0
+                if ! _VDPREG
+                lea     VDPCTRL, a1     ; Use a temporary register for faster access
+                endif
                 moveq   #18, d0
                 move.w  #$8000, d1
 vdpsetuploop\?  move.b  (a0)+, d1
                 if _VDPREG
                 move.w  d1, (a5)
                 else
-                move.w  d1, VDPCTRL
+                move.w  d1, (a1)
                 endif
                 addi.w  #$100, d1
                 dbra    d0, vdpsetuploop\?
@@ -376,9 +379,9 @@ VDPPREPPALETTE  macro   data, palette
 VDPSETBG        macro   color
                 VDPSETWRITE 0, CRAM
                 if _VDPREG
-                move.w  #color, (a4)
+                move.w  color, (a4)
                 else
-                move.w  #color, VDPDATA
+                move.w  color, VDPDATA
                 endif
                 endm
 

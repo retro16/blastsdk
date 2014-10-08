@@ -25,6 +25,7 @@ BDB commands :
     bootsp <file>            boot only the SP from a CD image
     blsgen                   run blsgen
     asmx <file> [addr]       Assemble a file, send it to addr and point PC at it.
+    cdsim <file>             use <file> for CD-ROM simulator
     
     break <address>          place a breakpoint at <address>. If <address> is omitted, show a list of breakpoints.
     delete <address>         delete a breakpoint at <address>

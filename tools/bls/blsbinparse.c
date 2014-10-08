@@ -5,6 +5,8 @@
 int getimgtype(const u8 *img, int size);
 u32 getipoffset(const u8 *img, const u8 **out_ip_start);
 u32 getspoffset(const u8 *img, const u8 **out_sp_start);
+u32 getspentry(const u8 *img);
+u32 getspl2(const u8 *img);
 u32 detect_region(const u8 *img);
 
 // Returns the type of the image
@@ -57,8 +59,38 @@ u32 getipoffset(const u8 *img, const u8 **out_ip_start)
 
 u32 getspoffset(const u8 *img, const u8 **out_sp_start)
 {
-  *out_sp_start = img + getint(&img[0x40], 4) + SPHEADERSIZE;
-  return getint(&img[0x44], 4) - SPHEADERSIZE;
+  *out_sp_start = img + getint(&img[0x40], 4);
+  return getint(&img[0x44], 4);
+}
+
+u32 getspinit(const u8 *img)
+{
+  const u8 *spoffset;
+  getspoffset(img, &spoffset);
+
+  u32 table = 0x6000 + getint(spoffset + 0x18, 2);
+
+  return table + getint(table, 2);
+}
+
+u32 getspmain(const u8 *img)
+{
+  const u8 *spoffset;
+  getspoffset(img, &spoffset);
+
+  u32 table = 0x6000 + getint(spoffset + 0x18, 2);
+
+  return table + getint(table + 2, 2);
+}
+
+u32 getspl2(const u8 *img)
+{
+  const u8 *spoffset;
+  getspoffset(img, &spoffset);
+
+  u32 table = 0x6000 + getint(spoffset + 0x18, 2);
+
+  return table + getint(table + 4, 2);
 }
 
 // Returns security code length

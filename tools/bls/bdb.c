@@ -25,6 +25,7 @@
 #include "blsfile.h"
 #include "bdp.h"
 #include "d68k_mod.h"
+#include "blsload_sim.bin.c"
 
 ////// Globals
 
@@ -33,6 +34,8 @@ sigjmp_buf mainloop_jmp;
 
 int cpu; // Current CPU
 char regname[][3] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "pc", "sr"};
+
+FILE *cdsim_file = 0;
 
 static void usage();
 static void goto_mainloop(int sig);
@@ -63,13 +66,43 @@ static void goto_mainloop(int sig)
 }
 
 
+static void on_bdp_comm(const u8 *data, int len)
+{
+  if(len == 3 && data[0] < 0x08) {
+    printf("ROMREAD %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
+    // ROMREAD request from simulated BIOS
+    u32 offset = getint(data, 3) * CDBLOCKSIZE;
+    if(cdsim_file) {
+      fseek(cdsim_file, offset, SEEK_SET);
+    } else {
+      printf("BDP requested CD read at %08X but no CD image is loaded\n", offset);
+    }
+  } else if(len == 3 && data[0] == 0x0F) {
+    printf("CDCREAD %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
+    // CDCREAD request from simulated BIOS
+    if(cdsim_file) {
+      u8 buf[CDBLOCKSIZE + 4];
+      u32 offset = ftell(cdsim_file);
+      fread(buf, 1, CDBLOCKSIZE, cdsim_file);
+      buf[CDBLOCKSIZE] = (offset / CDBLOCKSIZE / 75 / 60); // mm
+      buf[CDBLOCKSIZE] = (offset / CDBLOCKSIZE / 75) % 60; // ss
+      buf[CDBLOCKSIZE] = (offset / CDBLOCKSIZE) % (75 * 60); // ff
+      buf[CDBLOCKSIZE] = 1; // md (0 = audio, 1 = mode 1, 2 = mode 2)
+
+      writemem(1, 0x800, buf, sizeof(buf));
+    }
+  } else {
+    printf("%.*s", len, data);
+  }
+}
+
+
 void on_unknown(const u8 inp[36], int inpl)
 {
-  // TODO : CD-ROM simulator hook here
-
   erase_prompt();
   if(inpl == 4 && inp[0] >= 1 && inp[0] <= 3) {
-    printf("%.*s", (unsigned int)inp[0], &inp[1]);
+    // BDP communication request
+    on_bdp_comm(&inp[1], inpl - 1);
   } else {
     printf("Received unknown data from the genesis\n");
     hexdump(inp, inpl, 0);
@@ -164,7 +197,18 @@ void showreg(int cpu)
     printf("\n");
   }
 
-  printf("pc:%08X sr:%04X\n", regs[REG_PC], regs[REG_SR]);
+  printf("pc:%08X sr:%04X [ %c %c %d %c %c %c %c %c ]\n",
+      regs[REG_PC],
+      regs[REG_SR],
+      (regs[REG_SR] & 0x8000) ? 'T' : ' ',
+      (regs[REG_SR] & 0x2000) ? 'S' : 'U',
+      (regs[REG_SR] >> 8) & 0x7,
+      (regs[REG_SR] & 0x0010) ? 'X' : ' ',
+      (regs[REG_SR] & 0x0008) ? 'N' : ' ',
+      (regs[REG_SR] & 0x0004) ? 'Z' : ' ',
+      (regs[REG_SR] & 0x0002) ? 'V' : ' ',
+      (regs[REG_SR] & 0x0001) ? 'C' : ' '
+  );
 }
 
 void boot_cd(u8 *image, int imgsize)
@@ -180,6 +224,10 @@ void boot_cd(u8 *image, int imgsize)
   spsize = getspoffset(image, &sp_start);
 
   u32 seccodesize = detect_region(image);
+
+  u32 spinit = getspinit(image);
+  u32 spmain = getspmain(image);
+  u32 spl2 = getspl2(image);
 
   // TODO : upload BIOS simulator and setup simulator callback
 
@@ -199,9 +247,11 @@ void boot_cd(u8 *image, int imgsize)
   printf("Uploading SP (%d bytes) ...\n", spsize);
   writemem(1, 0x6000 + SPHEADERSIZE, sp_start, spsize);
   printf("Setting sub CPU registers.\n");
-  setreg(1, REG_PC, 0x6000 + SPHEADERSIZE);
-  setreg(1, REG_SP, 0x5E80);
+  setreg(1, REG_PC, 0xA04);
   setreg(1, REG_SR, 0x2700);
+
+  printf("Uploading simulated BIOS ...\n");
+  writemem(1, 0xA04, blsload_sim_bin, sizeof(blsload_sim_bin));
 
   printf("Ready to boot.\n");
 }
@@ -324,6 +374,8 @@ void boot_img(const char *filename)
 
   case 2:
     boot_cd(image, imgsize);
+    if(cdsim_file) fclose(cdsim_file);
+    cdsim_file = fopen(filename, "rb");
     break;
 
   case 4:
@@ -889,8 +941,22 @@ void on_line_input(char *line)
     if(strcmp(token, "symload") == 0) {
       parse_word(token, &l);
       d68k_readsymbols(token);
+      continue;
     }
 
+    if(strcmp(token, "cdsim") == 0) {
+      parse_word(token, &l);
+
+      if(cdsim_file) fclose(cdsim_file);
+      cdsim_file = fopen(token, "rb");
+
+      if(cdsim_file) {
+        printf("Using %s to simulate CD-ROM\n", token);
+      } else {
+        printf("Could not open image %s\n", token);
+      }
+      continue;
+    }
   } while(0);
 
   signal(SIGINT, SIG_DFL);

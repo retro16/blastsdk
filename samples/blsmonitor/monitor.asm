@@ -190,7 +190,7 @@ int_vblank
 		move.b	15*4(a7), d0
 		cmp.b	#$20, d0
 		beq.b	.nospurious
-		VDPSETBG $750
+		VDPSETBG #$750
 .nospurious
 
 		VDPSETREAD $0, CRAM
@@ -272,7 +272,7 @@ int_vblank_end
 		rte
 
 interrupt
-		VDPSETBG $F0F			; Magenta background = unknown interrupt
+		VDPSETBG #$F0F			; Magenta background = unknown interrupt
 		rte
 
 pressup
@@ -336,7 +336,7 @@ pressright
 		bra.w	int_vblank_end
 
 pressread
-		VDPSETBG $0C0			; Green background = read
+		VDPSETBG #$0C0			; Green background = read
 		move.l	addr, d2
 		move.b	mode, d1
 		btst	#1, d1
@@ -383,7 +383,7 @@ pressread
 		bra.w	int_vblank_end
 
 presswrite
-		VDPSETBG $00C			; Red background = write
+		VDPSETBG #$00C			; Red background = write
 		move.l	addr, d2
 		move.b	mode, d1
 		btst	#1, d1

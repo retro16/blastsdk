@@ -1,6 +1,7 @@
 # Object files
 *.o
 *.ko
+/tools/bls/blsload_sim.*
 
 # Libraries
 *.lib

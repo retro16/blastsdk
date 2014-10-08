@@ -1007,6 +1007,7 @@ void stopcpu(int cpu)
 
 void stepcpu(int cpu)
 {
+  cpumonitor(0);
   cpumonitor(cpu);
   u32 oldsr = readreg(cpu, REG_SR);
   setreg(cpu, REG_SR, 0x8700 | oldsr); // Set trace bit and mask interrupts
@@ -1016,10 +1017,10 @@ void stepcpu(int cpu)
   setcpustate(cpu, 0);
 
   if(cpu) {
-    // Wait for TRACE interrupt on sub CPU
+    // Wait for monitor mode on sub CPU
     do {
       usleep(500);
-    } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+    } while((readbyte(0, 0xA1200F) & 0x80) != 0x80);
   } else {
     // Wait for TRACE interrupt on main CPU
     readdata();
@@ -1040,12 +1041,14 @@ void stepcpu(int cpu)
   setreg(cpu, REG_SR, (readreg(cpu, REG_SR) & 0x00FF) | (oldsr & 0xFF00));
 
   cpurelease(cpu);
+  cpurelease(0);
 }
 
 
 // Run until a breakpoint is reached
 void reach_breakpoint(int cpu)
 {
+  cpumonitor(0);
   cpumonitor(cpu);
 
   // Run the CPU
@@ -1064,9 +1067,15 @@ void reach_breakpoint(int cpu)
 
     if(cpu) {
       // Wait for TRAP7 interrupt on sub CPU
-      do {
-        usleep(500);
-      } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+      readdata();
+
+      if(inpl != 4
+          || inp[0] != CMD_HANDSHAKE
+          || inp[1] != 0x00
+          || inp[2] != 0x01
+          || inp[3] != 0x27) {
+        on_unknown(inp, inpl);
+      }
     } else {
       // Wait for TRAP7 interrupt on main CPU
       readdata();
@@ -1090,6 +1099,7 @@ void reach_breakpoint(int cpu)
   setreg(cpu, REG_PC, pc); // Replace on instruction
 
   cpurelease(cpu);
+  cpurelease(0);
 }
 
 
@@ -1161,8 +1171,8 @@ static void subexec(u32 opcode, u32 op1, u32 op1size, u32 op2, u32 op2size)
 
   // Wait for TRACE interrupt on sub CPU
   do {
-    usleep(50);
-  } while((readbyte(0, 0xA1200F) & 0xC0) != 0xC0);
+    usleep(500);
+  } while((readbyte(0, 0xA1200F) & 0x80) != 0x80);
 
   // CPU returned in its previous state
   cpustate[1] = curstate;

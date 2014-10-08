@@ -36,6 +36,16 @@ CFLAGS_blsgen_png = $(shell libpng-config --cflags)
 LDFLAGS_blsgen = $(shell libpng-config --ldflags)
 LDFLAGS_bdb = -lreadline
 
+# Special targets
+bdb.o: bdb.c blsload_sim.bin.c *.h
+
+blsload_sim.bin.c: blsload_sim.bin
+	bin2c blsload_sim.bin
+
+blsload_sim.bin: ../../src/blsload_sim.asm
+	asmx -b 0xA04 -C 68000 -o "$@" "$^" -I ../../include -i bls.inc -d BUS:=2 -d CHIP:=9 -d TARGET:=2
+	#asmx -b 0xA04 -C 68000 -w -e -l /dev/stdout -o "$@" "$^" -I ../../include -i bls.inc -d BUS:=2 -d CHIP:=9 -d TARGET:=2
+
 
 install: $(TARGETS)
 	for f in $(INSTALL_TARGETS); do cp "$$f" "$(INSTALL_DIR)"; done

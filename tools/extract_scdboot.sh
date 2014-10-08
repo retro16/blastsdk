@@ -16,8 +16,6 @@ fi
 
 cd `dirname "$0"`
 
-make -s -C bin2c
-
 if ! [ -r "$1" ]; then
 echo "Cannot open $1 for reading."
 exit 2
@@ -26,7 +24,7 @@ fi
 dd if="$1" of=extract.tmp bs=512 count=3 skip=1 &>/dev/null
 
 # Detect region and size
-bin2c/bin2c extract.tmp extract.tmp.c
+bin2c extract.tmp extract.tmp.c
 if grep '0x05,0x64,0x60,0x0f,0x00,0x00' extract.tmp.c &>/dev/null; then
 echo "Europe boot code detected"
 OUTFILE="bls/scdboot_eu"
@@ -42,12 +40,12 @@ SIZE=342
 fi
 
 dd if=extract.tmp of="$OUTFILE" bs=$SIZE count=1 &>/dev/null
-bin2c/bin2c "$OUTFILE"
+bin2c "$OUTFILE"
 
-rm extract.tmp extract.tmp.c "$OUTFILE" bin2c/bin2c
+rm extract.tmp extract.tmp.c "$OUTFILE"
 
-if [ -d .git ]; then
+if [ -d ../.git ]; then
   git update-index --assume-unchanged "$OUTFILE.c"
 fi
 
-echo "C code generated. Please run '$(dirname "$0")/setup.sh force' to recompile blsbuild with correct data."
+echo "C code generated. Please run '$(dirname "$0")/../setup.sh force' to recompile blsgen with correct data."

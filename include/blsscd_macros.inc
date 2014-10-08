@@ -3,27 +3,32 @@ SYNC_MAIN_SUB   macro
 
         if BUS == BUS_MAIN
 
-        lea GA_COMMFLAGS + 1, a0
-        bset    #4, -1(a0)
-.1m\?
-        btst    #4, (a0)
-        beq.b   .1m\?
-        bclr    #4, -1(a0)
-.2m\?
-        btst    #4, (a0)
-        bne.b   .2m\?
+                lea GA_COMMFLAGS + 1, a0        ; Write to -1(a0), read from (a0)
+                move.b  (a0), d0
+                andi.b  #$10, d0
+.waitsub\?
+                
+                ; Compare bit 4 of d0 with bit 4 of (a0)
+                move.b  (a0), d1
+                andi.b  #$10, d1
+                eor.b   d0, d1
+                beq.b   .waitsub\?              ; Jump if still equal
+
+                bchg    #4, -1(a0)              ; Stop sub oscillation by flipping the bit once
 
         else
 
-        lea GA_COMMFLAGS, a0
-        bset    #4, 1(a0)
-.1s\?
-        btst    #4, (a0)
-        beq.b   .1s\?
-        bclr    #4, 1(a0)
-.2s\?
-        btst    #4, (a0)
-        bne.b   .2s\?
+                lea GA_COMMFLAGS, a0            ; Write to 1(a0), read from (a0)
+                move.b  (a0), d0
+                andi.b  #$10, d0
+.waitmain\?
+                bchg    #4, 1(a0)               ; Oscillate
+                
+                ; Compare bit 4 of d0 with bit 4 of (a0)
+                move.b  (a0), d1
+                andi.b  #$10, d1
+                eor.b   d0, d1
+                beq.b   .waitmain\?             ; Jump if still equal
 
         endif
 
@@ -71,7 +76,7 @@ SUB_ACCESS_PRAM macro bank
                 move.b  d0, (a0)
                 endm
 
-SUB_RELEASE_PRAM        macro
+SUB_RELEASE_PRAM macro
                 move.b  (a7)+, d0
                 move.b  (a7)+, GA_RH + 1        ; Restore old busreq status
                 
@@ -80,7 +85,7 @@ SUB_RELEASE_PRAM        macro
                 lsr.b   #1, d1
                 andi.b  #$02, d1
                 andi.b  #$C0, d0
-                ori.b   d1, d0
+                or.b    d1, d0
                 move.b  d0, GA_MM + 1
                 endm
 

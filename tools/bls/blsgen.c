@@ -1780,7 +1780,7 @@ void bls_build_cd_image()
 
   // 0x18 Entry point table offset
   fputlong(0x20, f);
-  fputlong(0x20, f);
+  fputlong(0x00, f);
 
   sv spmain = symbol_get_bus("SP_MAIN", bus_sub);
 

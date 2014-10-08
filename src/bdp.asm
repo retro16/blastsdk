@@ -2,7 +2,7 @@ BDP_OUT_BUFSIZE equ     $30     ; Address of data size in buffer
 BDP_OUT_BUFFER  equ     $32     ; Address of sub buffer
 BDP_OUT_MAXSIZE equ     $2E     ; Max number of bytes in buffer
 
-                if BUS == BUS_MAIN
+        if BUS == BUS_MAIN
 
 ; Set port used for communication
 BDPDATA set     CDATA2
@@ -24,8 +24,8 @@ bdp_write
 
                 ; Mask interrupts
                 move    sr, d0
+                move.w  d0, -(sp)
                 move    #$2700, sr
-                move.w  d0, -(a7)
 
                 ; Setup port in output mode
                 move.b  #BDP_SENDDATA, BDPDATA
@@ -33,10 +33,10 @@ bdp_write
 
                 ; Compute packet size
 bdp_send_packet
-                move.w  d1, d0  ; d0 = packet size
+                move.w  d1, d0                  ; d0 = packet size
                 cmpi.l  #3, d1
-                ble.b           .small
-                moveq           #3, d0  ; Max 3 bytes per packet
+                ble.b   .small
+                moveq   #3, d0                  ; Max 3 bytes per packet
 .small
 
 bdp_send_raw_packet     ; Entry point to send one raw packet (d0 = low nybble of first byte, d1 = 3, a0 points to data)
@@ -50,9 +50,9 @@ bdp_send_raw_packet     ; Entry point to send one raw packet (d0 = low nybble of
                 bne.b   .head_msb
                 move.b  d0, BDPDATA
 
-                moveq   #2, d0  ; Always send 3 bytes per packet
+                moveq   #2, d0                  ; Always send 3 bytes per packet
 bdp_send_byte
-                swap    d0      ; Use other half of d0
+                swap    d0                      ; Use other half of d0
 
                 ; Wait until last byte was acknowledged
 .wait_last_ack
@@ -63,7 +63,7 @@ bdp_send_byte
                 move.b  (a0), d0
                 lsr.b   #4, d0
                 ori.b   #CTR|CTH, d0
-                move.b  d0, BDPDATA     ; Send high nybble of data
+                move.b  d0, BDPDATA             ; Send high nybble of data
 
                 ; Precompute low nybble
                 move.b  (a0)+, d0
@@ -75,13 +75,13 @@ bdp_send_byte
                 btst    #CTH_BIT, BDPDATA
                 bne.b   .byte_msb
 
-                move.b  d0, BDPDATA     ; Send low nybble of data
+                move.b  d0, BDPDATA             ; Send low nybble of data
 
-                swap    d0      ; Restore byte count in d0
+                swap    d0                      ; Restore byte count in d0
                 dbra    d0, bdp_send_byte
 
                 ; Packet sent
-                subq.w  #3, d1  ; Compute remaining bytes to send
+                subq.w  #3, d1                  ; Compute remaining bytes to send
                 bgt.b   bdp_send_packet
 
 bdp_write_finished
@@ -90,51 +90,44 @@ bdp_write_finished
                 move.b  #BDP_NEUTRALCTRL, BDPCTRL
 
                 ; Unmask interrupts
-                move.w  (a7)+, d0
+                move.w  (sp)+, d0
                 move    d0, sr
 
                 rts
 
 
-                if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
 ; Poll sub cpu state
 ; void bdp_sub_check();
 bdp_sub_check
-                andi.b  #$E0, GA_COMMFLAGS_SUB  ; Quickly check sub CPU flags
-                bne.w   .int
+                andi.b  #$A0, GA_COMMFLAGS_SUB  ; Quickly check sub CPU flags
+                bne.b   .int
                 rts
 
 .int
+                btst    #6, GA_COMMFLAGS_SUB
+                beq.b   .bda_check_end
+
+                bset    #6, GA_COMMFLAGS_MAIN   ; Ack the event
+.wait_trap_ack  btst    #6, GA_COMMFLAGS_SUB
+                bne.b   .wait_trap_ack
+
                 ; mask interrupts
                 move    sr, d0
                 move    #$2700, sr
-                move.w  d0, -(a7)
 
                 ; setup port in output mode
                 move.b  #BDP_SENDDATA, BDPDATA
                 move.b  #BDP_SENDCTRL, BDPCTRL
 
-                ; prepare raw packet
+                ; prepare raw packet parameters
                 moveq   #3, d1
-                moveq   #0, d0
-
-                ; Point a0 at data to be sent and call bdp_send_raw_packet
-                btst    #6, GA_COMMFLAGS_SUB
-                beq.b   .notrace
-                ; sub cpu raised a trace exception
-                lea     .sub_trace + 1, a0
-                pea     .bda_check_end
-                jmp     bdp_send_raw_packet
-.notrace
-
-                ; sub cpu entered monitor by itself (trap #7)
                 lea     .sub_trap7 + 1, a0
-                pea     .bda_check_end
+                pea     .bda_check_end          ; Tail call and return to .bda_check_end
+                move.w  d0, -(sp)               ; bdp_send_packet will restore SR from the stack
+                moveq   #0, d0                  ; d0 contains the header byte
                 jmp     bdp_send_raw_packet
-
-.sub_trace
-                dl      $109
 .sub_trap7
                 dl      $127
 .bda_check_end
@@ -149,11 +142,12 @@ bdp_sub_check
                 beq.b   .emptybuf
 
                 ; Send data to the debugger
-                pea.l   #$020000 + BDP_OUT_BUFFER      ; Push data buffer address
-                moveq   #0, d0  ; Push data size
-                move.w  $020000 + BDP_OUT_BUFSIZE, d0
-                move.l  d0, -(a7)
-                jsr     bdp_write
+                pea.l   $020000 + BDP_OUT_BUFFER        ; Push data buffer address
+                moveq   #0, d0
+                move.w  $020000 + BDP_OUT_BUFSIZE, d0   ; Read data size
+                move.l  d0, -(sp)                       ; Push data size
+                jsr     bdp_write                       ; Call function
+                addq    #8, sp
 
                 ; Acknowledge to the sub cpu by resetting data size
                 clr.w   $020000 + BDP_OUT_BUFSIZE
@@ -161,12 +155,12 @@ bdp_sub_check
                 ; Release sub cpu
 .emptybuf       SUB_RELEASE_PRAM
 
-                .noout
+.noout
                 rts
 
-                endif
+        endif
 
-                elsif BUS == BUS_SUB
+        elsif BUS == BUS_SUB
 
 ; void bdp_write(char *data, int length);
 bdp_write
@@ -203,6 +197,6 @@ bdp_write
 
                 bra.b   .next_block
 
-                endif
+        endif
 
 ; vim: ts=8 sw=8 sts=8 et

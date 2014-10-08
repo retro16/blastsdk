@@ -17,9 +17,8 @@ VDPWIN_BOTLEFT  set     $0080
 VDPWIN_BOTRIGHT set     $8080
 
 bls_init_vdp    macro   hint, vint, plane_w, plane_h, plane_a_addr, window_addr, plane_b_addr, sprites_addr, hscroll_addr, hscroll_mode, vscroll_mode, window_x, window_y, window_pos, shadow, interlace
-                VDPSETALLREGS   reg_init_vdp\?(pc)
-                bra.b   jump_regs\?
-reg_init_vdp\?
+                bra.b   .jump_regs\?
+.reg_init_vdp\?
         if hint
 		db	VDPR00 | VDPHINT ; #00
         else
@@ -49,24 +48,25 @@ reg_init_vdp\?
 		db	VDPR14			; #14
 		db	VDPR15 | 2		; #15 - autoincrement
         if plane_w == 32
-VDPSCRH\?       set     VDPSCRH32
+.VDPSCRH\?      set     VDPSCRH32
         elsif plane_w == 64
-VDPSCRH\?       set     VDPSCRH64
+.VDPSCRH\?      set     VDPSCRH64
         else
-VDPSCRH\?       set     VDPSCRH128
+.VDPSCRH\?      set     VDPSCRH128
         endif
         if plane_h == 32
-VDPSCRV\?       set     VDPSCRV32
+.VDPSCRV\?      set     VDPSCRV32
         elsif plane_h == 64
-VDPSCRV\?       set     VDPSCRV64
+.VDPSCRV\?      set     VDPSCRV64
         else
-VDPSCRV\?       set     VDPSCRV128
+.VDPSCRV\?      set     VDPSCRV128
         endif
-		db	VDPR16 | VDPSCRH\? | VDPSCRV\?	        ; #16 - Plane size
+		db	VDPR16 | .VDPSCRH\? | .VDPSCRV\?	; #16 - Plane size
 		db	(window_pos >> 8 & $FF) | window_x      ; #17
 		db	(window_pos & $FF) | window_y           ; #18
 		align	2
-jump_regs\?
+.jump_regs\?
+                VDPSETALLREGS   .reg_init_vdp\?(pc)
                 endm
 
 bls_enable_interrupts macro

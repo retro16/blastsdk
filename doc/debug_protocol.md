@@ -252,14 +252,11 @@ it work correctly.
 
 If these interrupts happen on the sub cpu, the following data is sent :
 
-Data sent by the genesis when TRACE triggered on the sub cpu :
-
-    00 00 01 09
-
-Data sent by the genesis when TRAP 7 triggered on the sub cpu :
+Data sent by the genesis when TRAP 7 is triggered on the sub cpu :
 
     00 00 01 27
 
+On the sub CPU, only TRAP 7 sends data via bdp.
 
 
 Receiving arbitrary data from the Genesis
@@ -316,12 +313,14 @@ Communication flags (gate array + $0E) :
 
     |------------ MAIN -------------|------------- SUB -------------|
     | 15| 14| 13| 12| 11| 10| 09| 08| 07| 06| 05| 04| 03| 02| 01| 00|
-    |REQ|   |CDR|SYN|   |   |   |   |MON|TRA|BUF|SYN|   |   |   |   |
+    |REQ|ACK|CDR|SYN|   |   |   |   |MON|TRA|BUF|SYN|   |   |   |   |
     |-------------------------------|-------------------------------|
 
 Main -> sub flags :
 
  - REQ: The main cpu requests the sub cpu to enter monitor mode. This flag is checked by the sub cpu in its level 2 exception routine.
+
+ - ACK: Acknowledge TRA flag
 
  - CDR: CD read request. commwords 14-15 contain count (1 byte) + sector (3 bytes).
    The sub cpu will read the specified sectors from cd and put them at the beginning of word ram. The sub cpu will release word ram once data is ready. This mechanism is used by blsgen binary loader.
@@ -332,7 +331,8 @@ Sub -> main flags :
 
  - MON: The sub cpu is in monitor mode
 
- - TRA: The sub cpu issued a TRACE exception
+ - TRA: Set if the cpu entered monitor mode because of a trap. Cleared when the ACK bit is set.
+   This bit triggers the `00 00 01 27` message.
 
  - BUF: The sub cpu communication buffer contains data
 
@@ -360,16 +360,100 @@ Sub CPU -> PC protocol :
     <3 bytes : CD-ROM sector>
 
 
-**CDREAD**
+**CDCREAD**
 
-    0F FF FF
+    0F 0F 0F
 
-    <bdb grabs PRAM, writes sector at $000200 and sets the flag at $000A00>
+    <bdb grabs PRAM, writes sector at $000200 and sector header at $000A00>
 
 
 **CDCACK**
 
-    <sub cpu clears the flag>
+    <sub cpu clears the header>
 
 Other calls can be ignored.
+
+
+Sub CPU memory map
+==================
+
+When the sub CPU is operating within BDB, with BDA, BDP and the CD-ROM
+simulator enabled, the memory map is as following :
+
+    -------- 0000 --------
+    | Reset SP / PC      |
+    -------- 0008 --------
+    |                    |
+    | Interrupt vectors  |
+    |                    |
+    -------- 0030 --------
+    |                    |
+    | BDP buffer         |
+    |                    |
+    -------- 0060 --------
+    |                    |
+    | Interrupt vectors  |
+    |                    |
+    -------- 00C0 --------
+    |                    |
+    | BDA registers      |
+    |                    |
+    -------- 0106 --------
+    |                    |
+    | BDA code           |
+    |                    |
+    -------- 0200 --------
+    |                    |
+    |                    |
+    |                    |
+    | CD-ROM sector      |
+    | buffer             |
+    |                    |
+    |                    |
+    -------- 0A00 --------
+    |                    |
+    | CD-ROM header      |
+    | buffer             |
+    |                    |
+    -------- 0A04 --------
+    |                    |
+    | Startup entry      |
+    | point              |
+    |                    |
+    | - - - - - - - - - -|
+    |                    |
+    |                    |
+    |                    |
+    | Simulated BIOS     |
+    |                    |
+    |                    |
+    |                    |
+    -------- 5000 --------
+    |                    |
+    |                    |
+    |                    |
+    | User program stack |
+    |                    |
+    -------- 5E80 --------
+    |                    |
+    | BIOS entry points  |
+    |                    |
+    |                    |
+    |                    |
+    -------- 6000 --------
+    |                    |
+    | SP header          |
+    |                    |
+    | - - - - - - - - - -|
+    |                    |
+    | User RAM           |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    |                    |
+    ----------------------
 
