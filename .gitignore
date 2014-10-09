@@ -17,9 +17,9 @@
 *.exe
 *.out
 *.app
-/samples/*/*.iso
-/samples/*/*.gen
-/samples/*/*.ram
+*.iso
+*.gen
+*.ram
 /tools/asmx2/src/asmx
 /tools/bls/bdb
 /tools/bls/blsgen
@@ -33,7 +33,7 @@
 
 # Build directories
 /build
-/samples/*/build_blsgen
+build_blsgen
 
 # VIM status files
 .*.swp
