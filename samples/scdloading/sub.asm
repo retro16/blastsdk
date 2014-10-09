@@ -1,6 +1,6 @@
                 include blsload_sub.inc
                 include cdbios.inc
-                include bdp.inc
+                include bdp_sub.inc
 
 SP_INIT
                 rts

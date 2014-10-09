@@ -30,7 +30,7 @@ Binary sub
  - provides sub.asm
  - bus sub
 
- - include blsload_sub.md
+ - include blsload_sub.md bdp_sub.md
 
 --------------------------------------
 

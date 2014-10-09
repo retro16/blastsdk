@@ -444,6 +444,8 @@ void buffer()
     exit(2);
   }
 
+  if(bdpdump) printf("(buffered)\n");
+
   memcpy(cmdbuf[cmdbufl], inp, 36);
   ++cmdbufl;
 }

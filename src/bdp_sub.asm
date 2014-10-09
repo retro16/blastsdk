@@ -1,6 +1,6 @@
 BDP_OUT_BUFSIZE equ     $30     ; Address of data size in buffer
 BDP_OUT_BUFFER  equ     $32     ; Address of sub buffer
-BDP_OUT_MAXSIZE equ     $2E     ; Max number of bytes in buffer
+BDP_OUT_MAXLEN  equ     $2E     ; Max number of bytes in buffer
 
 ; void bdp_write(char *data, int length);
 _sub_bdp_write
@@ -24,7 +24,8 @@ _sub_bdp_write
 .big_data       sub.w   d0, d1                  ; Compute number of bytes
                                                 ; remaining after copy
 
-.copy_start     move.w  d0, BDP_OUT_BUFSIZE     ; Tell main CPU current block size
+.copy_start     lea     BDP_OUT_BUFSIZE, a1
+                move.w  d0, (a1)+               ; Tell main CPU current block size
                 subq.w  #1, d0                  ; Adjust d0 for dbra
 .copy_loop      move.b  (a0)+, (a1)+            ; Copy data to buffer
                 dbra    d0, .copy_loop

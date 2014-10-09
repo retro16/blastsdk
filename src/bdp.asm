@@ -151,5 +151,6 @@ bdp_sub_check
 
 .noout
                 rts
+        endif
 
 ; vim: ts=8 sw=8 sts=8 et
