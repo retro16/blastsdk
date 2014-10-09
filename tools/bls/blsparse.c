@@ -226,7 +226,7 @@ void hexdump(const u8 *data, int size, u32 offset)
     printf("  ");
 
     for(c = 0; c < asciisize; ++c) {
-      if(asciidata[c] >= 0x20 && asciidata[c] < 0x80) {
+      if(asciidata[c] >= 0x20 && asciidata[c] < 0x7F) {
         printf("%c", asciidata[c]);
       } else {
         printf(".");
