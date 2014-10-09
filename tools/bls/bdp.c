@@ -38,6 +38,11 @@
 int genfd = -1;
 static u8 inp[36];
 static int inpl;
+
+static u8 cmdbuf[4096][36];
+static int cmdbufl;
+#define CMDBUFMAX 4096
+
 static int bdpdump = 0;
 static int cpustate[3] = {0,0,0};
 static int busstate[3] = {0,0,0};
@@ -55,13 +60,16 @@ static void open_device(const char *device);
 static void open_network(const char *host);
 void close_debugger();
 void bdp_set_dump(int newdump);
-int bdp_readdata();
+void bdp_readdata();
+void bdp_readbuffer();
+static void processdata();
 int bridgequery(u8 *data);
 void update_bda_sub(const u8 *image, int imgsize);
 
 // Low level packet reading
 static int packetlen(u8 header);
 static int readdata();
+static void buffer();
 
 // Low level packet sending
 static void senddata(const u8 *data, int size);
@@ -212,19 +220,33 @@ void bdp_set_dump(int value)
 
 
 // Call this when data is available on the file descriptor
-int bdp_readdata()
+void bdp_readdata()
 {
   readdata();
+  processdata();
+}
 
+
+void bdp_readbuffer()
+{
+  int c;
+  for(c = 0; c < cmdbufl; ++c) {
+    memcpy(inp, cmdbuf[c], 36);
+    inpl = packetlen(inp[0]);
+    processdata();
+  }
+  cmdbufl = 0;
+
+  if(busstate[1]) {
+    busrelease(1);
+  }
+}
+
+
+static void processdata()
+{
   if(inpl < 4) {
     on_unknown(inp, inpl);
-    return 0;
-  } else if(inpl == 4 && inp[0] == 0 && inp[1] == 0 && inp[2] == 0 && inp[3] == 0) {
-    // Main CPU stopped
-    return 1;
-  } else if(inpl == 4 && inp[0] == 0x20 && inp[1] == 0 && inp[2] == 0 && inp[3] == 0) {
-    // Main CPU started
-    return 1;
   } else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] == 0x27) {
     // TRAP #7
     u32 bpaddress;
@@ -233,6 +255,8 @@ int bdp_readdata()
     u8 c = inp[2];
 
     cpustate[c] = 1;
+    busstate[c] = 0;
+    ga_status = 0xFFFF;
 
     cleanup_breakpoints(c);
     if((bpaddress = breakpoint_reached(c))) {
@@ -242,12 +266,13 @@ int bdp_readdata()
     }
   } else if(inp[0] == 0x00 && inp[1] == 0x00 && inp[2] < 3 && inp[3] > 0x00 && inp[3] < 0x30) {
     cpustate[inp[2]] = 1;
-    on_exception(inp[2], inp[3]);
+    busstate[inp[2]] = 0;
+    if(inp[3]) {
+      on_exception(inp[2], inp[3]);
+    }
   } else {
     on_unknown(inp, inpl);
   }
-
-  return 1;
 }
 
 
@@ -255,15 +280,13 @@ int bridgequery(u8 *data)
 {
   sendcmd(CMD_EXIT, 0x56510A);
   waitack();
-  readdata();
 
-  if(inpl != 4
-      || inp[0] != 0x20
-      || inp[1] < '0' || inp[1] > '9'
-      || inp[2] < '0' || inp[2] > '9'
-      || inp[3] < '0' || inp[3] > '9') {
-    on_unknown(inp, inpl);
-    return 0;
+  while(readdata() && (inpl != 4
+        || inp[0] != 0x20
+        || inp[1] < '0' || inp[1] > '9'
+        || inp[2] < '0' || inp[2] > '9'
+        || inp[3] < '0' || inp[3] > '9')) {
+    buffer();
   }
 
   data[0] = inp[1];
@@ -275,8 +298,11 @@ int bridgequery(u8 *data)
 
 void update_bda_sub(const u8 *image, int imgsize)
 {
-#define TRAP7_INT_OFFSET 10
-#define LEVEL2_INT_OFFSET 24
+  // Negative offsets before closing DEADBEEF
+#define RESET_OFFSET 16
+#define TRACE_INT_OFFSET 12
+#define LEVEL2_INT_OFFSET 8
+#define TRAP7_INT_OFFSET 4
 
   const u8 *bdabeg = NULL;
   const u8 *bdaend = NULL;
@@ -314,20 +340,26 @@ void update_bda_sub(const u8 *image, int imgsize)
 
   writemem(1, bda_sub_code, bdabeg, bdaend - bdabeg);
 
+  // Read entry points in the image
+  u32 entry_reset = getint(bdaend - 16, 4);
+  u32 entry_trace = getint(bdaend - 12, 4);
+  u32 entry_level2 = getint(bdaend - 8, 4);
+  u32 entry_trap7 = getint(bdaend - 4, 4);
+
   // Update exception vectors
-  printf("TRACE vector at %08X\n", bda_sub_code);
-  writelong(1, 0x000024, bda_sub_code); // TRACE
-  printf("LEVEL2 vector at %08X\n", bda_sub_code + code_size - LEVEL2_INT_OFFSET);
-  writelong(1, 0x000068, bda_sub_code + code_size - LEVEL2_INT_OFFSET); // L2
-  printf("TRAP #7 vector at %08X\n", bda_sub_code + code_size - TRAP7_INT_OFFSET);
-  writelong(1, 0x00009C, bda_sub_code + code_size - TRAP7_INT_OFFSET); // TRAP #7
+  printf("TRACE vector at %08X\n", entry_trace);
+  writelong(1, 0x000024, entry_trace);
+  printf("LEVEL2 vector at %08X\n", entry_level2);
+  writelong(1, 0x000068, entry_level2);
+  printf("TRAP #7 vector at %08X\n", entry_trap7);
+  writelong(1, 0x00009C, entry_trap7);
+  printf("Reset entry at %08X\n", entry_reset);
+  writelong(1, 0x000004, entry_reset);
+
+  writebyte(0, 0xA1200E, 0x80); // Enter monitor immediately after reset
 
   // Reset the sub CPU in the new bda monitor
-  writebyte(0, 0xA1200E, readbyte(0, 0xA1200E) | 0x80); // Stay in monitor
-  u32 oldresetvector = readlong(1, 0x000004);
-  writelong(1, 0x000004, bda_sub_code);
   subreset();
-//  writelong(1, 0x000004, oldresetvector);
 
   if(!cpustate[1]) {
     cpustate[1] = 1;
@@ -340,6 +372,11 @@ void update_bda_sub(const u8 *image, int imgsize)
 // Return total packet length based on header value
 static int packetlen(u8 header)
 {
+  if(header == 0x3F) {
+    // Command acknowledge
+    return 1;
+  }
+
   if((header & 0xC0) && (header & CMD_WRITE)) {
     int l = header & CMD_LEN;
 
@@ -400,6 +437,18 @@ static int readdata()
 }
 
 
+void buffer()
+{
+  if(cmdbufl >= CMDBUFMAX) {
+    fprintf(stderr, "Command buffer full.\n");
+    exit(2);
+  }
+
+  memcpy(cmdbuf[cmdbufl], inp, 36);
+  ++cmdbufl;
+}
+
+
 void senddata(const u8 *data, int size)
 {
   if(bdpdump) {
@@ -447,32 +496,8 @@ void waitack_tcp()
 
 void waitack_serial()
 {
-  for(;;) {
-    // Read the header byte, then the whole remaining packet
-    char c;
-    ssize_t r = read(genfd, &c, 1);
-
-    if(r == 0) {
-      fprintf(stderr, "Could not read from genesis : connection closed.\n");
-      exit(2);
-    }
-
-    if(r == -1) {
-      if(errno == EAGAIN) {
-        printf(" EAGAIN\n");
-        usleep(100);
-      } else if(errno != EINTR) {
-        fprintf(stderr, "Could not read from genesis : %s\n", strerror(errno));
-        exit(2);
-      }
-    } else {
-      if(c != 0x3F) {
-        printf("Acknowledge not received. Received %02X instead.\n", (unsigned int)(unsigned char)c);
-        exit(2);
-      }
-
-      return;
-    }
+  while(readdata() && (inpl != 1 || inp[0] != 0x3F)) {
+    buffer();
   }
 }
 
@@ -490,11 +515,9 @@ void readburst(u8 *target, u32 address, u32 length)
 {
   sendcmd(CMD_READ | CMD_BYTE | (CMD_LEN & length), address);
   waitack();
-  readdata();
 
-  if(inp[0] != (CMD_WRITE | CMD_BYTE | (CMD_LEN & length))) {
-    printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_BYTE | (CMD_LEN & length)));
-    exit(2);
+  while(readdata() && inp[0] != (CMD_WRITE | CMD_BYTE | (CMD_LEN & length))) {
+    buffer();
   }
 
   memcpy(target, &inp[4], length);
@@ -808,11 +831,9 @@ u32 readbyte(int cpu, u32 address)
   } else {
     sendcmd(CMD_READ | CMD_BYTE | 1, address);
     waitack();
-    readdata();
 
-    if(inp[0] != (CMD_WRITE | CMD_BYTE | 1)) {
-      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_BYTE | 1));
-      exit(2);
+    while(readdata() && inp[0] != (CMD_WRITE | CMD_BYTE | 1)) {
+      buffer();
     }
 
     value = getint(&inp[4], 1);
@@ -846,11 +867,9 @@ u32 readword(int cpu, u32 address)
   } else {
     sendcmd(CMD_READ | CMD_WORD | 2, address);
     waitack();
-    readdata();
 
-    if(inp[0] != (CMD_WRITE | CMD_WORD | 2)) {
-      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_WORD | 2));
-      exit(2);
+    while(readdata() && inp[0] != (CMD_WRITE | CMD_WORD | 2)) {
+      buffer();
     }
 
     value = getint(&inp[4], 2);
@@ -884,11 +903,9 @@ u32 readlong(int cpu, u32 address)
   } else {
     sendcmd(CMD_READ | CMD_LONG | 4, address);
     waitack();
-    readdata();
 
-    if(inp[0] != (CMD_WRITE | CMD_LONG | 4)) {
-      printf("Genesis communication error. Received %02X instead of %02X.\n", inp[0], (CMD_WRITE | CMD_LONG | 4));
-      exit(2);
+    while(readdata() && inp[0] != (CMD_WRITE | CMD_LONG | 4)) {
+      buffer();
     }
 
     value = getint(&inp[4], 4);
@@ -1091,14 +1108,12 @@ void stepcpu(int cpu)
     writebyte(0, 0xA1200E, readbyte(0, 0xA1200E) | 0x80);
   } else {
     // Wait for TRACE interrupt on main CPU
-    readdata();
-
-    if(inpl != 4
+    while(readdata() && (inpl != 4
         || inp[0] != CMD_HANDSHAKE
         || inp[1] != 0x00
         || inp[2] != 0x00
-        || inp[3] != 0x09) {
-      on_unknown(inp, inpl);
+        || inp[3] != 0x09)) {
+      buffer();
     }
   }
 
@@ -1133,28 +1148,13 @@ void reach_breakpoint(int cpu)
     setup_breakpoints(cpu);
     setcpustate(cpu, 0);
 
-    if(cpu) {
-      // Wait for TRAP7 interrupt on sub CPU
-      readdata();
-
-      if(inpl != 4
-          || inp[0] != CMD_HANDSHAKE
-          || inp[1] != 0x00
-          || inp[2] != 0x01
-          || inp[3] != 0x27) {
-        on_unknown(inp, inpl);
-      }
-    } else {
-      // Wait for TRAP7 interrupt on main CPU
-      readdata();
-
-      if(inpl != 4
-          || inp[0] != CMD_HANDSHAKE
-          || inp[1] != 0x00
-          || inp[2] != 0x00
-          || inp[3] != 0x27) {
-        on_unknown(inp, inpl);
-      }
+    // Wait for TRAP7 interrupt
+    while(readdata() && (inpl != 4
+        || inp[0] != CMD_HANDSHAKE
+        || inp[1] != 0x00
+        || inp[2] != cpu
+        || inp[3] != 0x27)) {
+      buffer();
     }
 
     // CPU returned in its previous state
@@ -1282,10 +1282,9 @@ void setcpustate(int cpu, int newstate)
         // Stop main CPU
         sendcmd(CMD_HANDSHAKE, 0);
         waitack();
-        readdata();
 
-        if(inpl != 4 || inp[0] != 0x00 || inp[1] != 0x00 || inp[2] != 0x00 || inp[3] != 0x00) {
-          on_unknown(inp, inpl);
+        while(readdata() && (inpl != 4 || inp[0] != 0x00 || inp[1] != 0x00 || inp[2] != 0x00 || inp[3] != 0x00)) {
+          buffer();
         }
       }
     } else {
@@ -1305,10 +1304,8 @@ void setcpustate(int cpu, int newstate)
         // Start main CPU
         sendcmd(CMD_EXIT, 0);
         waitack();
-        readdata();
-
-        if(inpl != 4 || inp[0] != 0x20 || inp[1] != 0x00 || inp[2] != 0x00 || inp[3] != 0x00) {
-          on_unknown(inp, inpl);
+        while(readdata() && (inpl != 4 || inp[0] != 0x20 || inp[1] != 0x00 || inp[2] != 0x00 || inp[3] != 0x00)) {
+          buffer();
         }
       }
     }
@@ -1346,7 +1343,6 @@ void subfreeze()
 
 static void subreq()
 {
-  printf("subreq\n");
   assert(ga_status == 0xFFFF);
 
   ga_status = readbyte(0, 0xA12001);
@@ -1373,7 +1369,6 @@ static void subsetbank(int bank)
 
 static void subrelease()
 {
-  printf("subrelease\n");
   assert(ga_status != 0xFFFF);
 
   if(!(ga_status & 0x0002)) {

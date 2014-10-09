@@ -34,26 +34,28 @@ typedef unsigned long u32;
 #define TARGET_SCD2 2
 #define TARGET_RAM 4
 
-#define TRAP(t) asm volatile("\tTRAP #"#t)
+static inline void trap(t) { asm volatile("\tTRAP #"#t); }
 #define BLS_INT_CALLBACK __attribute__((interrupt))
 typedef void (*bls_int_callback)();
 
-#define bls_enable_interrupts() asm volatile("\tandi #$F8FF, SR\n")
-#define bls_disable_interrupts() asm volatile("\tori #$0700, SR\n")
+static inline void bls_enable_interrupts() { asm volatile("\tandi #$F8FF, SR\n"); }
+static inline void bls_disable_interrupts() { asm volatile("\tori #$0700, SR\n"); }
+
+static inline void enter_monitor() { trap(7); }
 
 #if BUS == BUS_MAIN
-#define ENTER_MONITOR() TRAP(7)
 
 #if TARGET == TARGET_GEN
-#define VDPSECURITY() \
-asm volatile("\tmove.b %d0, -(%a7)\n" \
-"\tmove.b 0xA10001, %d0\n" \
-"\tandi.b #0x0F, %d0\n" \
-"\tbeq.b 1f\n" \
-"\tmove.l 0x100, 0xA14000\n" \
-"1:\tmove.b (%a7)+, %d0\n" )
+static inline void VDPSECURITY() {
+  asm volatile("\tmove.b %d0, -(%a7)\n"
+  "\tmove.b 0xA10001, %d0\n"
+  "\tandi.b #0x0F, %d0\n"
+  "\tbeq.b 1f\n"
+  "\tmove.l 0x100, 0xA14000\n"
+  "1:\tmove.b (%a7)+, %d0\n" );
+}
 #else
-#define VDPSECURITY() do {} while(0)
+static inline void VDPSECURITY() {}
 #endif
 
 // Fast inline copy not using stdlib.asm. Optimized for constant length.

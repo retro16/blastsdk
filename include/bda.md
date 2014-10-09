@@ -6,7 +6,7 @@ To use BDA, include this file in your binary, include "bda.inc" or "bda.h"
 depending on your language, then call bda_init
 
 Do not include this file if you use bls_init : bls_init automatically includes
-bda as the standard procedure.
+and initializes bda as the standard procedure.
 
 
 Example in asmx :

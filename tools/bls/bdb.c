@@ -68,7 +68,7 @@ static void goto_mainloop(int sig)
 
 static void on_bdp_comm(const u8 *data, int len)
 {
-  if(len == 3 && data[0] < 0x08) {
+  if(len == 3 && data[0] < 0x07) {
     printf("ROMREAD %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
     // ROMREAD request from simulated BIOS
     u32 offset = getint(data, 3) * CDBLOCKSIZE;
@@ -77,7 +77,7 @@ static void on_bdp_comm(const u8 *data, int len)
     } else {
       printf("BDP requested CD read at %08X but no CD image is loaded\n", offset);
     }
-  } else if(len == 3 && data[0] == 0x0F) {
+  } else if(len == 3 && data[0] == 0x07) {
     printf("CDCREAD %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
     // CDCREAD request from simulated BIOS
     if(cdsim_file) {
@@ -89,10 +89,12 @@ static void on_bdp_comm(const u8 *data, int len)
       buf[CDBLOCKSIZE] = (offset / CDBLOCKSIZE) % (75 * 60); // ff
       buf[CDBLOCKSIZE] = 1; // md (0 = audio, 1 = mode 1, 2 = mode 2)
 
-      writemem(1, 0x4000, buf, sizeof(buf));
+      writemem(1, getint(&data[1], 2), buf, sizeof(buf));
     }
-  } else {
+  } else if(data[0] >= 0x20 || data[0] == '\r' || data[0] == '\n' || data[0] == '\t') {
     printf("%.*s", len, data);
+  } else {
+    hexdump(data, len, 0);
   }
 }
 
@@ -102,7 +104,7 @@ void on_unknown(const u8 inp[36], int inpl)
   erase_prompt();
   if(inpl == 4 && inp[0] >= 1 && inp[0] <= 3) {
     // BDP communication request
-    on_bdp_comm(&inp[1], inpl - 1);
+    on_bdp_comm(&inp[1], inp[0]);
   } else {
     printf("Received unknown data from the genesis\n");
     hexdump(inp, inpl, 0);
@@ -235,6 +237,9 @@ void boot_cd(u8 *image, int imgsize)
   u8 clear[0x10];
   memset(clear, '\0', sizeof(clear));
   writemem(0, 0xA12010, clear, sizeof(clear)); // Clear other comm words
+
+  printf("Clearing BDP buffer ...\n");
+  writelong(1, 0x000030, 0);
 
   printf("Uploading IP (%d bytes) ...\n", ipsize);
   writemem(0, 0xFF0000 + seccodesize, ip_start, ipsize);
@@ -569,6 +574,8 @@ int main(int argc, char **argv)
   for(;;) {
     fd_set readset;
     int selectresult;
+
+    bdp_readbuffer();
 
     FD_ZERO(&readset);
     FD_SET(0, &readset);

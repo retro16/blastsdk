@@ -96,12 +96,25 @@ group *source_parse(const mdconfnode *n, const char *name)
   if(!s) {
     sources = blsll_insert_group(sources, group_new());
     s = sources->data;
+    s->name = strdupnul(name);
   } else if(!n) {
     return s;
   }
 
   bankreset(&s->banks);
-  s->name = strdupnul(name);
+
+  if(!s->file || strcmp(s->name, s->file) == 0) {
+    if(s->file) {
+      free(s->file);
+    }
+    s->file = (char *)mdconfget(n, "file");
+    if(s->file) {
+      s->file = strdup(s->file);
+    } else if(s->name) {
+      s->file = strdup(s->name);
+    }
+  }
+
   s->format = format_parse(mdconfget(n, "format"));
 
   if(s->format == format_auto && s->name) {
@@ -424,6 +437,18 @@ group *binary_parse(const mdconfnode *mdnode, const char *name)
   const mdconfnode *n;
 
   int explicitdeps = 0;
+
+  if(!bin->file || strcmp(bin->name, bin->file) == 0) {
+    if(bin->file) {
+      free(bin->file);
+    }
+    bin->file = (char *)mdconfget(mdnode, "file");
+    if(bin->file) {
+      bin->file = strdup(bin->file);
+    } else if(bin->name) {
+      bin->file = strdup(bin->name);
+    }
+  }
 
   bankreset(&bin->banks);
   MDCONF_GET_ENUM(mdnode, bus, bus, bin->banks.bus);

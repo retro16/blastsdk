@@ -1,8 +1,8 @@
 SP_INIT
+                SYNC_MAIN_SUB
                 rts
 
 SP_MAIN
-                ; Start
                 moveq   #0, d0
 .loop
                 addq.l  #1, d0

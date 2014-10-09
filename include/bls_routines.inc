@@ -19,46 +19,6 @@ BLSFASTFILL_WORD macro dest, words, value
     endif
     endm
 
-; Repeat instruction with zero or one parameter count times
-BLSREPEAT macro count, instruction
-    if (count) > 256
-    BLSREPEAT 256, instruction
-    BLSREPEAT ((count)-256), instruction
-    elsif (count) > 64
-    BLSREPEAT 64, instruction
-    BLSREPEAT ((count)-64), instruction
-    elsif (count) > 16
-    BLSREPEAT 16, instruction
-    BLSREPEAT ((count)-16), instruction
-    elsif (count) > 4
-    BLSREPEAT 4, instruction
-    BLSREPEAT ((count)-4), instruction
-    elsif (count) > 0
-    instruction 
-    BLSREPEAT ((count)-1), instruction
-    endif
-    endm
-
-; Repeat instruction with 2 parameters count times
-BLSREPEAT2 macro count, instruction, p2
-    if (count) > 256
-    BLSREPEAT2 256, instruction, p2
-    BLSREPEAT2 ((count)-256), instruction, p2
-    elsif (count) > 64
-    BLSREPEAT2 64, instruction, p2
-    BLSREPEAT2 ((count)-64), instruction, p2
-    elsif (count) > 16
-    BLSREPEAT2 16, instruction, p2
-    BLSREPEAT2 ((count)-16), instruction, p2
-    elsif (count) > 4
-    BLSREPEAT2 4, instruction, p2
-    BLSREPEAT2 ((count)-4), instruction, p2
-    elsif (count) > 0
-    instruction , p2
-    BLSREPEAT2 ((count)-1), instruction, p2
-    endif
-    endm
-
 
 ; Copy memory from word-aligned addresses.
 ; dest and src can be anything supported by LEA.

@@ -9,7 +9,7 @@ Build the binary image
 
     blsgen
 
-Burn monitor.bin on a cart or load it from your linker
+Burn monitor.gen on a cart or load it from your linker
 
 See README.md for usage
 
@@ -21,9 +21,9 @@ Section font.png.img
 Binary main
 ===========
 
- - provides main.asm monitor.asm monitor_ram.asm font.png.img
+ - provides monitor.asm monitor_ram.asm font.png.img
  - bus main
- - include bda.md beh.md
+ - include bls_init.md
 
 Output monitor
 ==============

@@ -5,10 +5,6 @@
 bls_init        macro   hint_handler, vint_handler
                 ccall2  bls_init, hint_handler, vint_handler
                 endm
-        else
-bls_init        macro
-                ccall   bls_init
-                endm
         endif
 
 VDPWIN_TOPLEFT  set     $0000

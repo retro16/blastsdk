@@ -29,6 +29,10 @@ void group_free(group *p)
     free(p->name);
   }
 
+  if(p->file) {
+    free(p->file);
+  }
+
   free(p);
 }
 
@@ -466,6 +470,10 @@ void group_dump(const group *grp, FILE *out)
 {
   BLSLL(section) *secl;
   section *sec;
+
+  if(grp->file) {
+    fprintf(out, " - file `%s`\n", grp->file);
+  }
 
   fprintf(out, " - format %s\n", format_names[grp->format]);
 

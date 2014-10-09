@@ -33,7 +33,7 @@ Run bdb (replace /dev/ttyUSB0 with your arduino serial port device / IP address)
 
 Upload the binary image (this takes a long time)
 
-    bdb > boot monitor_ram.bin
+    bdb > boot monitor.ram
 
 Run the program
 
@@ -50,16 +50,16 @@ Section font.png.img
 Binary main
 ===========
 
- - provides main.asm monitor.asm monitor_ram.asm font.png.img
+ - provides monitor.asm monitor_ram.asm font.png.img
  - bus main
- - include bda.md beh.md
+ - include bls_init.md
 
 Output monitor
 ==============
 
  - name **BLS MONITOR**
  - copyright **(C)2014 RETRO16**
- - file monitor_ram.ram
+ - file monitor.ram
  - region JUE
  - target ram
 

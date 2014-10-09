@@ -122,8 +122,8 @@ Byte level protocol
 
     First byte : header
     B7..B5 : command
-      000 = handshake (ping genesis)
-      001 = exit monitor mode
+      000 = handshake (ping genesis) / bdp data
+      001 = exit monitor mode / bridge command
       010 = byte read
       011 = byte write
       100 = long read
@@ -214,7 +214,7 @@ Testing intermediate connectivity
 
 A special handshake allows to test communication between the PC and the
 Arduino. This command never reaches the Genesis. It allows to query version
-and revision of the bridge. This packet has
+and revision of the bridge.
 
 Send a version request :
 
@@ -278,14 +278,20 @@ To send more than 3 bytes, you must send as many commands as needed. This is
 inefficient, but it avoids doing complex computations when implementing the
 low level protocol in the Arduino
 
-On the sega cd, data may be sent from both cpu. There is no way to tell which cpu sent data.
+On the sega cd, data may be sent from both cpu. There is no way to tell which
+cpu sent data.
+
+This is implemented by the bdp.md library on the genesis side, so you can use
+it in your programs for debugging, but remember that you cannot send data and
+debug step by step at the same time, since it would conflict on port access !
 
 
-Flow control in serial mode
----------------------------
+Flow control in serial / USB mode
+---------------------------------
 
 Since most arduino boards have no flow control, an acknowledge byte is sent
-after each packet successfully sent to the genesis.
+after each packet successfully sent to the genesis when communicating over
+the serial port / USB serial port.
 
 The acknowledge is a single byte with the value : 0x3F. It is sent by the
 arduino board, NOT by the genesis.
@@ -306,8 +312,9 @@ This is what is seen on the genesis side :
 Main-sub cpu communication
 --------------------------
 
-The sub cpu cannot access the pad port, nor it can interrupt the main cpu. Communication between the sub cpu and the debugger is
-done by setting communication flags.
+The sub cpu cannot access the pad port, nor it can interrupt the main cpu.
+Communication between the sub cpu and the debugger is done by setting
+communication flags.
 
 Communication flags (gate array + $0E) :
 
@@ -318,12 +325,15 @@ Communication flags (gate array + $0E) :
 
 Main -> sub flags :
 
- - REQ: The main cpu requests the sub cpu to enter monitor mode. This flag is checked by the sub cpu in its level 2 exception routine.
+ - REQ: The main cpu requests the sub cpu to enter monitor mode. This flag is
+   checked by the sub cpu in its level 2 exception routine.
 
  - ACK: Acknowledge TRA flag
 
- - CDR: CD read request. commwords 14-15 contain count (1 byte) + sector (3 bytes).
-   The sub cpu will read the specified sectors from cd and put them at the beginning of word ram. The sub cpu will release word ram once data is ready. This mechanism is used by blsgen binary loader.
+ - CDR: CD request. commwords 14-15 contain count (1 byte) + sector (3 bytes).
+   The sub cpu will read the specified sectors from cd and put them at the
+   beginning of word ram. The sub cpu will release word ram once data is ready.
+   This mechanism is used by blsgen binary loader.
 
  - SYN: main-sub synchronization
 
@@ -331,47 +341,71 @@ Sub -> main flags :
 
  - MON: The sub cpu is in monitor mode
 
- - TRA: Set if the cpu entered monitor mode because of a trap. Cleared when the ACK bit is set.
-   This bit triggers the `00 00 01 27` message.
+ - TRA: Set if the cpu entered monitor mode because of a trap. Cleared when
+   the ACK bit is set. This bit triggers the `00 00 01 27` message.
 
  - BUF: The sub cpu communication buffer contains data
 
  - SYN: main-sub synchronization
 
 
-To output data (bdp_write) from the sub cpu, the routine places data length at $30 and data in $32-$60 range in the program ram, sets BUF flag and waits until data length at $30 is reset to 0 by the main cpu.
+To output data (bdp_write) from the sub cpu, the routine places data length at
+$30 and data in $32-$60 range in the program ram, sets BUF flag and waits until
+data length at $30 is reset to 0 by the main cpu.
 
 
 Simulated CD-ROM operation
 ==========================
 
-(this is not implemented, just ideas)
-
 The sub CPU sends packets using BDP_WRITE to request data, then the debugger
-pauses the 2 CPU and writes the sector in the $000200-$005800 area of PRAM.
+pauses the 2 CPU and writes the sector in the BIOS area of PRAM (see memory map
+below).
 
 When booting using bdb 'boot' command, bdb installs a new BIOS in the sub CPU,
 reimplementing BIOS_* calls to use BDP instead of real CD-ROM calls.
 
-Sub CPU -> PC protocol :
+Simulated BIOS calls :
 
-**ROMREAD / ROMREADN**
+**ROMREAD / ROMREADN / ROMREADE**
 
-    <3 bytes : CD-ROM sector>
+The BIOS sends the sector number over BDP. Example requesting sector $140221 :
 
+    03 14 02 21
+
+BDB will seek the file descriptor at the correct offset.
+
+**CDCSTAT**
+
+Since BDP is too slow anyway, CDCSTAT is always successful (no seek time).
 
 **CDCREAD**
 
-    0F 0F 0F
+The BIOS sends a BDP packet of 3 bytes : `0x07` followed by the target :
 
-    <bdb grabs PRAM, writes sector at $004000 and sector header at $004800>
+    03 07 48 00
+
+BDB grabs PRAM, reads the current sector from the image file, then uploads it
+at the address specified ($004800 in the example), followed by the sector
+header (4 bytes).
+
+During this time, the sub CPU stalls until the sector header is written, which
+happens at the very end, when the header is written.
+
+
+**CDCTRN**
+
+The BIOS copies the buffered sector and header from the reserved BIOS buffer to
+the target address.
 
 
 **CDCACK**
 
-    <sub cpu clears the header>
+The simulated BIOS clears the current header in the BIOS buffer.
 
-Other calls can be ignored.
+**Other calls**
+
+Other calls are ignored for now. A good idea would be to play audio tracks on
+the PC on MSC_* calls and implement battery RAM calls to a file.
 
 
 Sub CPU memory map
@@ -407,7 +441,7 @@ simulator enabled, the memory map is as following :
     |                    |
     |                    |
     |                    |
-    -------- 4000 --------
+    -------- 4800 --------
     |                    |
     |                    |
     |                    |
@@ -416,9 +450,9 @@ simulator enabled, the memory map is as following :
     |                    |
     |                    |
     |                    |
-    -------- 4800 --------
+    -------- 5000 --------
     | CD sector header   |
-    -------- 4804 --------
+    -------- 5004 --------
     |                    |
     |                    |
     |                    |

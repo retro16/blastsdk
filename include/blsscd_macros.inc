@@ -62,14 +62,17 @@ SUB_SET_BANK    macro   bank
 
 SUB_ACCESS_PRAM macro bank
                 lea     GA_RH + 1, a0
-                move.b  (a0), -(a7)     ; Push current busreq status on stack
-                bset    #GA_BUSREQ_BIT, (a0)
+                move.b  (a0), d0
+                move.b  d0, d1          ; Store original state of GA_RH + 1
+                bset    #GA_BUSREQ_BIT, d0
+                move.b  d0, (a0)
 .1\?    btst    #GA_BUSREQ_BIT, (a0)
                 beq.b   .1\?
-                
+                swap    d1              ; Use second part of d1
                 addq    #2, a0  ; Point a0 at GH_MM + 1
                 move.b  (a0), d0
-                move.b  d0, -(a7)       ; Push current bank on stack
+                move.b  d0, d1          ; Store original state of GH_MM + 1
+                move.l  d1, -(a7)       ; Push current state
                 lsr.b   #1, d0          ; MODE flag represents neutral operation for DMNA
                 andi.b  #$02, d0        ; Clear other bits
                 ori.b   #(bank << 6), d0
@@ -77,8 +80,10 @@ SUB_ACCESS_PRAM macro bank
                 endm
 
 SUB_RELEASE_PRAM macro
-                move.b  (a7)+, d0
-                move.b  (a7)+, GA_RH + 1        ; Restore old busreq status
+                move.l  (a7)+, d0
+                swap    d0
+                move.b  d0, GA_RH + 1           ; Restore old busreq status
+                swap    d0
                 
                 ; Restore old bank setting
                 move.b  d0, d1

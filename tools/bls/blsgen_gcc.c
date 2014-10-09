@@ -448,7 +448,7 @@ void source_get_symbols_gcc(group *s)
   sprintf(object, BUILDDIR"/%s.o", s->name);
   sprintf(elf, BUILDDIR"/%s.elf", s->name);
 
-  if(!findfile(srcname, s->name)) {
+  if(!findfile(srcname, s->file)) {
     printf("Error: %s not found\n", s->name);
     exit(1);
   }
@@ -498,7 +498,7 @@ void source_get_symbol_values_gcc(group *s)
   sprintf(object, BUILDDIR"/%s.o", s->name);
   sprintf(elf, BUILDDIR"/%s.elf", s->name);
 
-  if(!findfile(srcname, s->name)) {
+  if(!findfile(srcname, s->file)) {
     printf("Error: %s not found\n", s->name);
     exit(1);
   }
@@ -541,7 +541,7 @@ void source_compile_gcc(group *s)
   sprintf(object, BUILDDIR"/%s.o", s->name);
   sprintf(elf, BUILDDIR"/%s.elf", s->name);
 
-  if(!findfile(srcname, s->name)) {
+  if(!findfile(srcname, s->file)) {
     printf("Error: %s not found\n", s->name);
     exit(1);
   }

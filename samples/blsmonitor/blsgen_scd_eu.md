@@ -54,9 +54,9 @@ Section font.png.img
 Binary main
 ===========
 
- - provides main.asm monitor.asm monitor_ram.asm font.png.img bda_ram.asm
+ - provides monitor.asm monitor_ram.asm font.png.img bda_ram.asm
  - bus main
- - include bda.md beh.md
+ - include bls_init.md
 
 Binary sub
 ==========
@@ -70,5 +70,5 @@ Output monitor
  - name **Monitor**
  - file monitor_scd_eu.iso
  - region E
- - target scd1
+ - target scd2
 

@@ -1,19 +1,14 @@
-		include bls.inc
+		include bls_init.inc
 
-monitor_init	; Call this to initialize the monitor
-		VDPSETADDRREG			; Use a4/a5 for VDP macros
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+IP_MAIN
+                SYNC_MAIN_SUB
+        endif
 
-		; Clear VRAM
-		VDPSETREG 1, VDPR01		; Disable display, disable VINT, disable DMA
-		VDPSETREG 15, VDPR15 | 2		; Set autoincrement to 2
-		VDPSETWRITE 0, VRAM
-		move.w	#$7FFF, d0
-		moveq	#0, d1
-.vram_clear
-		move.w	d1, (a4)
-		dbra	d0, .vram_clear
+MAIN
+                BLS_INIT 0, INT_VBLANK
 
-		VDPSETALLREGS reg_init_vdp	; Load reg_init_vdp to VDP register
+                VDPSETADDRREG                   ; Access VDP through a4/a5
 
 		VDPDMASEND FONT_PNG_IMG, 0, FONT_PNG_IMG_SIZE/2, VRAM ; Upload font tiles
 
@@ -22,13 +17,6 @@ monitor_init	; Call this to initialize the monitor
 		VDPSETWRITE 34, CRAM		; Point at palette 2, index 1
 		move.w	#$00E0, (a4)		; Set highlighted text color
 
-		VDPSETWRITE HSCROLL_TABLE, VRAM
-		move.l	#$0, (a4)		; Reset horizontal scrolling
-		VDPSETWRITE 0, VSRAM
-		move.l	#$0, (a4)		; Reset vertical scrolling
-
-		move.b	#CSEL, CCTRL1		; Enable CSEL for gamepad
-
 		; Initialize RAM values
 		move.l	#$FF0000, dumpscroll
 		move.l	#$FF0000, addr
@@ -36,36 +24,10 @@ monitor_init	; Call this to initialize the monitor
 		move.w	#0, cursor
 		move.b	#1, mode
 
-		if SCD == 1
-		; Set vblank interrupt entry point on SCD
-		movea.l	$78, a0					; Read vector target
-		move.w	#$4EF9, (a0)+			; Write JMP
-		move.l	#int_vblank, (a0)		; Write target
-		endif
+                BLS_INIT_VDP 0, 1, 64, 32, PLANE_A_DEF, 0, PLANE_B_DEF, SPRAT_DEF, HSCROLL_TABLE_DEF, VDPHSCRSCROLL, VDPVSCRSCROLL, 0, 0, VDPWIN_TOPLEFT, 0, 0
 
-		rts
+.mainloop       bra.b   .mainloop
 
-reg_init_vdp
-		db	VDPR00			; #00
-		db	VDPR01 | VDPDISPEN | VDPVINT | VDPDMAEN	; #01
-		db	VDPR02			; #02 - Plane A
-		db	VDPR03			; #03 - Window
-		db	VDPR04			; #04 - Plane B
-		db	VDPR05			; #05 - Sprite attributes
-		db	VDPR06			; #06
-		db	VDPR07			; #07
-		db	VDPR08			; #08
-		db	VDPR09			; #09
-		db	VDPR10			; #10
-		db	VDPR11 | VDPEINT	; #11
-		db	VDPR12 | VDPH40		; #12
-		db	VDPR13			; #13
-		db	VDPR14			; #14
-		db	VDPR15 | 2		; #15 - autoincrement
-		db	VDPR16 | VDPSCRH64	; #16 - Plane size
-		db	VDPR17			; #17
-		db	VDPR18			; #18
-		align	2
 
 
 ; Screen line display example : FF0004 DEADBEEF 4
@@ -77,12 +39,8 @@ reg_init_vdp
 ;
 ; Middle character is 1 for byte, 2 for word, 4 for long and B for branch
 
-		nop
-		nop
-		nop
-		nop
 printline
-		VDPSETWRITEPLANE PLANE_A, 64, 0, 0
+		VDPSETWRITEPLANE PLANE_A_DEF, 64, 0, 0
 		move.w	#0, (a4)	; Print space
 		move.w	#0, (a4)	; Print space
 		move.w	#0, (a4)	; Print space
@@ -109,7 +67,7 @@ printline
 		dbra	d0, .1
 
 hilight_cursor
-		move.w  #PLANE_A, d0
+		move.w  #PLANE_A_DEF, d0
 		move.b  cursor+1, d0	; Character number to d0
 		addq	#8, d0
 		VDPSETREADVAR d0, VRAM	; Read from VRAM at highlighted character
@@ -119,7 +77,7 @@ hilight_cursor
 		move.w	d1, (a4)	; Replace highlighted character
 dump_ram
 		move.l	dumpscroll, a0
-		move.w	#PLANE_A + 64*2, d4	; VRAM address of the beginning of the line
+		move.w	#PLANE_A_DEF + 64*2, d4	; VRAM address of the beginning of the line
 		moveq	#26, d6		; Line count
 
 .1		VDPSETWRITEVAR d4, VRAM

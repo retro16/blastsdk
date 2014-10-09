@@ -85,7 +85,7 @@ void source_get_size_png(group *s)
   png_structp png_ptr;
   png_infop info_ptr;
   char srcname[4096];
-  findfile(srcname, s->name);
+  findfile(srcname, s->file);
 
   open_png(srcname, &f, &png_ptr, &info_ptr);
 
@@ -189,7 +189,7 @@ void source_compile_png(group *s)
   png_structp png_ptr;
   png_infop info_ptr;
   char srcname[4096];
-  findfile(srcname, s->name);
+  findfile(srcname, s->file);
 
   open_png(srcname, &f, &png_ptr, &info_ptr);
 

@@ -1,14 +1,15 @@
 #ifndef BLS_BDP_H
 #define BLS_BDP_H
 
-extern BDP_WRITE(const char *data, int size);
 
-#if BUS == BUS_MAIN
+extern void _MAIN_BDP_WRITE(const char *data, int size);
+static inline void bdp_write(const char *data, int size) { _MAIN_BDP_WRITE(data, size); }
+
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 extern void BDP_SUB_CHECK();
+static inline void bdp_sub_check() { BDP_SUB_CHECK(); }
 #else
-#define BDP_SUB_CHECK() do {} while(0)
-#endif
+static inline void bdp_sub_check() { }
 #endif
 
 #endif

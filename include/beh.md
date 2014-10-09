@@ -43,7 +43,7 @@ blsgen.md:
 common.asm:
 
             include beh.inc
-            BEH_INIT
+            beh_init
             ; ... your init code here ...
 
 Or if you provide common.c:
@@ -53,7 +53,7 @@ Or if you provide common.c:
     void common_init()
     {
       // ... init code ...
-      BEH_INIT();
+      beh_init();
       // ... init code ...
     }
 

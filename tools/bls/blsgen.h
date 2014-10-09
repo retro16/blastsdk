@@ -71,6 +71,7 @@ struct blsll_node_group;
 typedef struct group {
   format format;
   char *name;
+  char *file; // Real file name used for compilation
   sv physaddr; // Physical address on medium
   sv physsize; // Size on physical medium
   int physalign; // Alignment on physical medium

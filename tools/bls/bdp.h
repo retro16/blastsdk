@@ -11,7 +11,8 @@ extern int genfd; // Genesis file descriptor
 extern void open_debugger(const char *path, unknown_handler_ptr on_unknown, breakpoint_handler_ptr on_breakpoint, exception_handler_ptr on_exception);
 extern void close_debugger();
 extern void bdp_set_dump(int newdump);
-extern int bdp_readdata();
+extern void bdp_readdata();
+extern void bdp_readbuffer();
 extern int bridgequery(u8 *data);
 extern void update_bda_sub(const u8 *image, int imgsize);
 

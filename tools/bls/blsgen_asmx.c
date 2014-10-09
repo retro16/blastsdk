@@ -412,8 +412,8 @@ void source_get_symbols_asmx(group *s)
 
   const char *defs = gen_load_defines_asmx();
 
-  if(!findfile(srcname, s->name)) {
-    printf("Error: %s not found\n", s->name);
+  if(!findfile(srcname, s->file)) {
+    printf("Error: %s not found (source %s)\n", s->file, s->name);
     exit(1);
   }
 
@@ -442,8 +442,8 @@ char cmdline[4096];
 const char *defs = gen_load_defines_asmx();
 gen_symtable_asmx(s);
 
-if(!findfile(srcname, s->name)) {
-printf("Error: %s not found\n", s->name);
+if(!findfile(srcname, s->file)) {
+printf("Error: %s not found (source %s)\n", s->file, s->name);
 exit(1);
 }
 

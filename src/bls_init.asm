@@ -5,12 +5,11 @@
                 include beh.inc
                 include bls_vdp.inc
 
+        if BUS == BUS_MAIN
+
 ; Main CPU :
 ;    void bls_init(bls_int_callback hint_handler, bls_int_callback vint_handler);
-; Sub CPU :
-;    void bls_init();
-bls_init
-        if BUS == BUS_MAIN
+BLS_INIT
                 ; Initialize Genesis part
 
                 VDPSECURITY                     ; Unlock TMSS
@@ -53,8 +52,7 @@ bls_init
                 VDPUSEADDR
                 movem.l (sp)+, a4-a5
 
-        endif   ; BUS == MAIN
-
                 rts
+        endif   ; BUS == MAIN
 
 ; vim: ts=8 sw=8 sts=8 et

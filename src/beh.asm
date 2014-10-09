@@ -1,16 +1,12 @@
                 if TARGET == TARGET_GEN
 int_buserr      move.w  #$0008, -(a7)
-                bra.w   beh_display_exception
-                endif
-int_addrerr     move.w  #$000C, -(a7)
-                if TARGET == TARGET_GEN
-                bra.w   beh_display_exception
-                else
                 bra.b   beh_display_exception
                 endif
+int_addrerr     move.w  #$000C, -(a7)
+                bra.b   beh_display_exception
                 if TARGET == TARGET_GEN
 int_ill         move.w  #$0010, -(a7)
-                bra.w   beh_display_exception
+                bra.b   beh_display_exception
                 endif
 int_zdiv        move.w  #$0014, -(a7)
                 bra.b   beh_display_exception
@@ -64,9 +60,12 @@ beh_display_exception
                 VDPSETWRITE 0, CRAM
                 move.l  #$00000AAA, (a4)        ; Set background to black and text to grey
 
+                VDPSETWRITE 0, VSRAM
+                move.l  #$0, (a4)               ; Clear vertical scroll
+
                 moveq   #1, d4                  ; Column count
                 moveq   #16, d7                 ; Line count
-                move.w  #PLANE_A+64*2*2+12, d6  ; VRAM address of the beginning of the 3rd line
+                move.w  #PLANE_A_DEF+64*2*2+12, d6  ; VRAM address of the beginning of the 3rd line
 
 .1              VDPSETWRITEVAR d6, VRAM
                 move.l  (a7)+, d0               ; d0 = value to display
@@ -85,7 +84,7 @@ beh_display_exception
                 dbra    d7, .1
 
                 moveq   #16, d7                 ; Line count
-                move.w  #PLANE_A+64*2*2+40, d6  ; VRAM address of the beginning of the second column
+                move.w  #PLANE_A_DEF+64*2*2+40, d6  ; VRAM address of the beginning of the second column
                 dbra    d4, .1                  ; Update second column
 
 beh_freeze      bra.b   beh_freeze
@@ -93,9 +92,9 @@ beh_freeze      bra.b   beh_freeze
 beh_vdp_regs
                 db      VDPR00                  ; #00
                 db      VDPR01 | VDPDISPEN      ; #01
-                db      VDPR02                  ; #02 - Plane A
+                db      VDPR02 | (PLANE_A_DEF >> 10 & $38)      ; #02 - Plane A
                 db      VDPR03                  ; #03 - Window
-                db      VDPR04                  ; #04 - Plane B (same as plane A)
+                db      VDPR04 | (PLANE_A_DEF >> 13)            ; #04 - Plane B (same as plane A)
                 db      VDPR05                  ; #05 - Sprite attributes
                 db      VDPR06                  ; #06
                 db      VDPR07                  ; #07
@@ -104,7 +103,7 @@ beh_vdp_regs
                 db      VDPR10                  ; #10
                 db      VDPR11                  ; #11
                 db      VDPR12 | VDPH40         ; #12
-                db      VDPR13                  ; #13
+                db      VDPR13                  ; #13 - Horizontal scroll
                 db      VDPR14                  ; #14
                 db      VDPR15 | 2              ; #15 - autoincrement
                 db      VDPR16 | VDPSCRH64      ; #16 - Plane size

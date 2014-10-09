@@ -18,9 +18,6 @@ BDP_OUT_BUFSIZE equ     $30                     ; Address of data size in buffer
 BDP_OUT_BUFFER  equ     $32                     ; Address of sub buffer
 BDP_OUT_MAXSIZE equ     $2E                     ; Max number of bytes in buffer
 
-SECBUF          set     $004800                 ; Sector buffer
-SECHEAD         set     $005000                 ; Sector header in CDCTRN format
-
                 org     $000200                 ; BIOS boot entry point
 
 BOOT            ; Simulated BIOS boot program
@@ -141,12 +138,12 @@ CDCACK
 
 ROMREAD
                 movem.l a0/a1, -(sp)
-                lea             5(a0), a0
-                lea             BDP_OUT_BUFFER.w, a1
+                addq    #1, a0
+                lea     BDP_OUT_BUFFER.w, a1
                 move.b  (a0)+, (a1)+
                 move.b  (a0)+, (a1)+
                 move.b  (a0)+, (a1)+
-                jsr             BDP_WRITE_BUF(PC)
+                jsr     BDP_WRITE_BUF(PC)
                 movem.l (sp)+, a0/a1
                 rts
 
@@ -162,7 +159,7 @@ BDP_WRITE_BUF
 
 CDCREAD
                 movem.l a0/a1, -(sp)
-                move.l  #$0F0F0F0F, BDP_OUT_BUFFER.w
+                move.l  #($07000000 | (SECBUF << 8)), BDP_OUT_BUFFER.w
                 jsr     BDP_WRITE_BUF(PC)
                 movem.l (sp)+, a0/a1
 .wait_sector
@@ -181,5 +178,9 @@ CDCTRN
                 move.l  SECHEAD.w, (a1)+
                 rts
 
+SECBUF                                          ; Sector buffer starts here
+SECHEAD         set     SECBUF + $800           ; Sector header in CDCTRN format
+
+                assert  SECHEAD < $5000         ; Ensure there is enough room for the user stack.
 
 ; vim: ts=8 sw=8 sts=8 et

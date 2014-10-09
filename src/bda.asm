@@ -8,11 +8,11 @@ BDADATA         equ     CDATA2
 BDA_NEUTRALDATA set     (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
 BDA_NEUTRALCTRL set     (CTHINT|CTR)
 
-BDA_RECVDATA    set (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
-BDA_RECVCTRL    set (CTL|CTR)
+BDA_RECVDATA    set     (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_RECVCTRL    set     (CTL|CTR)
 
-BDA_SENDDATA    set (CTH|CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
-BDA_SENDCTRL    set (CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_SENDDATA    set     (CTH|CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
+BDA_SENDCTRL    set     (CTL|CTR|CUP|CDOWN|CLEFT|CRIGHT)
 
 
 ; Call this to initialize the monitor and setup gamepad link
@@ -26,12 +26,9 @@ bda_init                                        ; Call at console initialization
                 ; Get sub CPU BUSREQ
                 move.w  #GA_BUSREQ|GA_NORESET, GA_RH
 .waitbus
-        move.b  GA_RH + 1, d0
-        cmpi.b  #GA_BUSREQ|GA_NORESET, d0
-        bne.b   .waitbus
-
-                ; Reset comm flags
-                move.b  #0, GA_COMMFLAGS_MAIN
+                move.b  GA_RH + 1, d0
+                cmpi.b  #GA_BUSREQ|GA_NORESET, d0
+                bne.b   .waitbus
 
                 ; Copy sub CPU monitor to sub CPU RAM
                 lea     bda_sub_code_source(pc), a1
@@ -63,7 +60,6 @@ bda_init                                        ; Call at console initialization
                 move.w  #GA_NORESET, GA_RH
 
         endif   ; TARGET == TARGET_SCD1/2
-        endif   ; TARGET != TARGET_GEN
 
                 ; Initialize main CPU interrupt vectors
                 lea     $24, a0
@@ -82,6 +78,7 @@ bda_init                                        ; Call at console initialization
                 move.w  #(bda_code_source_end-bda_code_source) / 2 - 1, d0
 .1              move.w  (a1)+, (a0)+
                 dbra    d0, .1
+        endif   ; TARGET != TARGET_GEN
 
                 ; Setup gamepad port in neutral state (TR low, all other pins input, enable interrupt)
                 move.b  #BDA_NEUTRALDATA, BDADATA               ; Set all high except TR low
@@ -423,8 +420,8 @@ bdasub_sp       set     bdasub_d0 + 15*4
 bdasub_pc       set     bdasub_d0 + 16*4
 bdasub_sr       set     bdasub_d0 + 17*4
 
-BDA_COMM_MAIN   set     $FF800E
-BDA_COMM_SUB    set     $FF800F
+BDA_COMM_MAIN   set     $FFFF800E
+BDA_COMM_SUB    set     $FFFF800F
 
                 ; Mark the beginning of bda sub code
                 ; Used by update_bda_sub in bdp.c
@@ -434,6 +431,15 @@ BDA_COMM_SUB    set     $FF800F
 bda_sub_code_source
                 rorg    bdasub_sr + 2           ; Place code after CPU state
 bda_sub_code
+
+bda_sub_reset   ; Reset comm flags
+                ; Called only by BDB
+                lea     BDA_COMM_SUB, a0
+                clr.b   (a0)
+                lea     $11(a0), a0
+                move.w  #3, d0
+.clear_loop     clr.l   (a0)+
+                dbra    d0, .clear_loop
 
 bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
                 move.w  (a7)+, bdasub_sr.w      ; Copy SR value to a fixed address
@@ -469,8 +475,6 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
 
                 rte
 
-                ; WARNING : code below is interpreted by bdb in function update_bda_sub
-
 bda_sub_l2
                 btst    #7, BDA_COMM_MAIN
                 bne.b   bda_sub_wait            ; If the bit is set, go to monitor mode
@@ -488,8 +492,14 @@ bda_sub_code_end
 bda_sub_code_source_end
 BUS     set BUS_MAIN
 
+                ; Entry point offsets for update_bda_sub
+                dl      bda_sub_reset           ; Reset vector offset
+                dl      bda_sub_wait            ; Trace vector offset
+                dl      bda_sub_l2              ; L2 vector offset
+                dl      bda_sub_trap            ; TRAP #7 vector offset
                 ; Marker for the end of bda sub code
                 hex     CAFE BABE
+
         endif   ; TARGET == TARGET_SCD1/2
 
         endif   ; BUS == BUS_MAIN

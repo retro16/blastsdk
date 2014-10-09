@@ -11,7 +11,7 @@ Run from a CD-ROM
 
 Build the binary image
 
-    blsgen blsgen_scd_eu.md
+    blsgen blsgen_scd_us.md
 
 Burn monitor_scd_us.iso on a non-rewritable CD-ROM
 
@@ -28,7 +28,7 @@ the debugger without burning it to a CD.
 
 Build the binary image
 
-    blsgen monitor_scd_us.md
+    blsgen blsgen_scd_us.md
 
 Start blsmonitor on the genesis / sega cd
 
@@ -54,9 +54,9 @@ Section font.png.img
 Binary main
 ===========
 
- - provides main.asm monitor.asm monitor_ram.asm font.png.img bda_ram.asm
+ - provides monitor.asm monitor_ram.asm font.png.img bda_ram.asm
  - bus main
- - include bda.md beh.md
+ - include bls_init.md
 
 Binary sub
 ==========
@@ -70,5 +70,5 @@ Output monitor
  - name **Monitor**
  - file monitor_scd_us.iso
  - region U
- - target scd1
+ - target scd2
 
