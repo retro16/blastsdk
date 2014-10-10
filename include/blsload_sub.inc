@@ -1,3 +1,7 @@
+BLSLOAD_CHECK_MAIN macro
+                jsr     BLSLOAD_CHECK_MAIN
+                endm
+
 BLSLOAD_START_READ macro sector, count
                 CCALL2  BLSLOAD_START_READ, sector, count
                 endm

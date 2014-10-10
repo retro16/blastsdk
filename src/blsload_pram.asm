@@ -1,3 +1,5 @@
+BLSLOAD_TARGET  ds      4       ; Target address for SUB->MAIN load
+BLSLOAD_TRIES   ds      2       ; Number of retries before drive reinit
 BLSLOAD_BUFOFF  ds      2       ; Offset in BLSLOAD_DATA buffer
 BLSLOAD_SECTOR  ds      4       ; Sector requested by main CPU
 BLSLOAD_COUNT   ds      4       ; Number of sectors requested by main CPU

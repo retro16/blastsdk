@@ -21,7 +21,7 @@
 #endif
 
 #ifndef SUB_SCRATCH
-#define SUB_SCRATCH 0x1F0 // Writable part of the sub CPU program ram
+#define SUB_SCRATCH 0x1D0 // RAM that can be used as sdcratch pad. Used to make the sub CPU run code.
 #endif
 
 // Register identifiers

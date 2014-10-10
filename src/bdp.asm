@@ -2,10 +2,6 @@ BDP_OUT_BUFSIZE equ     $30     ; Address of data size in buffer
 BDP_OUT_BUFFER  equ     $32     ; Address of sub buffer
 BDP_OUT_MAXSIZE equ     $2E     ; Max number of bytes in buffer
 
-; Set port used for communication
-BDPDATA set     CDATA2
-BDPCTRL set     CCTRL2
-
 BDP_NEUTRALDATA set     (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
 BDP_NEUTRALCTRL set     (CTHINT|CTR)
 

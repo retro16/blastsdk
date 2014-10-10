@@ -15,6 +15,9 @@ SP_MAIN
 
 .1              bra.b   .1                      ; Endless loop
 
+SUB_INT_LEVEL2  BLSLOAD_CHECK_MAIN
+                rts
+
 counter         dl      0
 hello           db      'HELLO '
 target_data     db      'DUMB'          ; Will contain 'SEGA' if successful

@@ -11,20 +11,21 @@ IP_MAIN
 
                 SYNC_MAIN_SUB
 
+                bclr    #CSEL_BIT, CDATA1       ; Read A/Start
+
                 move.w  #1, ready
-CPUSYNC
-.1              bra.b .1
+
+.1              btst    #CBTNSTART_BIT, CDATA1
+                bne.b   .1
+
+                BLSLOAD_BINARY_MAIN2
+                jmp     MAIN2
 
 ready           dw      0
 
 INT_VBLANK      movem.l d0/d1/a0/a1, -(sp)
                 lea     bgcolor(pc), a0
-                tst.w   ready
-                beq.b   .notready
-                addi.w  #$020, (a0)
-                andi.w  #$EEE, (a0)
-                VDPSETBG (a0)
-.notready
+
                 SUB_INTERRUPT
                 bdp_sub_check
                 movem.l (sp)+, d0/d1/a0/a1

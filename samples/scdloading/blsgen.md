@@ -18,6 +18,12 @@ Binary main
  - include bls_init.md
  - include bdp.md
 
+Binary main2
+------------
+
+ - provides main2.asm
+ - bus main
+
 --------------------------------------
 
 Sub CPU binaries

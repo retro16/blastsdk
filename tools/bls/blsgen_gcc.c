@@ -232,7 +232,7 @@ void parse_symtable_dump(section *s, FILE *in, int setvalues)
   }
 }
 
-const char *binary_load_function = "BLS_LOAD_BINARY_";
+const char *binary_load_function = "BLSLOAD_BINARY_";
 
 void binary_loaded(group *s, const char *symname)
 {

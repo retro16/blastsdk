@@ -1,8 +1,10 @@
                 if BUS == BUS_MAIN
 GATE_ARRAY      set     $A12000
                 else
-GATE_ARRAY      set     $FF8000
-SUBCODE         set     $FF8100 ; Subcode buffer (size = $80)
+SUB_SCRATCH     set     $000001D0               ; BDA scratch pad
+
+GATE_ARRAY      set     $FFFF8000
+SUBCODE         set     $FFFF8100               ; Subcode buffer (size = $80)
                 endif
 
 

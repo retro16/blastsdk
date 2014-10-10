@@ -1,57 +1,17 @@
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
                 include cdbios.inc
-        
-; Read d1 sectors starting at d0 into buffer in a0 (using Sub-CPU)
-ReadCD
-                movem.l d0-d1/a0-a1, -(sp)
-.0
-                move.w  #$0089, d0      ;CDCSTOP
-                jsr     $5F22.w         ;call CDBIOS function
-
-                movea.l sp, a0          ;ptr to 32 bit sector start and 32 bit sector count
-                move.w  #$0020, d0      ;ROMREADN
-                jsr     $5F22.w         ;call CDBIOS function
-.1
-                move.w  #$008A, d0      ;CDCSTAT
-                jsr     $5F22.w         ;call CDBIOS function
-                bcs.b   .1              ;no sectors in CD buffer
-
-                ;set CDC Mode destination device to Sub-CPU
-                andi.w  #$F8FF, $FFFF8004.w
-                ori.w   #$0300, $FFFF8004.w
-.2
-                move.w  #$008B, d0      ;CDCREAD
-                jsr     $5F22.w         ;call CDBIOS function
-                bcs.b   .2              ;not ready to xfer data
-
-                movea.l 8(sp), a0       ;data buffer
-                lea     12(sp), a1      ;header address
-                move.w  #$008C, d0      ;CDCTRN
-                jsr     $5F22.w         ;call CDBIOS function
-                bcs.b   .0              ;failed, retry
-
-                move.w  #$008D, d0      ;CDCACK
-                jsr     $5F22.w         ;call CDBIOS function
-
-                addq.l  #1, (sp)        ;next sector
-                addi.l  #2048, 8(sp)    ;inc buffer ptr
-                subq.l  #1, 4(sp)       ;dec sector count
-                bne.b   .1
-
-                lea     16(sp), sp      ;cleanup stack
-                rts
 
 
-
-; Level 2 interrupt handler for blsgen binary loader.
-; JMP or JSR here at every level 2 interrupt
-BLSLOAD_INTERRUPT_HANDLER
-                jmp     .checkflag      ; Jmp target altered by the code
-.checkflag
+; Check if the main CPU made a load request
+; You should call this at each level 2 interrupt
+; void BLSLOAD_CHECK_MAIN();
+BLSLOAD_CHECK_MAIN
+                jmp     .idle.l                 ; Jmp target altered by the code
+.idle      
                 btst    #BLSCDR_BIT, GA_COMMFLAGS_MAIN
                 bne.b   .loadquery
-.disable
+
                 rts
 
 .loadquery      ; Main CPU asked for loading
@@ -61,36 +21,66 @@ BLSLOAD_INTERRUPT_HANDLER
                 moveq   #0, d1                  ; Get sector count from main CPU
                 move.b  BLSCDR_COMM, d1         ;
 
+        if TARGET == TARGET_SCD1
+                move.l  #$0C0000, BLSLOAD_TARGET
+        else
+                assert TARGET == TARGET_SCD2
+                move.l  #$080000, BLSLOAD_TARGET
+        endif
+
+                movem.l d0/d1, BLSLOAD_SECTOR   ; Store data in ROMREADN format
+
+.romread_retry
                 BIOS_CDCSTOP
                 lea     BLSLOAD_SECTOR, a0
-                movem.l d0/d1, (a0)             ; Store data in ROMREADN format
                 BIOS_ROMREADN
 
-        if ..DEF BLSLOAD_DMA
-                move.b  #GA_CDC_DEST_WRAMDMA, BLSLOAD_DEST      ; Set destination to word RAM
+                ; Wait for the next sector on next interrupt
+.cdcstat
+                move.l  #.cdcstat, BLSLOAD_CHECK_MAIN + 2
+                BIOS_CDCSTAT
+                bcc.b   .sector_available
+                rts                             ; No sector available, wait until next interrupt
+.sector_available
 
-.reset_interrupt_handler
-                move.l  #.checkflag, BLSLOAD_INTERRUPT_HANDLER + 2
+                ; Set CDC in sub cpu read mode
+                move.b  #GA_CDC_DEST_SUBREAD, GA_CDC_DEST
+
+                move.l  #.cdcread, BLSLOAD_CHECK_MAIN + 2
+.cdcread        BIOS_CDCREAD
+                bcc.b   .cdcread_success
                 rts
-        
-        else    ; !BLSLOAD_DMA
+.cdcread_success
 
-                ; Restore level 2 interrupts and disable BLSLOAD interrupt processing
-                move.l  #.disable, BLSLOAD_INTERRUPT_HANDLER + 2
-                move.w  #$2000, sr
+                lea     BLSLOAD_HEADER, a1
+                move.l  -16(a1), a0             ; Load BLSLOAD_TARGET
+                BIOS_CDCTRN
+                bcc.b   .cdctrn_success
 
-        ; Use simple blocking read
-        if TARGET == TARGET_SCD1
-                lea     $0C0000, a0
-        else
-                lea     $080000, a0
-        endif
-                move.l  d1, d0
-;FIXME                lsl.l   #8, d0                  ; TODO : optimize slow shift
-;                lsl.l   #3, d0
-;                jsr     BLSLOAD_READ_CD_ASM
+                subi.w  #1, BLSLOAD_TRIES
+                bne.b   .romread_retry          ; Retry before resetting drive
 
-        ; Send WRAM back to main cpu
+                ; Retried 5 times: reset the drive before retrying
+                lea     DRVINIT_PARAMS(pc), a0
+                BIOS_DRVINIT
+                move.w  #5, BLSLOAD_TRIES       ; Reset retry counter
+                bra.b   .romread_retry
+
+.cdctrn_success BIOS_CDCACK
+
+                move.l  a0, BLSLOAD_TARGET      ; Save current address to RAM
+                ; a1 points at BLSLOAD_DATA
+                addi.l  #1, -12(a1)             ; Update BLSLOAD_SECTOR
+                subi.l  #1, -8(a1)              ; Update BLSLOAD_COUNT
+
+                bne.w   .cdcstat                ; Read next sector if BLSLOAD_COUNT is not zero
+
+                ; All sectors have been read.
+
+                ; Restore BLSLOAD interrupt handling
+                move.l  #.idle, BLSLOAD_CHECK_MAIN + 2
+
+                ; Send WRAM back to main cpu
         if TARGET == TARGET_SCD1
                 SWAP_WRAM_1M
         else
@@ -98,17 +88,15 @@ BLSLOAD_INTERRUPT_HANDLER
                 SEND_WRAM_2M
         endif
 
-        ; Restore BLSLOAD interrupt handling
-                move.l  #.checkflag, BLSLOAD_INTERRUPT_HANDLER + 2
                 rts
-        endif   ; !BLSLOAD_DMA
 
 
 ; void BLSLOAD_START_READ(u32 sector, u32 count);
 BLSLOAD_START_READ
                 BIOS_CDCSTOP
-                move.w  #$800, BLSLOAD_BUFOFF
                 lea     BLSLOAD_COUNT, a0
+                move.w  #5, -8(a0)              ; Reset BLSLOAD_TRIES
+                move.w  #$800, -6(a0)           ; Reset BLSLOAD_BUFOFF
                 move.l  8(sp), (a0)
                 move.l  4(sp), -(a0)
                 BIOS_ROMREADN
@@ -195,7 +183,6 @@ BLSLOAD_READ_CD
                 ; Update byte count registers
                 add.w   d0, d3                  ; Move the cursor
                 sub.w   d0, d5                  ; Update copy amount
-  movem.l d0-d7/a0-a7, $7F00         ; DEBUG
                 lsr.w   #2, d0                  ; Convert to long count
                 bcc.b   .long_aligned           ; Second bit clear : even number of words
                 move.w  (a1)+, (a3)+            ; Copy first word
@@ -204,7 +191,6 @@ BLSLOAD_READ_CD
                 beq.b   .ack                    ; Transfer was only 2 bytes !
                 subq    #1, d0                  ; Adjust for dbra
 
-  movem.l d0-d7/a0-a7, $7F80         ; DEBUG
 .copy_loop
                 move.l  (a1)+, (a3)+
                 dbra    d0, .copy_loop
@@ -221,20 +207,15 @@ BLSLOAD_READ_CD
 
 
                 ; Retry routine
-.track
-                dc.b    1                       ; Read TOC from track #1
-                dc.b    255                     ; Read all tracks
-
-.tries          dc.w    5                       ; Retries before reinit
 
 .reinit         ; Reinitialize drive if needed and retry read
-                subi.w  #1, .tries
+                subi.w  #1, BLSLOAD_TRIES
                 bne.b   .retry
 
                 ; 5 retries : reinitialize
-                lea     .track(pc), a0
+                lea     DRVINIT_PARAMS(pc), a0
                 BIOS_DRVINIT
-                move.w  #5, .tries              ; Reset retry counter
+                move.w  #5, BLSLOAD_TRIES       ; Reset retry counter
 
                 ; Retry a failed read (d2 = dest address)
 .retry
@@ -254,9 +235,11 @@ BLSLOAD_READ_CD
                 BIOS_CDCTRN
                 bcs.b   .reinit                 ; Failed again : reinitialize the drive and retry
 
-                move.w  #5, .tries              ; Reset retry counter
-
                 rts
+
+DRVINIT_PARAMS
+                dc.b    1                       ; Read TOC from track #1
+                dc.b    255                     ; Read all tracks
 
         endif
 

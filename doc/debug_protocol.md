@@ -430,7 +430,7 @@ simulator enabled, the memory map is as following :
     |                    |
     | BDA code           |
     |                    |
-    -------- 01F0 --------
+    -------- 01D0 --------
     | BDA scratchpad     |
     -------- 0200 --------
     | Sim BIOS entry     |
@@ -461,7 +461,6 @@ simulator enabled, the memory map is as following :
     -------- 5E80 --------
     |                    |
     | BIOS entry points  |
-    |                    |
     |                    |
     -------- 6000 --------
     | SP header          |

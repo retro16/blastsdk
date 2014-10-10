@@ -1,4 +1,5 @@
 ; Main include for Blast ! SDK
+; It is automatically included by blsgen
 
             if ..DEF BLS_VERSION
             else
@@ -78,6 +79,13 @@ CDATA3          equ     $A10007
 CCTRL1          equ     $A10009
 CCTRL2          equ     $A1000B
 CCTRL3          equ     $A1000D
+
+                ; Debug protocol control and data ports
+                ; To use the "EXT" port of the old genesis, specify CCTRL3 / CDATA3
+BDACTRL         equ     CCTRL2
+BDADATA         equ     CDATA2
+BDPCTRL         equ     BDACTRL
+BDPDATA         equ     BDPCTRL
 
 STX1            equ     $A1000F
 SRX1            equ     $A10011

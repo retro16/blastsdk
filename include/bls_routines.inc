@@ -22,7 +22,6 @@ BLSFASTFILL_WORD macro dest, words, value
 
 ; Copy memory from word-aligned addresses.
 ; dest and src can be anything supported by LEA.
-; dest can also be a1 and src can be a0.
 ; Addresses must be aligned to a word boundary.
 ; bytes is the number of bytes to copy. It must be <= 2097152.
 ; returns address past dest in a1 and past src in a0
@@ -30,12 +29,8 @@ BLSFASTCOPY_ALIGNED macro dest, src, bytes
     if bytes == 0
     else
 
-    if src != a0
     lea     src, a0                     ; a0 = src : Load source and dest address
-    endif
-    if dest != a1
     lea     dest, a1                    ; a1 = dst
-    endif
 
     if bytes >= $60
 
@@ -60,7 +55,7 @@ BLSFASTCOPY_ALIGNED macro dest, src, bytes
     BLSREPEAT2 (bytes & $1F) / 4, move.l (a0)+, (a1)+
 
     else
-    // Expanded move.l copy
+    ; Expanded move.l copy
     BLSREPEAT2 bytes / 4, move.l (a0)+, (a1)+
     endif
 

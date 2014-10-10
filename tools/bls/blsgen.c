@@ -20,6 +20,8 @@ group *group_new()
 {
   group *g = (group *)calloc(1, sizeof(group));
   g->optimize = -1;
+  g->physaddr = -1;
+  g->physsize = -1;
   return g;
 }
 

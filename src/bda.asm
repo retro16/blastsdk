@@ -1,10 +1,5 @@
         if BUS == BUS_MAIN
 
-                ; Debug protocol control and data ports
-                ; To use the "serial" port of the old genesis, specify CCTRL3 / CDATA3
-BDACTRL         equ     CCTRL2
-BDADATA         equ     CDATA2
-
 BDA_NEUTRALDATA set     (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
 BDA_NEUTRALCTRL set     (CTHINT|CTR)
 
@@ -487,7 +482,7 @@ bda_sub_trap    ; Voluntary interruption
                 jmp     bda_sub_wait
 
 bda_sub_code_end
-                assert  bda_sub_code_end <= $1F0 ; Ensure subcode fits in header, before comm buffer
+                assert  bda_sub_code_end <= SUB_SCRATCH ; Ensure subcode fits in the header, before scratch pad
                 rend
 bda_sub_code_source_end
 BUS     set BUS_MAIN

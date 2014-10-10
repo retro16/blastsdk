@@ -121,12 +121,38 @@ SEND_WRAM_2M    macro
                 loopuntil btst #GA_DMNA_BIT, GA_MM + 1
                 endm
 
-                if BUS == BUS_SUB
+                ; Blocks until wram is available
+WAIT_WRAM_2M    macro
+        if BUS == BUS_MAIN
+                loopuntil btst #GA_RET_BIT, GA_MM + 1
+        else
+                assert BUS == BUS_SUB
+                loopwhile btst #GA_RET_BIT, GA_MM + 1
+        endif
+                endm
+
+        if BUS == BUS_SUB
 SWAP_WRAM_1M    macro
                 bchg    #GA_RET_BIT, GA_MM + 1
                 loopwhile btst #GA_DMNA_BIT, GA_MM + 1
                 endm
-                endif
+
+                ; This must be called on both CPUs:
+                ; the two CPUs wait for each other, then WRAM is swapped
+SWAP_SYNC_1M    macro
+                loopuntil btst #GA_DMNA_BIT, GA_MM + 1
+                SWAP_WRAM_1M
+                endm
+        else
+                assert BUS == BUS_MAIN
+
+                ; This must be called on both CPUs:
+                ; the two CPUs wait for each other, then WRAM is swapped
+SWAP_SYNC_1M    macro
+                bset    #GA_DMNA_BIT, GA_MM + 1
+                loopwhile btst #GA_DMNA_BIT, GA_MM + 1
+                endm
+        endif
 
 ; vim: ts=8 sw=8 sts=8 et
 

@@ -140,8 +140,8 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 
     if(l > 10
         && ((line[0] >= '0' && line[0] <= '9') || (line[0] >= 'A' && line[0] <= 'F'))
-        && (sub = strstr(line, "BLS_LOAD_BINARY_"))) {
-      sub += 16;
+        && (sub = strstr(line, "BLSLOAD_BINARY_"))) {
+      sub += 15;
       char binname[4096];
       parse_sym(binname, &sub);
 
@@ -363,7 +363,7 @@ const char *gen_load_defines_asmx()
   BLSLL_FOREACH(bin, binl) {
     char binname[1024];
     getsymname(binname, bin->name);
-    fprintf(out, "BLS_LOAD_BINARY_%s\tMACRO\n", binname);
+    fprintf(out, "BLSLOAD_BINARY_%s\tMACRO\n", binname);
 
     if(maintarget == target_scd1 || maintarget == target_scd2) {
       // Load from WRAM
@@ -372,6 +372,11 @@ const char *gen_load_defines_asmx()
       if(bin->banks.bus == bus_main) {
         busaddr physba = {bus_main, 0x200000, -1};
         BLSLL_FOREACH(sec,secl) {
+          if(bin == mainout.ipbin || bin == mainout.spbin) {
+            // Layout for IP and SP is fixed
+            physba.addr = 0x200000 + sec->symbol->value.addr;
+          }
+
           // Load section from WRAM
           gen_load_section_asmx(out, sec, physba);
 

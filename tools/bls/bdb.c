@@ -35,7 +35,8 @@ sigjmp_buf mainloop_jmp;
 int cpu; // Current CPU
 char regname[][3] = { "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "pc", "sr"};
 
-FILE *cdsim_file = 0;
+int use_cdsim = 1; // Use CD-ROM simulator
+FILE *cdsim_file = 0; // CD simulator file
 
 static void usage();
 static void goto_mainloop(int sig);
@@ -44,13 +45,15 @@ static void restore_prompt();
 
 static void usage()
 {
-  fprintf(stderr, "Usage: bdb DEVICE\n"
+  fprintf(stderr, "Usage: bdb [-c] DEVICE [IMAGE]\n"
           "The Blast ! debugger.\n"
           "Communicates to a SEGA Mega Drive / Genesis via an arduino.\n"
           "\n"
           "Options:"
           "\n"
+          "      -c       use real CD-ROM drive instead of the simulator (does not work/unimplemented)\n"
           "      DEVICE   either a serial device (/dev/xxx) or an IP address.\n"
+          "      IMAGE    boot this image at bdb startup\n"
          );
 }
 
@@ -248,17 +251,25 @@ void boot_cd(u8 *image, int imgsize)
   setreg(0, REG_SP, 0xFFFFD000);
   setreg(0, REG_SR, 0x2700);
 
-  printf("Uploading simulated BIOS ...\n");
-  writemem(1, 0x200, blsload_sim_bin, sizeof(blsload_sim_bin));
-
-  update_bda_sub(image, imgsize);
-
   printf("Uploading SP (%d bytes) ...\n", spsize);
   writemem(1, 0x6000, sp_start, spsize);
-  printf("Setting sub CPU registers.\n");
-  setreg(1, REG_PC, 0x00000200);
-  setreg(1, REG_SP, readlong(1, 0));
-  setreg(1, REG_SR, 0x2700);
+
+  if(use_cdsim) {
+    printf("Uploading simulated BIOS ...\n");
+    writemem(1, 0x200, blsload_sim_bin, sizeof(blsload_sim_bin));
+
+    update_bda_sub(image, imgsize);
+
+    printf("Setting sub CPU registers.\n");
+    setreg(1, REG_PC, 0x00000200);
+    setreg(1, REG_SP, readlong(1, 0));
+    setreg(1, REG_SR, 0x2700);
+  } else {
+    printf("Boot on real BIOS is still unimplemented, sorry !\n");
+    exit(2);
+    // TODO
+    // How do you make the real BIOS reload the SP header ?
+  }
 
   printf("Ready to boot.\n");
 }
@@ -276,18 +287,26 @@ void boot_sp(u8 *image, int imgsize)
   printf("Freezing sub CPU\n");
   subfreeze();
 
-  printf("Uploading simulated BIOS ...\n");
-  writemem(1, 0x200, blsload_sim_bin, sizeof(blsload_sim_bin));
-
-  update_bda_sub(image, imgsize);
-
   printf("Uploading SP (%d bytes) ...\n", spsize);
   writemem(1, 0x6000, sp_start, spsize);
-  printf("Setting sub CPU registers.\n");
-  setreg(1, REG_PC, 0x00000200);
-  setreg(1, REG_SP, readlong(1, 0));
-  setreg(1, REG_SR, 0x2700);
-  printf("New SP program loaded.\n");
+
+  if(use_cdsim) {
+    printf("Uploading simulated BIOS ...\n");
+    writemem(1, 0x200, blsload_sim_bin, sizeof(blsload_sim_bin));
+
+    update_bda_sub(image, imgsize);
+
+    printf("Setting sub CPU registers.\n");
+    setreg(1, REG_PC, 0x00000200);
+    setreg(1, REG_SP, readlong(1, 0));
+    setreg(1, REG_SR, 0x2700);
+    printf("New SP program loaded.\n");
+  } else {
+    printf("Boot on real BIOS is still unimplemented, sorry !\n");
+    exit(2);
+    // TODO
+    // How do you make the real BIOS reload the SP header ?
+  }
 }
 
 // v is the vector offset (0x08-0xBC)
@@ -544,22 +563,36 @@ void on_line_input(char *l);
 
 int main(int argc, char **argv)
 {
-  if(argc < 2) {
+  int c;
+
+  while((c = getopt(argc, argv, "hc")) != -1) {
+    switch(c) {
+      case 'h':
+        usage();
+        return 0;
+
+      case 'c':
+        use_cdsim = 0;
+        break;
+    }
+  }
+
+  if(argc - optind < 2) {
     fprintf(stderr, "Missing parameter.\n");
     usage();
     exit(1);
   }
 
-  open_debugger(argv[1], on_unknown, on_breakpoint, on_exception);
+  open_debugger(argv[optind + 1], on_unknown, on_breakpoint, on_exception);
 
   printf("Blast ! debugger. Connected to %s\n", argv[1]);
 
   cpu = 0;
   d68k_setbus(bus_main);
 
-  if(argc >= 3) {
+  if(argc - optind >= 3) {
     printf("\n");
-    boot_img(argv[2]);
+    boot_img(argv[optind + 2]);
   } else {
     d68k_readsymbols(NULL);
   }
