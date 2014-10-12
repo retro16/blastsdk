@@ -930,31 +930,6 @@ bls_find_entry_default_exit:
     printf("Could not find IP binary.\n");
     exit(1);
 bls_find_entry_scd_ipbin_found:
-    // Premap IP at fixed location
-    secl = mainout.ipbin->provides;
-    sv addr = IPOFFSET;
-    printf("Premapping IP binary\n");
-    BLSLL_FOREACH(sec, secl) {
-      if(sec->symbol->value.chip != chip_ram) {
-        printf("Error: Bootloader binary must be in ram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
-        exit(1);
-      }
-      if(sec->format == format_raw && sec->size > 0) {
-        if(sec->symbol->value.addr == -1) {
-          printf("Premapping section %s at %06X-%06X\n", sec->name, (u32)addr, (u32)(addr + sec->size - 1));
-          sec->symbol->value.addr = addr;
-        } else if(sec->symbol->value.addr != addr) {
-          printf("Error : invalid offset for section %s (set at %06X, should be %06X).\n", sec->name, (unsigned int)sec->symbol->value.addr, (unsigned int)addr);
-          exit(1);
-        } else {
-          printf("Section %s already premapped at %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);
-        }
-        addr += sec->size;
-      } else if(sec->size > 0 && sec->format != format_empty) {
-        printf("Error: format %s is not supported in bootloader binaries\n", format_names[sec->format]);
-        exit(1);
-      }
-    }
 
     // Find SP entry point
 
@@ -986,33 +961,6 @@ bls_find_entry_scd_ipbin_found:
     printf("Could not find SP binary.\n");
     exit(1);
 bls_find_entry_scd_spbin_found:
-    // Premap SP at fixed location
-    secl = mainout.spbin->provides;
-    addr = SPOFFSET;
-    printf("Premapping SP binary\n");
-    BLSLL_FOREACH(sec, secl) {
-      if(sec->symbol->value.chip != chip_pram) {
-        printf("Error: Bootloader binary must be in pram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
-        exit(1);
-      }
-      if(sec->format == format_raw && sec->size > 0) {
-        if(sec->symbol->value.addr == -1) {
-          printf("Premapping section %s at %06X-%06X\n", sec->name, (u32)addr, (u32)(addr + sec->size - 1));
-          sec->symbol->value.addr = addr;
-        } else if(sec->symbol->value.addr != addr) {
-          printf("Error : invalid offset for section %s (set at %06X, should be %06X).\n", sec->name, (unsigned int)sec->symbol->value.addr, (unsigned int)addr);
-          exit(1);
-        } else {
-          printf("Section %s already premapped at %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);
-        }
-        addr += sec->size;
-      } else if(sec->size > 0 && sec->format != format_empty) {
-        printf("Error: format %s is not supported in bootloader binaries\n", format_names[sec->format]);
-        exit(1);
-      } else {
-        printf("Skipping section %s\n", sec->name);
-      }
-    }
 
     break;
   }
@@ -1095,6 +1043,8 @@ void bls_get_symbol_values()
   // Update _SIZE symbols with approx values
   BLSLL(section) *secl;
   section *sec;
+
+  secl = sections;
   BLSLL_FOREACH(sec, secl) {
     char s[1024];
 
@@ -1104,11 +1054,6 @@ void bls_get_symbol_values()
 
     strcpy(s, sec->symbol->name);
     strcat(s, "_SIZE");
-    symbol_set(&sec->intsym, s, nullca, sec);
-
-    // Set _PHYSSIZE to the same size as _SIZE
-    strcpy(s, sec->symbol->name);
-    strcat(s, "_PHYSSIZE");
     symbol_set(&sec->intsym, s, nullca, sec);
   }
 
@@ -1180,6 +1125,11 @@ void bls_cart_to_ram()
 
 void bls_map_section(section *sec)
 {
+  if(sec->fixed) {
+    // Fixed position section, do not remap
+    return;
+  }
+
   if(sec->size < 0) {
     printf("Error : section %s has an unknown size\n", sec->name);
     exit(1);
@@ -1246,9 +1196,81 @@ void bls_map()
   section *sec;
 
   printf("Map logical addresses.\n");
+
+  if(maintarget == target_scd1 || maintarget == target_scd2) {
+    // Premap IP at fixed location
+    secl = mainout.ipbin->provides;
+    sv addr = IPOFFSET;
+    printf("Premapping IP binary\n");
+    BLSLL_FOREACH(sec, secl) {
+      if(sec->symbol->value.chip != chip_ram) {
+        printf("Error: Bootloader binary must be in ram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
+        exit(1);
+      }
+      if(sec->format == format_raw && sec->size > 0) {
+        if(sec->symbol->value.addr == -1) {
+          printf("Premapping section %s at %06X-%06X\n", sec->name, (u32)addr, (u32)(addr + sec->size - 1));
+          sec->symbol->value.addr = addr;
+        } else if(sec->symbol->value.addr != addr) {
+          printf("Error : invalid offset for section %s (set at %06X, should be %06X).\n", sec->name, (unsigned int)sec->symbol->value.addr, (unsigned int)addr);
+          exit(1);
+        } else {
+          printf("Section %s already premapped at %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);
+        }
+        addr += sec->size;
+      } else if(sec->size > 0 && sec->format != format_empty) {
+        printf("Error: format %s is not supported in bootloader binaries\n", format_names[sec->format]);
+        exit(1);
+      }
+    }
+
+    // Premap SP at fixed location
+    secl = mainout.spbin->provides;
+    addr = SPOFFSET;
+    printf("Premapping SP binary\n");
+    BLSLL_FOREACH(sec, secl) {
+      if(sec->symbol->value.chip != chip_pram) {
+        printf("Error: Bootloader binary must be in pram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
+        exit(1);
+      }
+      if(sec->format == format_raw && sec->size > 0) {
+        if(sec->symbol->value.addr == -1) {
+          printf("Premapping section %s at %06X-%06X\n", sec->name, (u32)addr, (u32)(addr + sec->size - 1));
+          sec->symbol->value.addr = addr;
+        } else if(sec->symbol->value.addr != addr) {
+          printf("Error : invalid offset for section %s (set at %06X, should be %06X).\n", sec->name, (unsigned int)sec->symbol->value.addr, (unsigned int)addr);
+          exit(1);
+        } else {
+          printf("Section %s already premapped at %06X\n", sec->name, (unsigned int)sec->symbol->value.addr);
+        }
+        addr += sec->size;
+      } else if(sec->size > 0 && sec->format != format_empty) {
+        printf("Error: format %s is not supported in bootloader binaries\n", format_names[sec->format]);
+        exit(1);
+      } else {
+        printf("Skipping section %s\n", sec->name);
+      }
+    }
+  }
+
   secl = usedsections;
   BLSLL_FOREACH(sec, secl) {
     bls_map_section(sec);
+  }
+}
+
+void bls_map_reset()
+{
+  // Reset all automatically mapped sections
+
+  BLSLL(section) *secl;
+  section *sec;
+
+  secl = usedsections;
+  BLSLL_FOREACH(sec, secl) {
+    if(!sec->fixed && sec->symbol) {
+      sec->symbol->value.addr = -1;
+    }
   }
 }
 
@@ -2237,12 +2259,18 @@ int main(int argc, char **argv)
   if(maintarget != target_scd1 && maintarget != target_scd2) {
     bls_pack_sections(); // Pack once to find physical size for all files
     bls_physmap_cart(); // Map physical cartridge image
+    bls_map_reset();
+    bls_map(); // Remap with final binary sizes
+    bls_get_symbol_values();
     bls_compile(); // Recompile with physical addresses
     bls_pack_sections(); // Final packing pass
     bls_build_cart_image(); // Build the final cart image
   } else {
     bls_pack_binaries(); // Pack once to find physical size for all files
     bls_physmap_cd(); // Map physical CD
+    bls_map_reset();
+    bls_map(); // Remap with final binary sizes
+    bls_get_symbol_values();
     bls_compile(); // Compile with physical addresses
     bls_pack_binaries(); // Final packing pass
     bls_build_cd_image(); // Build the final CD image

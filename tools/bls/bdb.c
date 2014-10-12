@@ -184,6 +184,79 @@ void parse_token(char *token, const char **line)
   skipblanks(line);
 }
 
+int parse_register(const char **line)
+{
+  skipblanks(line);
+  int r = -1;
+
+  if(**line == 's' || **line == 'S') {
+    ++*line;
+
+    if(**line == 'r' || **line == 'R') {
+      ++*line;
+      return 17;
+    }
+  } else if(**line == 'p' || **line == 'P') {
+    ++*line;
+
+    if(**line == 'c' || **line == 'C') {
+      ++*line;
+      return 16;
+    }
+  } else if(**line == 'd' || **line == 'D') {
+    r = 0;
+  } else if(**line == 'a' || **line == 'A') {
+    r = 8;
+  }
+
+  if(r == -1) {
+    return -1;
+  }
+
+  ++*line;
+
+  if(**line >= '0' && **line <= '7') {
+    r += **line - '0';
+    ++*line;
+    skipblanks(line);
+    return r;
+  }
+
+  return -1;
+}
+
+u32 parse_address_skip(const char **line)
+{
+  skipblanks(line);
+  if(**line == '#') {
+    // Ignore # since it has no meaning
+    ++(*line);
+    skipblanks(line);
+  }
+  if((**line >= '0' && **line <= '9') || **line == '~' || **line == '-' || **line == '$') {
+    return parse_int_skip(line);
+  }
+
+  if(**line == '(' && (*line)[1] && (*line)[2] && (*line)[3] == ')') {
+    // Register
+    ++(*line); // Skip opening parenthese
+    int reg = parse_register(line);
+    ++(*line); // Skip closing parenthese
+    return readreg(cpu, reg);
+  }
+
+  char symname[4096];
+  parse_word(symname, line);
+  sv symval = getdsymval(symname);
+
+  if(symval == -1) {
+    printf("Unknown symbol %s\n", symname);
+    return 0;
+  }
+
+  return (u32)symval;
+}
+
 void showreg(int cpu)
 {
   u32 regs[18];
@@ -218,6 +291,8 @@ void showreg(int cpu)
 
 void boot_cd(u8 *image, int imgsize)
 {
+  maintarget = target_scd2;
+
   const u8 *ip_start;
   int ipsize;
   ipsize = getipoffset(image, &ip_start);
@@ -252,7 +327,7 @@ void boot_cd(u8 *image, int imgsize)
   setreg(0, REG_SR, 0x2700);
 
   printf("Uploading SP (%d bytes) ...\n", spsize);
-  writemem(1, 0x6000, sp_start, spsize);
+  writemem_verify(1, 0x6000, sp_start, spsize);
 
   if(use_cdsim) {
     printf("Uploading simulated BIOS ...\n");
@@ -276,7 +351,7 @@ void boot_cd(u8 *image, int imgsize)
 
 void boot_sp(u8 *image, int imgsize)
 {
-  (void)imgsize;
+  maintarget = target_scd2;
 
   const u8 *sp_start;
   int spsize;
@@ -351,6 +426,8 @@ void boot_ram(u8 *image, int imgsize)
     printf("Incorrect image size (must be 0xFF00)\n");
     return;
   }
+
+  maintarget = target_ram;
 
   stopcpu(0);
 
@@ -449,47 +526,6 @@ void boot_sp_from_iso(const char *filename)
   free(image);
 }
 
-int parse_register(const char **line)
-{
-  skipblanks(line);
-  int r = -1;
-
-  if(**line == 's' || **line == 'S') {
-    ++*line;
-
-    if(**line == 'r' || **line == 'R') {
-      ++*line;
-      return 17;
-    }
-  } else if(**line == 'p' || **line == 'P') {
-    ++*line;
-
-    if(**line == 'c' || **line == 'C') {
-      ++*line;
-      return 16;
-    }
-  } else if(**line == 'd' || **line == 'D') {
-    r = 0;
-  } else if(**line == 'a' || **line == 'A') {
-    r = 8;
-  }
-
-  if(r == -1) {
-    return -1;
-  }
-
-  ++*line;
-
-  if(**line >= '0' && **line <= '7') {
-    r += **line - '0';
-    ++*line;
-    skipblanks(line);
-    return r;
-  }
-
-  return -1;
-}
-
 // Assemble a file and send it to a memory buffer
 u32 asmfile(const char *filename, u8 *target, u32 org)
 {
@@ -565,6 +601,8 @@ int main(int argc, char **argv)
 {
   int c;
 
+  maintarget = target_gen;
+
   while((c = getopt(argc, argv, "hc")) != -1) {
     switch(c) {
       case 'h':
@@ -577,22 +615,22 @@ int main(int argc, char **argv)
     }
   }
 
-  if(argc - optind < 2) {
+  if(argc - optind < 1) {
     fprintf(stderr, "Missing parameter.\n");
     usage();
     exit(1);
   }
 
-  open_debugger(argv[optind + 1], on_unknown, on_breakpoint, on_exception);
+  open_debugger(argv[optind], on_unknown, on_breakpoint, on_exception);
 
   printf("Blast ! debugger. Connected to %s\n", argv[1]);
 
   cpu = 0;
   d68k_setbus(bus_main);
 
-  if(argc - optind >= 3) {
+  if(argc - optind >= 2) {
     printf("\n");
-    boot_img(argv[optind + 2]);
+    boot_img(argv[optind + 1]);
   } else {
     d68k_readsymbols(NULL);
   }
@@ -614,7 +652,10 @@ int main(int argc, char **argv)
     FD_SET(0, &readset);
     FD_SET(genfd, &readset);
 
-    selectresult = select(genfd + 1, &readset, NULL, NULL, NULL);
+    struct timeval select_timeout;
+    select_timeout.tv_sec = 0;
+    select_timeout.tv_usec = 40000;
+    selectresult = select(genfd + 1, &readset, NULL, NULL, &select_timeout);
 
     if(selectresult > 0) {
       if(FD_ISSET(0, &readset)) {
@@ -683,7 +724,7 @@ void on_line_input(char *line)
 
     if(strcmp(token, "asmx") == 0) {
       parse_word(token, &l);
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
 
       if(!address) {
         address = cpu ? 0x006000 : 0xFF0000;
@@ -701,7 +742,7 @@ void on_line_input(char *line)
 
     if(strcmp(token, "r") == 0) {
       parse_token(token, &l);
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
       u32 value;
 
       switch(token[0]) {
@@ -724,8 +765,8 @@ void on_line_input(char *line)
 
     if(strcmp(token, "w") == 0) {
       parse_token(token, &l);
-      u32 address = parse_int_skip(&l);
-      u32 value = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
+      u32 value = parse_address_skip(&l);
 
       switch(token[0]) {
       case 'b':
@@ -746,7 +787,7 @@ void on_line_input(char *line)
     }
 
     if(strcmp(token, "sendfile") == 0) {
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
       parse_word(token, &l);
       sendfile(cpu, token, address);
       continue;
@@ -776,9 +817,9 @@ void on_line_input(char *line)
     }
 
     if(strcmp(token, "dump") == 0) {
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
       skipblanks(&l);
-      u32 size = parse_int_skip(&l);
+      u32 size = parse_address_skip(&l);
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
       readmem(cpu, data, address, size);
@@ -803,7 +844,7 @@ void on_line_input(char *line)
     }
 
     if(strcmp(token, "showchr") == 0) {
-      u32 address = parse_int_skip(&l) * 32;
+      u32 address = parse_address_skip(&l) * 32;
       u8 data[32];
       readvram(data, address, 32);
       int c, x, y;
@@ -828,9 +869,9 @@ void on_line_input(char *line)
     }
 
     if(strcmp(token, "vdump") == 0) {
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
       skipblanks(&l);
-      u32 size = parse_int_skip(&l);
+      u32 size = parse_address_skip(&l);
       skipblanks(&l);
       u8 *data = (u8 *)malloc(size);
       readvram(data, address, size);
@@ -860,8 +901,8 @@ void on_line_input(char *line)
     }
 
     if(strcmp(token, "d68k") == 0) {
-      u32 address = parse_int_skip(&l);
-      u32 size = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
+      u32 size = parse_address_skip(&l);
       int instructions = -1;
 
       if(!address) {
@@ -894,7 +935,7 @@ void on_line_input(char *line)
         continue;
       }
 
-      u32 value = parse_int_skip(&l);
+      u32 value = parse_address_skip(&l);
       setreg(cpu, reg, value);
       showreg(cpu);
       continue;
@@ -935,13 +976,13 @@ void on_line_input(char *line)
         continue;
       }
 
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
       set_breakpoint(cpu, address);
       continue;
     }
 
     if(strcmp(token, "delete") == 0) {
-      u32 address = parse_int_skip(&l);
+      u32 address = parse_address_skip(&l);
 
       if(delete_breakpoint(cpu, address)) {
         printf("Deleted a breakpoint at $%06X\n", address);
@@ -974,19 +1015,35 @@ void on_line_input(char *line)
     }
 
     if(strcmp(token, "p") == 0 || strcmp(token, "print") == 0) {
-      parse_word(token, &l);
-      sv addr = getdsymval(token);
-      if(addr == -1) {
-        printf("%s: symbol not found\n", token);
-      } else {
-        printf("%s = $%08X\n", token, (u32)addr);
+      u32 addr = parse_address_skip(&l);
+      printf("$%08X  u32=%u i32=%d", addr, addr, (int)addr);
+      int val = addr;
+      if(val >= 0x8000 && val < 0x10000) {
+        signext(&val, 16);
+        printf(" i16=%d", val);
+      } else if(val >= 0x80 && val < 0x100) {
+        signext(&val, 8);
+        printf(" i8=%d", val);
       }
+      printf("\n");
       continue;
     }
 
     if(strcmp(token, "symload") == 0) {
       parse_word(token, &l);
       d68k_readsymbols(token);
+      continue;
+    }
+
+    if(strcmp(token, "symclear") == 0) {
+      parse_word(token, &l);
+      d68k_freesymbols();
+      printf("Symbol table cleared.\n");
+      continue;
+    }
+
+    if(strcmp(token, "dbgstatus") == 0) {
+      dbgstatus();
       continue;
     }
 
@@ -1003,6 +1060,13 @@ void on_line_input(char *line)
       }
       continue;
     }
+
+    if(strcmp(token, "target") == 0) {
+      parse_word(token, &l);
+      maintarget = target_parse(token);
+      printf("Target set to %s\n", target_names[maintarget]);
+    }
+
   } while(0);
 
   signal(SIGINT, SIG_DFL);

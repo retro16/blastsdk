@@ -32,13 +32,6 @@ bda_init                                        ; Call at console initialization
 .3              move.w  (a1)+, (a0)+
                 dbra    d0, .3
 
-                cmpi.l  #$200, $020068
-                blo.b   .damaged_l2
-
-                ; Copy current level 2 exception vector to the new sub code handler
-                move.l  $020068, bda_l2_jmp + 2 + $20000
-.damaged_l2
-
                 ; Set level 2 exception vector for sub CPU
                 move.l  #bda_sub_l2, $020068
 
@@ -48,7 +41,7 @@ bda_init                                        ; Call at console initialization
                 ; Set TRAP #7 exception vector for sub CPU
                 move.l  #bda_sub_trap, $02009C
 
-                ; Reset output buffer size
+                ; Reset bdp_write buffer
                 clr.w   $020030
 
                 ; Release BUSREQ
@@ -256,16 +249,16 @@ bda_readcmd
 
                 ; Wait the sender to pull TH
                 ; or sub CPU to enter monitor
-        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+        if TARGET == 9;TARGET_SCD1 || TARGET == TARGET_SCD2
                 lea     GA_COMMFLAGS + 1, a0
         endif
 .waitevt          
-        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+        if TARGET == 9;TARGET_SCD1 || TARGET == TARGET_SCD2 ; Code disabled, now done by bdb polling
                 btst    #6, (a0)
                 beq.b   .nosub
                 ori.b   #$C0, -1(a0)            ; Acknowledge
-.waitack        btst    #6, (a0)                ; Wait until flag is reset
-                bne.b   .waitack
+.waitsuback     btst    #6, (a0)                ; Wait until flag is reset
+                bne.b   .waitsuback
                 bclr    #6, -1(a0)              ; Clear ack flag
                 move.l  #$00000127, (a7)
                 sendhead_then bda_finishwrite
@@ -473,8 +466,7 @@ bda_sub_wait    move.w  #$2700, sr              ; Disable all interrupts
 bda_sub_l2
                 btst    #7, BDA_COMM_MAIN
                 bne.b   bda_sub_wait            ; If the bit is set, go to monitor mode
-
-bda_l2_jmp      jmp     $5F7C.l                 ; The JMP target will be patched by bda_init to jump at the official L2 handler
+                jmp     $5F7C.l                 ; Jump to the BIOS L2 handler
 
 
 bda_sub_trap    ; Voluntary interruption

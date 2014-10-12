@@ -218,6 +218,7 @@ void hexdump(const u8 *data, int size, u32 offset)
     const u8 *asciidata = data;
     int asciisize = 0;
 
+    // Display hex dump
     for(c = 0; c < 16 && size; ++c, ++data, ++offset, --size) {
       printf("%02X ", *data);
       ++asciisize;
@@ -225,6 +226,12 @@ void hexdump(const u8 *data, int size, u32 offset)
 
     printf("  ");
 
+    // Pad ASCII on the right
+    for(c = asciisize; c < 16; ++c) {
+      printf("   ");
+    }
+
+    // Display ASCII dump
     for(c = 0; c < asciisize; ++c) {
       if(asciidata[c] >= 0x20 && asciidata[c] < 0x7F) {
         printf("%c", asciidata[c]);

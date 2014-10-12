@@ -36,8 +36,8 @@ bdp_send_packet
 bdp_send_raw_packet     ; Entry point to send one raw packet (d0 = low nybble of first byte, d1 = 3, a0 points to data)
 
                 ; Send header byte
-                move.b  #0|CTR|CTH, BDPDATA     ; Send high nybble (always 0)
-                ori.b   #CTL|CTR|CTH, d0        ; Precompute next nybble (packet size)
+                move.b  #0|CTR, BDPDATA         ; Send high nybble (always 0)
+                ori.b   #CTL|CTR, d0            ; Precompute next nybble (packet size)
 
 .head_msb
                 btst    #CTH_BIT, BDPDATA       ; Wait ack for high nybble
@@ -49,20 +49,20 @@ bdp_send_byte
                 swap    d0                      ; Use other half of d0
 
                 ; Wait until last byte was acknowledged
-.wait_last_ack
+.wait_byte_ack
                 btst    #CTH_BIT, BDPDATA
-                beq.b   .wait_last_ack
+                beq.b   .wait_byte_ack
 
                 ; Send high nybble
                 move.b  (a0), d0
                 lsr.b   #4, d0
-                ori.b   #CTR|CTH, d0
+                ori.b   #CTR, d0
                 move.b  d0, BDPDATA             ; Send high nybble of data
 
                 ; Precompute low nybble
                 move.b  (a0)+, d0
                 andi.b  #$0F, d0
-                ori.b   #CTL|CTR|CTH, d0
+                ori.b   #CTL|CTR, d0
 
                 ; Wait for high nybble ack
 .byte_msb
@@ -75,9 +75,13 @@ bdp_send_byte
                 dbra    d0, bdp_send_byte
 
                 ; Packet sent
-                subq.w  #3, d1                  ; Compute remaining bytes to send
-                bgt.b   bdp_send_packet
+                subq.l  #3, d1                  ; Compute remaining bytes to send
+                bgt.w   bdp_send_packet
 
+                ; Wait until ack line is released
+.wait_last_ack
+                btst    #CTH_BIT, BDPDATA
+                beq.b   .wait_last_ack
 bdp_write_finished
                 ; Put port back to neutral state
                 move.b  #BDP_NEUTRALDATA, BDPDATA
@@ -123,17 +127,16 @@ bdp_sub_check
 .bda_check_end
 
                 btst    #5, GA_COMMFLAGS_SUB    ; test if sub buffer contains data
-                beq.b   .noout
+                beq.w   .noout
 
                 ; Request program ram bank 0
                 SUB_ACCESS_PRAM 0
 
-                tst.w   $020000 + BDP_OUT_BUFSIZE
+                moveq   #0, d0
+                move.w  $020000 + BDP_OUT_BUFSIZE, d0   ; Read data size
                 beq.b   .emptybuf
 
                 ; Send data to the debugger
-                moveq   #0, d0
-                move.w  $020000 + BDP_OUT_BUFSIZE, d0   ; Read data size
                 move.l  d0, -(sp)                       ; Push data size
                 pea.l   $020000 + BDP_OUT_BUFFER        ; Push data buffer address
                 jsr     _main_bdp_write                 ; Call function

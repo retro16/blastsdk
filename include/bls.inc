@@ -85,7 +85,7 @@ CCTRL3          equ     $A1000D
 BDACTRL         equ     CCTRL2
 BDADATA         equ     CDATA2
 BDPCTRL         equ     BDACTRL
-BDPDATA         equ     BDPCTRL
+BDPDATA         equ     BDADATA
 
 STX1            equ     $A1000F
 SRX1            equ     $A10011

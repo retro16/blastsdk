@@ -87,7 +87,7 @@ LOOPWHILE       macro   instruction, p2
 
 LOOPUNTIL       macro   instruction, p2
 .UNTIL_LOOP\?   instruction ,p2
-                bne.b   .UNTIL_LOOP\?
+                beq.b   .UNTIL_LOOP\?
                 endm
 
 ; Repeat instruction with zero or one parameter count times

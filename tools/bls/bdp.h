@@ -38,6 +38,7 @@ extern void writelong(int cpu, u32 address, u32 l);
 
 // CPU access
 extern void subfreeze();
+extern void dbgstatus(); // To be removed
 extern u32 readreg(int cpu, int reg); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
 extern void readregs(int cpu, u32 *regs); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
 extern void setreg(int cpu, int reg, u32 value);

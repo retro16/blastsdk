@@ -14,7 +14,7 @@
 #define TCPBRIDGE   // Uncomment to enable TCP server (ethernet shield)
 #define BLINKLED 13 // Set to the pin of the led to blink it while running. Undefine to disable blink.
 
-#define SERIAL_BAUDRATE 1000000
+#define SERIAL_BAUDRATE 115200
 
 #if defined (__AVR_ATmega168__) || defined (__AVR_ATmega328P__)
 #if GEND0 == 4 && GEND1 == 5 && GEND2 == 6 && GEND3 == 7
@@ -53,6 +53,28 @@ public:
   }
 
   void begin();
+  
+  operator bool() const {
+    // Returns false if not connected
+    if(digitalRead(GENTR) && digitalRead(GENTL) || !digitalRead(GENTH)) {
+      // Either a packet is just about to arrive, or the port is not ready for debug.
+      for(uint16_t i = 0; i < 10000; ++i) {
+        if((!digitalRead(GENTR) || !digitalRead(GENTL)) && digitalRead(GENTH)) {
+          // The Genesis is in debug mode !
+          return true;
+        }
+        
+#if F_CPU >= 20000000L
+      // Don't poll too fast on fast CPUs
+      delayMicroseconds(2);
+#endif
+      }
+    } else {
+      return true;
+    }
+    
+    return false;
+  }
 
   virtual int available()
   {
@@ -216,6 +238,7 @@ void GenPort::begin() {
 #endif
 
 #if F_CPU >= 20000000L
+    // Don't poll too fast on fast CPUs
     delayMicroseconds(2);
 #endif
   }
@@ -266,7 +289,8 @@ uint8_t GenPort::genWrite(uint8_t n) {
 
 void GenPort::genStartWrite() {
   // Wait until genesis is ready to receive data
-  while(digitalRead(GENTR));
+  while(digitalRead(GENTR))
+    if(!digitalRead(GENTH)) return; // The genesis is polling a pad ... Ouch !
 
   // Set clock to output
   digitalWrite(GENTH, HIGH);
@@ -310,10 +334,12 @@ uint8_t GenPort::genRead() {
   uint8_t v = 0;
 
   // Wait until the genesis is ready to send
-  while(!digitalRead(GENTR));
+  while(!digitalRead(GENTR))
+    if(!digitalRead(GENTH)) return 0; // The genesis is polling a pad ... Ouch !
 
   // Wait for clock
-  while(digitalRead(GENTL));
+  while(digitalRead(GENTL))
+    if(!digitalRead(GENTH)) return 0; // The genesis is polling a pad ... Ouch !
 
   // Read high nybble
 #ifdef GEN_AVRPORT
@@ -449,6 +475,11 @@ void loop()
   }
 
   LEDON();
+
+  while(!gen) {
+    // Stay in idle mode when the Genesis is not in debug mode
+    gen->begin();
+  }
 
   if(gen->available())
   {

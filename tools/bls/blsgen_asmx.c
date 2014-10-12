@@ -178,7 +178,11 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       sv binend = parse_hex(line);
 
       if(sec->symbol->value.addr != -1) {
-        sec->size = binend - chip2bus(sec->symbol->value, src->banks.bus).addr;
+        sv newsize = binend - chip2bank(sec->symbol->value, &src->banks);
+        if(newsize != sec->size) {
+          sec->size = newsize;
+          printf("Warning: %s changed size (%06X -> %06X)\n", sec->name, (u32)sec->size, (u32)newsize);
+        }
       } else {
         sec->size = binend - 0x40000;
         printf("## SIZE = $%04X\n", (unsigned int)sec->size);
@@ -366,10 +370,10 @@ const char *gen_load_defines_asmx()
     fprintf(out, "BLSLOAD_BINARY_%s\tMACRO\n", binname);
 
     if(maintarget == target_scd1 || maintarget == target_scd2) {
-      // Load from WRAM
-      fprintf(out, "\tBLSLOAD_START_READ\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
       secl = bin->provides;
       if(bin->banks.bus == bus_main) {
+        // Load from WRAM
+        fprintf(out, "\tBLSLOAD_READ_CD\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
         busaddr physba = {bus_main, 0x200000, -1};
         BLSLL_FOREACH(sec,secl) {
           if(bin == mainout.ipbin || bin == mainout.spbin) {
@@ -388,6 +392,7 @@ const char *gen_load_defines_asmx()
         }
       } else {
         // Load from CD
+        fprintf(out, "\tBLSLOAD_START_READ\t%08X, %04X\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
         BLSLL_FOREACH(sec,secl) {
           // Load from CD
           sv addr = chip2bank(sec->symbol->value, &sec->source->banks);
@@ -461,6 +466,7 @@ system(cmdline);
 
 // Generate and parse symbols from listing
 parse_symbols_asmx(s, 1);
+
 }
 
 void source_get_symbol_values_asmx(group *s)

@@ -61,7 +61,7 @@ beh_display_exception
                 move.l  #$00000AAA, (a4)        ; Set background to black and text to grey
 
                 VDPSETWRITE 0, VSRAM
-                move.l  #$0, (a4)               ; Clear vertical scroll
+                move.l  d3, (a4)                ; Clear vertical scroll
 
                 moveq   #1, d4                  ; Column count
                 moveq   #16, d7                 ; Line count

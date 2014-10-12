@@ -8,19 +8,20 @@ _sub_bdp_write
 
                 move.l  8(sp), d1               ; d1 = length
                 bne.b   .data_present
-.finished
                 rts
 .data_present
                 move.l  4(sp), a0               ; a0 = source data
+
+                move    sr, d0
+                move.w  d0, -(sp)               ; Save SR
+                ori     #$0700, sr              ; Disable interrupts
 
 .next_block
                 move.w  #BDP_OUT_MAXLEN, d0
                 cmp.w   d0, d1
                 bhi.b   .big_data               ; Buffer smaller than data
-                move.w  d1, d0
-                beq.b   .finished               ; No more data to copy
-                moveq   #0, d1                  ; Last loop
-                bra.b   .copy_start
+                move.w  d1, d0                  ; Copy the whole remaining data
+                beq.b   .finished               ; Quit if no more data to copy
 .big_data       sub.w   d0, d1                  ; Compute number of bytes
                                                 ; remaining after copy
 
@@ -36,5 +37,9 @@ _sub_bdp_write
                 bclr    #5, GA_COMMFLAGS_SUB
 
                 bra.b   .next_block
+.finished
+                move.w  (sp)+, d0               ; Restore sr
+                move    d0, sr
+                rts
 
 ; vim: ts=8 sw=8 sts=8 et

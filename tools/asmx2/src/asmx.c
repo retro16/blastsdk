@@ -5788,7 +5788,8 @@ int main(int argc, char * const argv[])
     if (cl_List)    fprintf(listing, "\n%.5d Total Error(s)\n\n", errCount);
     if (cl_Err)     fprintf(stderr,  "\n%.5d Total Error(s)\n\n", errCount);
 
-    if (cl_ListP1 == TRUE && cl_List)    fprintf(listing, "%08X ending address\n\n", (unsigned int)codPtr & 0xFFFFFFFF);
+    if (cl_List)    fprintf(listing, "%08X ending address\n\n", (unsigned int)codPtr & 0xFFFFFFFF);
+    // Was : if (cl_ListP1 == TRUE && cl_List)    fprintf(listing, "%08X ending address\n\n", (unsigned int)codPtr & 0xFFFFFFFF);
 
     if (symtabFlag)
     {

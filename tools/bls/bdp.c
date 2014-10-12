@@ -18,7 +18,7 @@
 #include "bls.h"
 #include "bdp.h"
 
-#define SERIAL_BAUDRATE B1000000
+#define SERIAL_BAUDRATE B115200
 #define MAX_BREAKPOINTS 255
 
 // Genesis command constants
@@ -229,6 +229,56 @@ void bdp_readdata()
 
 void bdp_readbuffer()
 {
+  // Synchronize sub CPU state if needed
+  // Simulate the effect of bdp_sub_check
+  if((maintarget == target_scd1 || maintarget == target_scd2) && cpustate[0]) {
+    int old_bdpdump = bdpdump;
+    bdpdump = 0; 
+    u32 commflags = readword(0, 0xA1200E);
+    bdpdump = old_bdpdump;
+
+    if(commflags & 0x0020) {
+      // Sub CPU set BDP buffer flag
+      busreq(1, 0x30);
+      u32 datasize = readword(1, 0x000030);
+      if(datasize > 0) {
+        u8 *data = (u8*)malloc(datasize);
+        readmem(1, data, 0x32, datasize);
+        inpl = 4;
+        inp[0] = 0x03;
+        u32 i;
+        for(i = 0; i < datasize - 3; i += 3) {
+          memcpy(&inp[1], data + i, 3);
+          buffer();
+        }
+        if(i < datasize) {
+          inp[0] = (u8)(datasize - i);
+          memcpy(&inp[1], data + i, i);
+          buffer();
+        }
+        writeword(1, 0x30, 0); // Reset data size counter to acknowledge BDP output
+      }
+      busrelease(1);
+    }
+
+    if((commflags & 0x0040) && !(commflags & 0x4000)) {
+      // TRAP #07 on sub CPU
+      writebyte(0, 0xA1200E, commflags >> 8 | 0x40); // Set acknowledge flag
+
+
+      // Add data to incoming buffer
+      inp[0] = 0x00;
+      inp[1] = 0x00;
+      inp[2] = 0x01;
+      inp[3] = 0x27;
+      inpl = 4;
+      buffer();
+    }
+
+    // Update CPU state
+    cpustate[1] = (commflags & 0x0080) ? 1 : 0;
+  }
+
   int c;
   for(c = 0; c < cmdbufl; ++c) {
     memcpy(inp, cmdbuf[c], 36);
@@ -338,7 +388,7 @@ void update_bda_sub(const u8 *image, int imgsize)
 
   printf("BDA sub code found (%04X bytes), upload it at %06X and reset CPU\n", code_size, bda_sub_code);
 
-  writemem(1, bda_sub_code, bdabeg, bdaend - bdabeg);
+  writemem_verify(1, bda_sub_code, bdabeg, bdaend - bdabeg);
 
   // Read entry points in the image
   u32 entry_reset = getint(bdaend - 16, 4);
@@ -714,38 +764,46 @@ void writemem(int cpu, u32 address, const u8 *source, u32 length)
 // Send data into RAM and verify data integrity
 void writemem_verify(int cpu, u32 address, const u8 *source, u32 length)
 {
+  u8 verify[32];
+
   cpumonitor(cpu);
+  cpumonitor(0);
 
-  if(cpu) {
-    // TODO
-  } else {
-    u8 verify[32];
-
-    while(length > 32) {
+  while(length > 32) {
 writemem_verify_retry:
+    if(cpu) {
+      writemem(cpu, address, source, 32);
+      readmem(cpu, verify, address, 32);
+    } else {
       writeburst(address, source, 32);
       readburst(verify, address, 32);
-
-      if(memcmp(source, verify, 32) != 0) {
-        printf("Corrupt data at %06X. Retrying.\n", address);
-        goto writemem_verify_retry;
-      }
-
-      source += 32;
-      address += 32;
-      length -= 32;
     }
 
-writemem_verify_retry_last:
-    writeburst(address, source, length);
-    readburst(verify, address, length);
-
-    if(memcmp(source, verify, length) != 0) {
+    if(memcmp(source, verify, 32) != 0) {
       printf("Corrupt data at %06X. Retrying.\n", address);
-      goto writemem_verify_retry_last;
+      goto writemem_verify_retry;
     }
+
+    source += 32;
+    address += 32;
+    length -= 32;
   }
 
+writemem_verify_retry_last:
+  if(cpu) {
+    writemem(cpu, address, source, length);
+    readmem(cpu, verify, address, length);
+  } else {
+    writeburst(address, source, length);
+    readburst(verify, address, length);
+  }
+
+  if(memcmp(source, verify, length) != 0) {
+    printf("Corrupt data at %06X. Retrying.\n", address);
+    goto writemem_verify_retry_last;
+  }
+
+  cpurelease(0);
   cpurelease(cpu);
 }
 
@@ -1299,7 +1357,9 @@ void setcpustate(int cpu, int newstate)
         // Generate a falling edge on comm flag 15
         cpumonitor(0);
         u8 commflag = readbyte(0, 0xA1200E);
-        writebyte(0, 0xA1200E, commflag | 0x80);
+        if(!(commflag & 0x80)) {
+          writebyte(0, 0xA1200E, commflag | 0x80);
+        }
         writebyte(0, 0xA1200E, commflag & ~0x80);
         cpurelease(0);
       } else {
@@ -1343,6 +1403,12 @@ void subfreeze()
 }
 
 
+void dbgstatus()
+{
+  printf("cpustate[0]=%d cpustate[1]=%d busstate[1]=%d ga_status=%04X\n", cpustate[0], cpustate[1], busstate[1], (u32)ga_status);
+}
+
+
 static void subreq()
 {
   assert(ga_status == 0xFFFF);
@@ -1350,7 +1416,7 @@ static void subreq()
   ga_status = readbyte(0, 0xA12001);
   ga_status |= readword(0, 0xA12002) << 16;
   if(ga_status & 0x0002) {
-    printf("Already in busreq mode.\n");
+    printf("Already in busreq mode cpu=%d bus=%d.\n", cpustate[1], busstate[1]);
   }
   writebyte(0, 0xA12001, 0x03);
   while((readbyte(0, 0xA12001) & 0x03) != 0x03);

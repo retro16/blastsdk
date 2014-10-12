@@ -25,9 +25,6 @@ BOOT            ; Simulated BIOS boot program
                 ; Disable interrupts
                 SUB_INT_DISABLE
 
-                ; Init stack pointer
-                lea     $5E80, sp
-
                 ; Clear comm flags
                 clr.b   GA_COMMFLAGS_SUB
                 clr.l   GA_COMMOUT
@@ -43,10 +40,12 @@ BOOT            ; Simulated BIOS boot program
                 bne.b   .wait_2m
 
                 ; Clear all BIOS entry points
-                lea     $5E80, a0
+                lea     $6000, sp
                 move.w  #($6000 - $5E80) / 2 - 1, d0
-.clear_entry    move.w  #$4E73, (a0)+           ; Write RTE instructions all over the place
+.clear_entry    move.w  #$4E73, -(sp)           ; Write RTE instructions all over the place
                 dbra    d0, .clear_entry
+
+                ; Stack pointer is now initialized at $005E80
 
                 ; Set BIOS call entry point
                 move.w  #$4EF9, $5F22.w         ; JMP xxx.L
@@ -65,7 +64,7 @@ BOOT            ; Simulated BIOS boot program
                 ; d1 contains address to level 2 interrupt
                 move.w  #$4EF9, $5F7C           ; JMP xxx.L
                 move.l  #L2_HANDLER, $5F7E      ; Target address
-                move.l  d0, L2_JUMP + 2         ; Patch handler with target address
+                move.l  d1, L2_JUMP + 2         ; Patch handler with target address
 .no_l2
 
                 ; Compute address to SP_MAIN
@@ -116,7 +115,7 @@ BLSLOAD_SIM_ENTRY
                 beq.b   ROMREAD
 
                 cmp.b   #$21, d0
-                beq.b   ROMREAD
+                bls.b   ROMREAD
 
                 cmp.b   #$8B, d0
                 beq.b   CDCREAD
@@ -128,33 +127,40 @@ RETURN_NOW
                 rts
 
 CDCSTAT
-                or.w    d0, d0                  ; Clear carry
+                or.b    d0, d0                  ; Clear carry
                 rts
 
 CDCSTOP
 CDCACK
-                clr.l   SECHEAD.w
+                clr.l   SECHEAD.w               ; Reset header
                 rts
 
 ROMREAD
-                movem.l a0/a1, -(sp)
+                movem.l d0/a0/a1, -(sp)
                 addq    #1, a0
                 lea     BDP_OUT_BUFFER.w, a1
                 move.b  (a0)+, (a1)+
                 move.b  (a0)+, (a1)+
                 move.b  (a0)+, (a1)+
                 jsr     BDP_WRITE_BUF(PC)
-                movem.l (sp)+, a0/a1
+                movem.l (sp)+, d0/a0/a1
                 rts
 
 ; Sends 3 bytes in BDP_WRITE_BUF using BDP
 BDP_WRITE_BUF
+                move    sr, d0
+                ori     #$0700, sr              ; Disable interrupts while waiting
+                
                 move.w  #3, BDP_OUT_BUFSIZE.w
                 bset    #5, GA_COMMFLAGS_SUB.w
+
 .wait_flush
                 tst.w   BDP_OUT_BUFSIZE
                 bne.b   .wait_flush
+
                 bclr    #5, GA_COMMFLAGS_SUB.w
+
+                move    d0, sr
                 rts
 
 CDCREAD
@@ -170,14 +176,33 @@ CDCREAD
 CDCTRN
                 movem.l d0/a1, -(sp)
                 lea     SECBUF.w, a1
+
+                ; Test if dest address is unaligned
+                move.w  a0, d0
+                btst    #0, d0
+                bne.b   .unaligned
+
+                ; Aligned destination: use long word copy
                 move.w  #$1FF, d0
-.trn_copy
+.trn_copy_long
                 move.l  (a1)+, (a0)+
-                dbra    d0, .trn_copy
+                dbra    d0, .trn_copy_long
+                bra.b   .finish
+
+                ; Unaligned destination: use slower byte copy
+.unaligned
+                move.w  #$7FF, d0
+.trn_copy_byte
+                move.l  (a1)+, (a0)+
+                dbra    d0, .trn_copy_byte
+
+                ; Restore damaged registers except a0 and write header
+.finish
                 movem.l (sp)+, d0/a1
                 move.l  SECHEAD.w, (a1)+
                 rts
 
+                ; Data buffer follows
 SECBUF                                          ; Sector buffer starts here
 SECHEAD         set     SECBUF + $800           ; Sector header in CDCTRN format
 

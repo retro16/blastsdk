@@ -46,6 +46,6 @@ Output monitor
  - name **Monitor**
  - file scdloading_eu.iso
  - region E
- - target scd1
+ - target scd2
  - binaries main sub
 

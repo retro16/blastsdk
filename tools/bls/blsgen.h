@@ -111,6 +111,7 @@ typedef struct section {
   struct symbol *symbol; // Target address
   int align;
   sv size; // Size once loaded
+  int fixed; // True if address should not be remapped automatically
 
   BLSLL(symbol) *intsym; // Internal symbols
   BLSLL(symbol) *extsym; // External symbols (dependencies)

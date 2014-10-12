@@ -31,13 +31,9 @@ BLS_INIT
                 move.w  #$4EF9, (a0)+
                 move.l  16(sp), (a0)
                 move.w  14(sp), GA_HINT         ; Set HBLANK interrupt
-
-                move.b  $01, GA_RH + 1          ; Disable BUSREQ
         endif
 
                 VDPDMAWAIT                      ; Wait for VRAM cleaning
-
-                andi    #$F8FF, SR              ; Enable interrupts
 
                 VDPSETAUTOINCR 2
                 VDPSETWRITE 0, CRAM             ; Clear CRAM

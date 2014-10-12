@@ -354,6 +354,10 @@ section *section_parse(const mdconfnode *md, const char *srcname, const char *na
   s->symbol = symbol_parse(md, sname);
   free(sname);
 
+  if(s->symbol->value.addr != -1) {
+    s->fixed = 1;
+  }
+
   const mdconfnode *n;
 
   for(n = md; (n = mdconfsearch(n, "uses")); n = n->next) {

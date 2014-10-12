@@ -66,8 +66,8 @@ SUB_ACCESS_PRAM macro bank
                 move.b  d0, d1          ; Store original state of GA_RH + 1
                 bset    #GA_BUSREQ_BIT, d0
                 move.b  d0, (a0)
-.1\?    btst    #GA_BUSREQ_BIT, (a0)
-                beq.b   .1\?
+.1\?            cmp.b   (a0), d0
+                bne.b   .1\?
                 swap    d1              ; Use second part of d1
                 addq    #2, a0  ; Point a0 at GH_MM + 1
                 move.b  (a0), d0
