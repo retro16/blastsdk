@@ -45,6 +45,7 @@ BLSLOAD_WAIT_READ macro
                 loopuntil btst #GA_RET_BIT, GA_MM + 1
 
         endif
+                bclr    #BLSCDR_BIT, GA_COMMFLAGS_MAIN
                 endm
         
 

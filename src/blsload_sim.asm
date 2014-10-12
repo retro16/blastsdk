@@ -146,7 +146,7 @@ ROMREAD
                 movem.l (sp)+, d0/a0/a1
                 rts
 
-; Sends 3 bytes in BDP_WRITE_BUF using BDP
+; Sends 3 bytes in BDP_OUT_BUFFER using BDP
 BDP_WRITE_BUF
                 move    sr, d0
                 ori     #$0700, sr              ; Disable interrupts while waiting
@@ -199,7 +199,7 @@ CDCTRN
                 ; Restore damaged registers except a0 and write header
 .finish
                 movem.l (sp)+, d0/a1
-                move.l  SECHEAD.w, (a1)+
+                move.l  SECHEAD.w, (a1)+        ; Write header and clear carry to return success
                 rts
 
                 ; Data buffer follows

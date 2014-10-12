@@ -15,15 +15,13 @@ SP_MAIN
                 blsload_read_cd 4, target_data(pc) ; Read 4 bytes
 
                 bdp_write hello, 17
-         loopwhile btst #0, GA_COMMFLAGS_MAIN
-                bdp_write target_data, 11
 
 .1              ;BLSLOAD_CHECK_MAIN
                 bra.b   .1                      ; Endless loop
 
 SUB_INT_LEVEL2  
                 ;move.l  l2data, target_data
-                ;BLSLOAD_CHECK_MAIN
+                BLSLOAD_CHECK_MAIN
                 rts
 
 counter         dl      0

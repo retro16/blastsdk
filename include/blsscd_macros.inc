@@ -117,8 +117,14 @@ SET_INT_HANDLER macro   vector, target
                 endm
 
 SEND_WRAM_2M    macro
+        if BUS == BUS_MAIN
                 bset    #GA_DMNA_BIT, GA_MM + 1
                 loopuntil btst #GA_DMNA_BIT, GA_MM + 1
+        else
+                assert BUS == BUS_SUB
+                bset    #GA_RET_BIT, GA_MM + 1
+                loopwhile btst #GA_RET_BIT, GA_MM + 1
+        endif
                 endm
 
                 ; Blocks until wram is available

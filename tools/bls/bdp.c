@@ -253,10 +253,10 @@ void bdp_readbuffer()
         }
         if(i < datasize) {
           inp[0] = (u8)(datasize - i);
-          memcpy(&inp[1], data + i, i);
+          memcpy(&inp[1], data + i, datasize);
           buffer();
         }
-        writeword(1, 0x30, 0); // Reset data size counter to acknowledge BDP output
+        writeword(1, 0x000030, 0); // Reset data size counter to acknowledge BDP output
       }
       busrelease(1);
     }
@@ -696,12 +696,12 @@ void writeburst(u32 address, const u8 *source, u32 length)
 // Send data into RAM as fast as possible
 void writemem(int cpu, u32 address, const u8 *source, u32 length)
 {
-  cpumonitor(cpu);
+  cpumonitor(0);
 
   if(cpu) {
-    cpumonitor(0);
 
     if(address + length < 0x80000) {
+      busreq(1, address);
       while(length > 0) {
         u32 burstaddr = address & 0x1FFFF;
         u32 burstlen = 32;
@@ -723,8 +723,10 @@ void writemem(int cpu, u32 address, const u8 *source, u32 length)
         address += burstlen;
         length -= burstlen;
       }
+      busrelease(1);
     } else {
       // target is not PRAM, use ultra slow copy !
+      cpumonitor(cpu);
       while(length > 0) {
         u32 burstlen;
 
@@ -743,9 +745,9 @@ void writemem(int cpu, u32 address, const u8 *source, u32 length)
         address += burstlen;
         length -= burstlen;
       }
+      cpurelease(cpu);
     }
 
-    cpurelease(0);
   } else {
     while(length > 32) {
       writeburst(address, source, 32);
@@ -757,7 +759,7 @@ void writemem(int cpu, u32 address, const u8 *source, u32 length)
     writeburst(address, source, length);
   }
 
-  cpurelease(cpu);
+  cpurelease(0);
 }
 
 
@@ -766,8 +768,10 @@ void writemem_verify(int cpu, u32 address, const u8 *source, u32 length)
 {
   u8 verify[32];
 
-  cpumonitor(cpu);
   cpumonitor(0);
+  if(cpu && address > 0x80000) {
+    cpumonitor(cpu);
+  }
 
   while(length > 32) {
 writemem_verify_retry:
@@ -803,8 +807,10 @@ writemem_verify_retry_last:
     goto writemem_verify_retry_last;
   }
 
+  if(cpu && address > 0x80000) {
+    cpurelease(cpu);
+  }
   cpurelease(0);
-  cpurelease(cpu);
 }
 
 void sendfile(int cpu, const char *token, u32 address)

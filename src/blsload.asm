@@ -26,6 +26,16 @@ BLSLOAD_CHECK_MAIN
         else
                 assert TARGET == TARGET_SCD2
                 move.l  #$080000, BLSLOAD_TARGET
+
+                ; Wait for 2M RAM to be available
+                nop                             ; Delay a bit to avoid missing the flag
+                nop                             ; by a few cycles !
+                move.l  #.wait_wram_2m, BLSLOAD_CHECK_MAIN + 2
+.wait_wram_2m
+                btst    #GA_RET_BIT, GA_MM + 1
+                beq.b   .wram_2m_ready
+                rts
+.wram_2m_ready
         endif
 
                 movem.l d0/d1, BLSLOAD_SECTOR   ; Store data in ROMREADN format
@@ -67,6 +77,7 @@ BLSLOAD_CHECK_MAIN
                 bra.b   .romread_retry
 
 .cdctrn_success BIOS_CDCACK
+ trap #7
 
                 move.l  a0, BLSLOAD_TARGET      ; Save current address to RAM
                 ; a1 points at BLSLOAD_DATA
@@ -77,9 +88,6 @@ BLSLOAD_CHECK_MAIN
 
                 ; All sectors have been read.
 
-                ; Restore BLSLOAD interrupt handling
-                move.l  #.idle, BLSLOAD_CHECK_MAIN + 2
-
                 ; Send WRAM back to main cpu
         if TARGET == TARGET_SCD1
                 SWAP_WRAM_1M
@@ -87,6 +95,12 @@ BLSLOAD_CHECK_MAIN
                 assert TARGET == TARGET_SCD2
                 SEND_WRAM_2M
         endif
+
+                ; Wait until the main CPU acknowledges by clearing its CDR flag
+                loopwhile btst #5, GA_COMMFLAGS_MAIN
+
+                ; Restore BLSLOAD interrupt handling
+                move.l  #.idle, BLSLOAD_CHECK_MAIN + 2
 
                 rts
 

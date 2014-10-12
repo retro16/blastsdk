@@ -72,7 +72,7 @@ static void goto_mainloop(int sig)
 static void on_bdp_comm(const u8 *data, int len)
 {
   if(len == 3 && data[0] < 0x07) {
-    printf("ROMREAD %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
+    printf("CD-ROM seek at sector %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
     // ROMREAD request from simulated BIOS
     u32 offset = getint(data, 3) * CDBLOCKSIZE;
     if(cdsim_file) {
@@ -81,7 +81,7 @@ static void on_bdp_comm(const u8 *data, int len)
       printf("BDP requested CD read at %08X but no CD image is loaded\n", offset);
     }
   } else if(len == 3 && data[0] == 0x07) {
-    printf("CDCREAD %02X%02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
+    printf("CD-ROM read sector. Upload to buffer at %02X%02X\n", (u32)data[0], (u32)data[1], (u32)data[2]);
     // CDCREAD request from simulated BIOS
     if(cdsim_file) {
       u8 buf[CDBLOCKSIZE + 4];

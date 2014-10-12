@@ -414,25 +414,25 @@ Sub CPU memory map
 When the sub CPU is operating within BDB, with BDA, BDP and the CD-ROM
 simulator enabled, the memory map is as following :
 
-    -------- 0000 --------
+     ------ 000000 ------
     | Reset SP / PC      |
-    -------- 0008 --------
+    |------ 000008 ------|
     | Interrupt vectors  |
-    -------- 0030 --------
+    |------ 000030 ------|
     | BDP buffer         |
-    -------- 0060 --------
+    |------ 000060 ------|
     | Interrupt vectors  |
-    -------- 00C0 --------
+    |------ 0000C0 ------|
     |                    |
-    | BDA registers      |
+    | BDA CPU registers  |
     |                    |
-    -------- 0106 --------
+    |------ 000106 ------|
     |                    |
     | BDA code           |
     |                    |
-    -------- 01D0 --------
+    |------ 0001D0 ------|
     | BDA scratchpad     |
-    -------- 0200 --------
+    |------ 000200 ------|
     | Sim BIOS entry     |
     |                    |
     |                    |
@@ -441,7 +441,7 @@ simulator enabled, the memory map is as following :
     |                    |
     |                    |
     |                    |
-    -------- 4800 --------
+    | - - - - - - - - - -|
     |                    |
     |                    |
     |                    |
@@ -450,19 +450,21 @@ simulator enabled, the memory map is as following :
     |                    |
     |                    |
     |                    |
-    -------- 5000 --------
+    | - - - - - - - - - -|
     | CD sector header   |
-    -------- 5004 --------
+    | - - - - - - - - - -|
+    | (reserved)         |
+    |------ 005000 ------|
     |                    |
     |                    |
     |                    |
     | User program stack |
     |                    |
-    -------- 5E80 --------
+    |------ 005E80 ------|
     |                    |
     | BIOS entry points  |
     |                    |
-    -------- 6000 --------
+    |------ 006000 ------|
     | SP header          |
     | - - - - - - - - - -|
     |                    |
@@ -475,5 +477,5 @@ simulator enabled, the memory map is as following :
     |                    |
     |                    |
     |                    |
-    ----------------------
+     --------------------
 

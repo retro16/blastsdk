@@ -22,9 +22,9 @@ IP_MAIN
                 btst    #CBTNSTART_BIT, CDATA1
                 bne.b   .1
 
-                bset    #0, GA_COMMFLAGS_MAIN
+                ;bset    #0, GA_COMMFLAGS_MAIN
 
-                ;BLSLOAD_READ_CD 0, 1
+                BLSLOAD_READ_CD 0, 1
 
 .0 bra.b .0
 
