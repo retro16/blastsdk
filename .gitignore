@@ -34,6 +34,7 @@
 # Build directories
 /build
 build_blsgen
+/tools/libraries/readme.txt
 
 # VIM status files
 .*.swp
