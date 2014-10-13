@@ -3,6 +3,7 @@
 ; VDP address mappings - can be changed to use registers
 VDPDATA         set     $C00000
 VDPCTRL         set     $C00004
+VDPHV           set     $C00008
 VDPUSEADDR      macro   ; Use address constants
 _VDPREG         set     0
                 endm
@@ -64,7 +65,7 @@ VDPR06          set     $00             ; VDP register #06
 VDPR07          set     $00             ; VDP register #07
 VDPR08          set     $00             ; VDP register #08
 VDPR09          set     $00             ; VDP register #09
-VDPR10          set     $00             ; VDP register #10
+VDPR10          set     $00             ; VDP register #10 - hblank period
 
 VDPR11          set     $00             ; VDP register #11
 VDPEINT         set     $08             ; Enable external interrupt (level 2)
@@ -165,6 +166,20 @@ VDPENABLE       macro   display, hint, vint, dma
         endif
                 VDPSETREG2 0, .R00\?, 1, .R01\?
                 endm
+
+VDPWAITLINE     macro   line
+.waitline\?
+                move.w  VDPHV, -(sp)            ; Read HV counter with a word access
+                cmpi.b  #line, (sp)             ; Compare V part with the line
+                addq.l  #2, sp                  ; Pop the value (CCR not affected)
+                bne.b   .waitline\?             ; Wait if line number is different
+
+VDPUNTILLINE    macro   line
+.waitline\?
+                move.w  VDPHV, -(sp)            ; Read HV counter with a word access
+                cmpi.b  #line, (sp)             ; Compare V part with the line
+                addq.l  #2, sp                  ; Pop the value (CCR not affected)
+                blo.b   .waitline\?             ; Wait if line number is different
 
 VRAM            equ     $00000000
 CRAM            equ     $80000000

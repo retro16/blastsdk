@@ -137,6 +137,16 @@ WAIT_WRAM_2M    macro
         endif
                 endm
 
+
+                ; Sets Z flag if WRAM is unavailable
+                ; Clears Z flag if WRAM is available
+HAS_WRAM_2M     macro
+                btst    #GA_RET_BIT, GA_MM + 1
+        if BUS == BUS_SUB
+                eori    #$04, CCR               ; Reverse the condition
+        endif
+                endm
+
         if BUS == BUS_SUB
 SWAP_WRAM_1M    macro
                 bchg    #GA_RET_BIT, GA_MM + 1
@@ -156,6 +166,16 @@ SWAP_SYNC_1M    macro
                 ; the two CPUs wait for each other, then WRAM is swapped
 SWAP_SYNC_1M    macro
                 bset    #GA_DMNA_BIT, GA_MM + 1
+                loopwhile btst #GA_DMNA_BIT, GA_MM + 1
+                endm
+
+                ; Send a swap request
+SWAP_REQ_1M     macro
+                bset    #GA_DMNA_BIT, GA_MM + 1
+                endm
+
+                ; Wait until swap request has been honored by the sub CPU
+SWAP_WAIT_1M    macro
                 loopwhile btst #GA_DMNA_BIT, GA_MM + 1
                 endm
         endif

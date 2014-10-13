@@ -1,6 +1,9 @@
 ; Provides Genesis / SCD initializatoin routines.
 ; You must include bls_init.md in the same binary.
 
+        if ..UNDEF bls_init_inc
+bls_init_inc    set     1
+
         if BUS == BUS_MAIN
 bls_init        macro   hint_handler, vint_handler
                 ccall2  bls_init, hint_handler, vint_handler
@@ -72,5 +75,7 @@ bls_enable_interrupts macro
 bls_disable_interrupts macro
                 ori     #$0700, SR
                 endm
+
+        endif
 
 ; vim: ts=8 sw=8 sts=8 et
