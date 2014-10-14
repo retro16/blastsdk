@@ -19,9 +19,9 @@ bls_init_vdp    macro   hint, vint, plane_w, plane_h, plane_a_addr, window_addr,
                 bra.b   .jump_regs\?
 .reg_init_vdp\?
         if hint
-		db	VDPR00 | VDPHINT ; #00
+		db	VDPR00 | VDPHINT | VDPHVEN ; #00
         else
-		db	VDPR00           ; #00
+		db	VDPR00 | VDPHVEN ; #00
         endif
         if vint
 		db	VDPR01 | VDPDISPEN | VDPVINT | VDPDMAEN ; #01

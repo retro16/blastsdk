@@ -150,7 +150,7 @@ VDPPREPAUTOINCR macro   s
         endm
 
 VDPENABLE       macro   display, hint, vint, dma
-.R00\?          set     VDPR00
+.R00\?          set     VDPR00 | VDPHVEN
 .R01\?          set     VDPR01
         if display
 .R01\?          set     .R01\? | VDPDISPEN

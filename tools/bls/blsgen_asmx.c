@@ -288,17 +288,7 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
 
   if(sec->format == format_zero) {
     if(sec->symbol->value.chip == chip_ram) {
-      if(sec->size > 4) {
-        fprintf(out, "\tBLSFASTFILL_WORD\t$%08X, $%08X, 0\n", (unsigned int)ba.addr, (unsigned int)sec->size / 2);
-      } else if(sec->size == 4) {
-        fprintf(out, "\tCLR.L\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
-      } else if(sec->size >= 2) {
-        fprintf(out, "\tCLR.W\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
-      }
-
-      if(sec->size & 1) {
-        fprintf(out, "\tCLR.B\t$%08X\n", (unsigned int)(ba.addr + sec->size - 1));
-      }
+      fprintf(out, "\tBLSFASTFILL\t$%08X, 0, $%08X\n", (unsigned int)ba.addr, (unsigned int)sec->size);
     } else if(sec->symbol->value.chip == chip_vram) {
       fprintf(out, "\tBLSVDP_CLEAR\t$%04X, $%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     } else {
@@ -321,13 +311,8 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
   case chip_cart:
   case chip_bram:
   case chip_pram:
-  case chip_wram:
   case chip_pcm:
   case chip_max:
-    break;
-
-  case chip_zram:
-    // TODO
     break;
 
   case chip_vram:
@@ -338,6 +323,8 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
     fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     break;
 
+  case chip_wram:
+  case chip_zram:
   case chip_ram:
     if(maintarget != target_ram && ba.addr != physba.addr) {
       fprintf(out, "\tBLSFASTCOPY_ALIGNED\t$%08X, $%08X, $%08X\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);

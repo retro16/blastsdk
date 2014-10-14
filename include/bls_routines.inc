@@ -4,7 +4,6 @@ BLSFASTFILL_WORD macro dest, words, value
     elsif words == 1
     move.w  dest, value
     else
-    movem.l d0/a0, -(a7)
     lea     dest, a1
     if words <= 128
     clr     d0
@@ -15,9 +14,128 @@ BLSFASTFILL_WORD macro dest, words, value
 .fastfill\?
     move.w  value, (a0)+
     dbra    d0, .fastfill\?
-    movem.l (a7)+, d0/a0
     endif
     endm
+
+BLSFASTFILL macro dest, value, bytes
+        if bytes > 0
+        if bytes == 1
+         if value == 0
+                clr.b   dest
+         else
+                move.b  #value, dest
+         endif
+        elsif bytes == 2
+         if value == 0
+                clr.w   dest
+         else
+                move.w  #(value<<8) | value, dest
+         endif
+        elsif bytes == 4
+         if value == 0
+                clr.l   dest
+         else
+                move.l  #(value<<24)|(value<<16)|(value<<8)|value, dest
+         endif
+        else
+                lea     dest + bytes, a0
+         if bytes == 3 && value == 0
+                clr.w   -(a0)
+                clr.b   -(a0)
+         else
+
+          if value == 0
+                moveq   #0, d0
+          else
+                movei.l #(value<<24)|(value<<16)|(value<<8)|value, d0
+          endif
+
+          if bytes & 1
+                move.b  d0, -(a0)
+          endif
+
+          if bytes < 32
+                BLSREPEAT2 bytes / 4, move.l d0, -(a0)
+                BLSREPEAT2 (bytes / 2) * 2 - (bytes / 4) * 4, move.w d0, -(a0)
+          elsif bytes < 128
+                move.l  d0, a1
+                move.l  d0, d1
+                BLSREPEAT2 bytes / 12, movem.l d0-d1/a1, -(a0)
+           if (bytes % 12) >= 10
+                movem.l d0-d1, -(a0)
+                move.w  d0, -(a0)
+           elsif (bytes % 12) >= 8
+                movem.l d0-d1, -(a0)
+           elsif (bytes % 12) >= 6
+                move.l  d0, -(a0)
+                move.w  d0, -(a0)
+           elsif (bytes % 12) >= 4
+                move.l  d0, -(a0)
+           elsif (bytes % 12) >= 2
+                move.w  d0, -(a0)
+           endif
+          else
+           if bytes & 2
+                move.w  d0, -(a0)
+           endif
+
+                movem.l d2-d7, -(sp)
+                move.l  d0, a1
+                move.l  d0, d2
+                move.l  d0, d3
+                move.l  d0, d4
+                move.l  d0, d5
+                move.l  d0, d6
+                move.l  d0, d7
+           if bytes < 512
+                BLSREPEAT2 bytes / 32, movem.l d0/a1/d2-d7, -(a0)
+            if (bytes % 32) >= 28
+                movem.l d0/a1/d2-d6, -(a0)
+            elsif (bytes % 32) >= 24
+                movem.l d0/a1/d2-d5, -(a0)
+            elsif (bytes % 32) >= 20
+                movem.l d0/a1/d2-d4, -(a0)
+            elsif (bytes % 32) >= 16
+                movem.l d0/a1/d2-d3, -(a0)
+            elsif (bytes % 32) >= 12
+                movem.l d0/a1/d2, -(a0)
+            elsif (bytes % 32) >= 8
+                movem.l d0/a1, -(a0)
+            elsif (bytes % 32) >= 4
+                move.l  d0, -(a0)
+            endif
+           else
+            if bytes / 32 < 256
+                moveq   #(bytes / 32) - 1, d1
+            else
+                movei.w #(bytes / 32) - 1, d1
+            endif
+.blsfill_loop\?
+                movem.l d0/a1/d2-d7, -(a0)
+                dbra    d1, .blsfill_loop\?
+            if (bytes % 32) >= 28
+                movem.l d0/a1/d2-d6, -(a0)
+            elsif (bytes % 32) >= 24
+                movem.l d0/a1/d2-d5, -(a0)
+            elsif (bytes % 32) >= 20
+                movem.l d0/a1/d2-d4, -(a0)
+            elsif (bytes % 32) >= 16
+                movem.l d0/a1/d2-d3, -(a0)
+            elsif (bytes % 32) >= 12
+                movem.l d0/a1/d2, -(a0)
+            elsif (bytes % 32) >= 8
+                movem.l d0/a1, -(a0)
+            elsif (bytes % 32) >= 4
+                move.l  d0, -(a0)
+            endif
+           endif
+                movem.l (sp)+, d2-d7
+          endif
+        
+
+         endif
+        endif
+        endm
 
 
 ; Copy memory from word-aligned addresses.
