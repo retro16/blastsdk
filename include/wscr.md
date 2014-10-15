@@ -95,3 +95,12 @@ plus one null tile.
  - size $4B20
  - align $20
 
+Section wscr_framebuffer
+========================
+
+This section stores the framebuffer in word RAM
+
+ - format empty
+ - chip wram
+ - size 19456 (256*152/2)
+ - align $20

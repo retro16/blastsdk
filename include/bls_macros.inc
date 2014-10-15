@@ -1,3 +1,5 @@
+; This file contains asm-specific macros not available in the C API.
+
 ; Macros to call C functions
 
 CCALL   macro   routine
@@ -129,9 +131,5 @@ BLSREPEAT2 macro count, instruction, p2
     BLSREPEAT2 ((count)-1), instruction, p2
     endif
     endm
-
-ENTER_MONITOR   macro
-                trap    #07
-                endm
 
 ; vim: ts=8 sw=8 sts=8 et

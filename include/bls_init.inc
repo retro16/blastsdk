@@ -68,14 +68,6 @@ bls_init_vdp    macro   hint, vint, plane_w, plane_h, plane_a_addr, window_addr,
                 VDPSETALLREGS   .reg_init_vdp\?(pc)
                 endm
 
-bls_enable_interrupts macro
-                andi    #$F8FF, SR
-                endm
-
-bls_disable_interrupts macro
-                ori     #$0700, SR
-                endm
-
         endif
 
 ; vim: ts=8 sw=8 sts=8 et

@@ -22,7 +22,7 @@ wscr_pad_b_bit      set     4
 wscr_pad_c_bit      set     5
 wscr_pad_start_bit  set    13
 
-wscr_pad_status set     GA_COMMOUT
+wscr_pad_status set     GA_COMMWORDS_MAIN
 wscr_pad1_status set    wscr_pad_status
 wscr_pad2_status set    wscr_pad_status + 2
 wscr_miss_count set     wscr_pad_status + 4
@@ -30,20 +30,11 @@ wscr_miss_count set     wscr_pad_status + 4
                 include bls_vdp.inc
                 include bls_init.inc
 
-wscr_init_vdp   macro   vblank_callback, vblank_miss_callback, framebuffer_addr, tile_attr, plane_a_addr, sprites_addr, interlace
+wscr_init_vdp   macro   vblank_callback, vblank_miss_callback, tile_attr, plane_a_addr, sprites_addr, interlace
 
-wscr_framebuffer_addr set framebuffer_addr
-
-        if vblank_callback
-                move.w  #$4EB9, wscr_vblank_callback ; JSR.L
-                move.l  #vblank_callback, wscr_vblank_callback + 2
-        endif
-        if vblank_miss_callback
-                move.w  #$4EB9, wscr_vblank_miss_callback ; JSR.L
-                move.l  #vblank_miss_callback, wscr_vblank_miss_callback + 2
-        endif
-
-                pea     tileattr
+                pea     vblank_miss_callback
+                pea     vblank_callback
+                pea     tile_attr
                 pea     .jump_regs\?            ; Function returns after registers
                 jmp     _main_wscr_init_vdp
 .reg_init_vdp\?
@@ -69,7 +60,11 @@ wscr_framebuffer_addr set framebuffer_addr
                 db      0                       ; #18
         align   2
 .jump_regs\?
+                lea     12(sp), sp              ; Pop C parameters
                 VDPSETALLREGS   .reg_init_vdp\?(pc)
+        if TARGET == TARGET_SCD2
+                SEND_WRAM_2M
+        endif
                 endm
 
 
@@ -81,6 +76,9 @@ wscr_hold       macro
 
                 ; Resume widescreen display
 wscr_resume     macro
+        if TARGET == TARGET_SCD2
+                SEND_WRAM_2M
+        endif
                 VDPSETREG 0, VDPR00 | VDPHINT | VDPHVEN
                 endm
 

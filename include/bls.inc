@@ -113,6 +113,21 @@ SC4800          equ     $00
 ZBUSREQ         equ     $A11100
 ZRESET          equ     $A11200
 ZREQ            equ     $0100                   ; Value to be written to ZBUSREQ or ZRESET
+
+; Sound defines
+                if BUS == BUS_Z80
+FM1REG          equ     $4000
+FM1DATA         equ     $4001
+FM2REG          equ     $4002
+FM2DATA         equ     $4003
+PSG             equ     $7F11
+                else
+FM1REG          equ     $A04000
+FM1DATA         equ     $A04001
+FM2REG          equ     $A04002
+FM2DATA         equ     $A04003
+PSG             equ     $C00011
+                endif
                 endif
                 
 ; Interrupt vector offsets
@@ -156,22 +171,6 @@ INTV_TRAP13     set     $B4
 INTV_TRAP14     set     $B8
 INTV_TRAP15     set     $BC
 
-; Sound defines
-
-                if BUS == BUS_Z80
-FM1REG          equ     $4000
-FM1DATA         equ     $4001
-FM2REG          equ     $4002
-FM2DATA         equ     $4003
-PSG             equ     $7F11
-                else
-FM1REG          equ     $A04000
-FM1DATA         equ     $A04001
-FM2REG          equ     $A04002
-FM2DATA         equ     $A04003
-PSG             equ     $C00011
-                endif
-                
                 include bls_macros.inc
                 include bls_routines.inc
                 

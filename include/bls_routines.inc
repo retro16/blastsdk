@@ -199,4 +199,17 @@ BLS_SETINTVECTOR macro vect, target
     endif
     endm
 
+
+BLS_ENABLE_INTERRUPTS macro
+                andi    #$F8FF, SR
+                endm
+
+BLS_DISABLE_INTERRUPTS macro
+                ori     #$0700, SR
+                endm
+
+ENTER_MONITOR   macro
+                trap    #07
+                endm
+
 ; vim: ts=8 sw=8 sts=8 et

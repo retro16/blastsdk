@@ -66,9 +66,9 @@ GA_CDC_DEST_WRAMDMA     set     $07
 GA_CDC_DEST_DMA         set     $04             ; DMA flag
 GA_CDC_DEST_DMA_BIT     set     2               ; DMA flag bit
 GA_EDT          set     $8000                   ; End Data Transfert
-GA_EDT_BIT      set     7
+GA_EDT_BIT      set     15
 GA_DSR          set     $4000                   ; Data Set Ready
-GA_DSR_BIT      set     6
+GA_DSR_BIT      set     14
                 if BUS == BUS_MAIN
 GA_HINT         set     GATE_ARRAY + $06        ; H-INT address
                 else
@@ -82,6 +82,8 @@ GA_COMMFLAGS    set     GATE_ARRAY + $0E        ; MSB writable by main, LSB writ
 GA_COMMFLAGS_MAIN       set     GATE_ARRAY + $0E        ; Byte access
 GA_COMMFLAGS_SUB        set     GATE_ARRAY + $0F        ; Byte access
 GA_COMMWORDS    set     GATE_ARRAY + $10
+GA_COMMWORDS_MAIN set   GATE_ARRAY + $10
+GA_COMMWORDS_SUB set    GATE_ARRAY + $20
                 if BUS == BUS_MAIN
 GA_COMMOUT      set     GA_COMMWORDS            ; Read-write
 GA_COMMIN       set     GA_COMMWORDS + $10      ; Read-only
@@ -130,8 +132,11 @@ GA_FONTDATA     set     GATE_ARRAY + $50        ; 8 bytes : expanded data (4 byt
 
 GA_STAMPSIZE    set     GATE_ARRAY + $58
 GA_STS          set     $0002                   ; Set : 32x32, Clear : 16x16
+GA_STS_BIT      set     1
 GA_SMS          set     $0004                   ; Set : 16x16, Clear : 1x1
+GA_SMS_BIT      set     2
 GA_RPT          set     $0001                   ; Repeat image if set
+GA_RPT_BIT      set     0
 
 GA_STMAP        set     GATE_ARRAY + $5A        ; Stamp map base address
 GA_VCELLS       set     GATE_ARRAY + $5C        ; Image V cell count minus one
@@ -141,7 +146,7 @@ GA_IMGHSIZE     set     GATE_ARRAY + $62        ; Image width in pixels
 GA_IMGVSIZE     set     GATE_ARRAY + $64        ; Image height in pixels
 GA_TVADDR       set     GATE_ARRAY + $66        ; Trace vector address
 
-GA_SCADDR       set     GATE_ARRAY + $68        ; Subcode addddress
+GA_SCADDR       set     GATE_ARRAY + $68        ; Subcode address
 
                 include blsscd_macros.inc
                 include blsscd_routines.inc

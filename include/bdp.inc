@@ -1,3 +1,6 @@
+        if ..UNDEF BDP_INC
+BDP_INC         set     1
+
 ; void bdp_write(char *data, int length);
 bdp_write       macro   data, length
                 CCALL2  _MAIN_BDP_WRITE, data, length
@@ -11,4 +14,5 @@ bdp_sub_check   macro
                 endif
                 endm
 
+        endif
 ; vim: ts=8 sw=8 sts=8 et

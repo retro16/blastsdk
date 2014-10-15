@@ -1,20 +1,20 @@
-_blsth_init     macro   ptr
+blsth_init      macro   ptr
                 pea     ptr
                 jsr     blsth_init
                 lea     -4(sp), sp
                 endm
 
-_blsth_run      macro   ptr
+blsth_run       macro   ptr
                 pea     ptr
                 jsr     blsth_run
                 lea     -4(sp), sp
                 endm
 
-_blsth_yield    macro
+blsth_yield     macro
                 jsr     blsth_yield
                 endm
 
-_blsth_call     macro   ptr, fct
+blsth_call      macro   ptr, fct
                 move.l  sp, blsth_sp
                 pea     fct
                 pea     ptr
@@ -22,7 +22,7 @@ _blsth_call     macro   ptr, fct
                 lea     -8(sp), sp
                 endm
 
-_blsth_call_w   macro   ptr, fct, p1
+blsth_call_w    macro   ptr, fct, p1
                 move.l  sp, blsth_sp
                 move.w  p1, -(sp)
                 pea     fct
@@ -31,7 +31,7 @@ _blsth_call_w   macro   ptr, fct, p1
                 lea     -10(sp), sp
                 endm
 
-_blsth_call_l   macro   ptr, fct, p1
+blsth_call_l    macro   ptr, fct, p1
                 move.l  sp, blsth_sp
                 pea     p1
                 pea     fct
@@ -40,7 +40,7 @@ _blsth_call_l   macro   ptr, fct, p1
                 lea     -12(sp), sp
                 endm
 
-_blsth_call_ww  macro   ptr, fct, p1, p2
+blsth_call_ww   macro   ptr, fct, p1, p2
                 move.l  sp, blsth_sp
                 pea     p2
                 pea     p1
@@ -50,7 +50,7 @@ _blsth_call_ww  macro   ptr, fct, p1, p2
                 lea     -12(sp), sp
                 endm
 
-_blsth_call_wl  macro   ptr, fct, p1, p2
+blsth_call_wl   macro   ptr, fct, p1, p2
                 move.l  sp, blsth_sp
                 pea     p2
                 move.w  p1, -(sp)
@@ -60,7 +60,7 @@ _blsth_call_wl  macro   ptr, fct, p1, p2
                 lea     -14(sp), sp
                 endm
 
-_blsth_call_lw  macro   ptr, fct, p1, p2
+blsth_call_lw   macro   ptr, fct, p1, p2
                 move.l  sp, blsth_sp
                 move.w  p2, -(sp)
                 pea     p1
@@ -70,7 +70,7 @@ _blsth_call_lw  macro   ptr, fct, p1, p2
                 lea     -14(sp), sp
                 endm
 
-_blsth_call_ll  macro   ptr, fct, p1, p2
+blsth_call_ll   macro   ptr, fct, p1, p2
                 move.l  sp, blsth_sp
                 pea     p2
                 pea     p1

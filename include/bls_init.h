@@ -6,7 +6,12 @@ static inline void bls_init(bls_int_callback hint, bls_int_callback vint) {
   BLS_INIT(hint, vint);
 }
 
-static inline void bls_init_vdp(int hint, int vint, int plane_w, int plane_h, u32 plane_a_addr, u32 window_addr, u32 plane_b_addr, u32 sprites_addr, u32 hscroll_addr, enum hscroll_mode_e hscroll_mode, enum vscroll_mode_e vscroll_mode, int window_x, int window_y, int shadow, int interlace)
+#define VDPWIN_TOPLEFT 0x0000
+#define VDPWIN_TOPRIGHT 0x8000
+#define VDPWIN_BOTLEFT 0x0080
+#define VDPWIN_BOTRIGHT 0x8080
+
+static inline void bls_init_vdp(int hint, int vint, int plane_w, int plane_h, u32 plane_a_addr, u32 window_addr, u32 plane_b_addr, u32 sprites_addr, u32 hscroll_addr, int hscroll_mode, int vscroll_mode, int window_x, int window_y, int shadow, int interlace)
 {
   u8 regs[19] = {
     VDPR00 | (hint ? VDPHINT : 0),

@@ -16,6 +16,18 @@ _main_wscr_init_vdp
 
                 movem.l d5-d7/a4-a5, -(sp)
                 move.l  24(sp), d7              ; Read parameter to d7
+
+                move.l  28(sp), d0              ; Read second parameter
+                beq.b   .no_vbl
+                move.w  #$4EB9, wscr_vblank_callback ; JSR.L
+                move.l  d0, wscr_vblank_callback + 2
+.no_vbl
+                
+                move.l  32(sp), d0              ; Read second parameter
+                beq.b   .no_vbl_miss
+                move.w  #$4EB9, wscr_vblank_miss_callback ; JSR.L
+                move.l  d0, wscr_vblank_miss_callback + 2
+.no_vbl_miss
                 
                 VDPSETADDRREG
                 VDPSETAUTOINCR 2
