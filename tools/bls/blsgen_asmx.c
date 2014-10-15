@@ -290,7 +290,8 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
     if(sec->symbol->value.chip == chip_ram) {
       fprintf(out, "\tBLSFASTFILL\t$%08X, 0, $%08X\n", (unsigned int)ba.addr, (unsigned int)sec->size);
     } else if(sec->symbol->value.chip == chip_vram) {
-      fprintf(out, "\tBLSVDP_CLEAR\t$%04X, $%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    fprintf(out, "\tVDPSETAUTOINCR 1\n");
+      fprintf(out, "\tVDPDMAFILL\t0, $%04X, $%04X\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     } else {
       printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
     }
@@ -316,10 +317,12 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
     break;
 
   case chip_vram:
+    fprintf(out, "\tVDPSETAUTOINCR 2\n");
     fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     break;
 
   case chip_cram:
+    fprintf(out, "\tVDPSETAUTOINCR 2\n");
     fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     break;
 

@@ -5,13 +5,16 @@
 
 #define VDPDATA ((volatile u16 *)0xC00000)
 #define VDPCTRL ((volatile u16 *)0xC00004)
+#define VDPDATA_B ((volatile u8 *)0xC00000)
+#define VDPCTRL_B ((volatile u8 *)0xC00004)
 #define VDPDATA_L ((volatile u32 *)0xC00000)
 #define VDPCTRL_L ((volatile u32 *)0xC00004)
 
 #define VDPREAD 0x00000000
 #define VDPWRITE 0x40000000
 #define VDPDMA 0x00000080
-#define VDPVRAM 0x80000000
+#define VDPVRAM 0x00000000
+#define VDPCRAM 0x80000000
 #define VDPVSRAM 0x00000010
 
 #define VDPST_EMPTY 0x0200   // VDP FIFO empty
@@ -131,17 +134,17 @@ static inline void blsvdp_enable(int display, int hint, int vint, int dma)
 static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 len)
 {
   blsvdp_set_reg2(19, len & 0xFF, 20, len >> 8);  // Set DMA length
-  u32 srcval = ((u32)src) / 2;
+  u32 srcval = (u32)src;
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
-  if((u8)(((u32)src) >> 16) == 0x20) {
+  if((src & 0x00F00000) == 0x00200000) {
     // WRAM DMA Workaround
     srcval += 2;
   }
 
 #endif
-  blsvdp_set_reg2(21, srcval & 0xFF, 22, (srcval >> 8) & 0xFF);
-  blsvdp_set_reg(23, (srcval >> 16) & 0xFF);
+  blsvdp_set_reg2(21, (srcval >> 1) & 0xFF, 22, (srcval >> 9) & 0xFF);
+  blsvdp_set_reg(23, (srcval >> 17) & 0x7F);
 
   *VDPCTRL = VDPCMD(VDPWRITE | VDPDMA, target, dest) >> 16;
 
@@ -151,13 +154,23 @@ static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 
 
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
-  if((u8)(((u32)src) >> 16) == 0x20) {
+  if((src & 0x00F00000) == 0x00200000) {
     // WRAM DMA Workaround
     *VDPCTRL_L = VDPCMD(VDPWRITE, target, dest);
     *VDPDATA = *((const u16 *)src);
   }
 
 #endif
+}
+
+static inline void blsvdp_dmafill_inline(u8 data, u16 dest, u16 len) {
+  blsvdp_set_reg2(19, len & 0xFF, 20, len >> 8);  // Set DMA length
+  u32 srcval = (u32)src;
+
+  blsvdp_set_reg(23, 0x8000); // Set fill mode
+
+  *VDPCTRL_L = VDPCMD(VDPWRITE | VDPDMA, VDPVRAM, dest);
+  *VDPDATA_B = data;
 }
 
 static inline void blsvdp_send_inline(u32 target, u16 dest, const void *src, u16 len)

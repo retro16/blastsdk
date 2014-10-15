@@ -285,6 +285,62 @@ static void extract_section(section *s)
   system(cmdline);
 }
 
+void gen_load_section_gcc(FILE *out, const section *sec, busaddr physba)
+{
+  busaddr ba = chip2bus(sec->symbol->value, bus_main);
+
+  if(sec->format == format_empty || sec->size == 0) {
+    return;
+  }
+
+  if(sec->format == format_zero) {
+    if(sec->symbol->value.chip == chip_ram) {
+      fprintf(out, "blsfastfill(0x%08X, 0, 0x%08X);\n", (unsigned int)ba.addr, (unsigned int)sec->size);
+    } else if(sec->symbol->value.chip == chip_vram) {
+      fprintf(out, "blsvdp_dmafill_inline(0, 0x%04X, 0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    } else {
+      printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
+    }
+
+    return;
+  }
+
+  if(sec->format != format_raw) {
+    printf("Warning : %s format unsupported\n", format_names[sec->format]);
+    return;
+  }
+
+  switch(sec->symbol->value.chip) {
+  case chip_none:
+  case chip_mstk:
+  case chip_sstk:
+  case chip_zstk:
+  case chip_cart:
+  case chip_bram:
+  case chip_pram:
+  case chip_pcm:
+  case chip_max:
+    break;
+
+  case chip_vram:
+    fprintf(out, "blsvdp_dma_inline(VDPVRAM, 0x%04X, 0x%08X, 0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+    break;
+
+  case chip_cram:
+    fprintf(out, "blsvdp_dma_inline(VDPCRAM, 0x%04X, 0x%08X, 0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+    break;
+
+  case chip_wram:
+  case chip_zram:
+  case chip_ram:
+    if(maintarget != target_ram && ba.addr != physba.addr) {
+      fprintf(out, "blsfastcopy_aligned(0x%08X, 0x%08X, 0x%08X);\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+    }
+
+    break;
+  }
+}
+
 const char *gen_load_defines()
 {
   static char filename[4096];
@@ -305,81 +361,48 @@ const char *gen_load_defines()
   BLSLL_FOREACH(bin, binl) {
     char binname[1024];
     getsymname(binname, bin->name);
-    fprintf(out, "#define %s%s() do { ", binary_load_function, binname);
+    fprintf(out, "static inline void %s%s() do { ", binary_load_function, binname);
 
     if(maintarget == target_scd1 || maintarget == target_scd2) {
-      // Begin SCD transfer
-      // blsload_scd_stream starts CD transfer and waits until data is ready in hardware buffer
-//      fprintf(out, "blsload_scd_stream(0x%08X, %d);", bin->physaddr / 2048, (bin->physsize + 2047) / 2048);
+      secl = bin->provides;
+      if(bin->banks.bus == bus_main) {
+        // Load from WRAM
+        fprintf(out, "blsload_read_cd(%08X, %04X);\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
+        busaddr physba = {bus_main, 0x200000, -1};
+        BLSLL_FOREACH(sec,secl) {
+          if(bin == mainout.ipbin || bin == mainout.spbin) {
+            // Layout for IP and SP is fixed
+            physba.addr = 0x200000 + sec->symbol->value.addr;
+          }
+
+          // Load section from WRAM
+          gen_load_section_asmx(out, sec, physba);
+
+          // Compute offset of next section
+          physba.addr += sec->size;
+          if(physba.addr & 1) {
+            ++physba.addr;
+          }
+        }
+      } else {
+        // Load from CD
+        fprintf(out, "blsload_start_read(%08X, %04X);\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
+        BLSLL_FOREACH(sec,secl) {
+          // Load from CD
+          sv addr = chip2bank(sec->symbol->value, &sec->source->banks);
+          fprintf(out, "blsload_read_cd(%08X, %08X);\n", (unsigned int)addr, (unsigned int)sec->size);
+        }
+      }
     } else {
       secl = bin->provides;
       BLSLL_FOREACH(sec, secl) {
         // Load each section
-        busaddr ba = chip2bus(sec->symbol->value, bus_main);
-
-        if(sec->format == format_empty || sec->size == 0) {
-          continue;
-        }
-
-        if(sec->format == format_zero) {
-          if(sec->symbol->value.chip == chip_ram) {
-            if(sec->size > 1) {
-              fprintf(out, "blsfastfill_word(0x%08X, 0x%08X, 0);", (unsigned int)ba.addr, (unsigned int)sec->size / 2);
-            }
-
-            if(sec->size & 1) {
-              fprintf(out, "*((char*)0x%08X) = 0;", (unsigned int)(ba.addr + sec->size - 1));
-            }
-          } else if(sec->symbol->value.chip == chip_vram) {
-            fprintf(out, "blsvdp_clear(0x%04X, 0x%04X, 0);", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
-          } else {
-            printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
-          }
-
-          continue;
-        }
-
-        if(sec->format != format_raw) {
-          printf("Warning : %s format unsupported\n", format_names[sec->format]);
-          continue;
-        }
-
-        switch(sec->symbol->value.chip) {
-        case chip_none:
-        case chip_mstk:
-        case chip_sstk:
-        case chip_zstk:
-        case chip_cart:
-        case chip_bram:
-        case chip_pram:
-        case chip_wram:
-        case chip_pcm:
-        case chip_max:
-          break;
-
-        case chip_zram:
-          // TODO
-          break;
-
-        case chip_vram:
-          fprintf(out, "blsvdp_dma(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)sec->size);
-          break;
-
-        case chip_cram:
-          fprintf(out, "blsvdp_set_cram(0x%04X, 0x%08X, 0x%04X);", (unsigned int)sec->symbol->value.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)sec->size);
-          break;
-
-        case chip_ram:
-          if(maintarget != target_ram) {
-            fprintf(out, "blsfastcopy_word(0x%08X, 0x%08X, 0x%08X);", (unsigned int)ba.addr, (unsigned int)phys2bus(sec->physaddr, bus_main).addr, (unsigned int)((sec->size + 1) / 2));
-          }
-
-          break;
-        }
+        busaddr physba = phys2bus(sec->physaddr, bus_main);
+        gen_load_section_asmx(out, sec, physba);
       }
     }
 
-    fprintf(out, " } while(0)\n");
+    fprintf(out, "}\n");
   }
 
   fclose(out);
