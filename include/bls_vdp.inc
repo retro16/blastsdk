@@ -327,7 +327,7 @@ SOFF            set     0
         endif
         if SOFF == 2
                 ; Circumvent hardware flaw in WRAM DMA
-                VDPSETWRITE tgt
+                VDPSETWRITE tgt, ram
                 VDPWRITEW src
         endif
                 endm

@@ -212,7 +212,8 @@ busaddr chip2bus(chipaddr ca, bus bus)
 
   case chip_vram:
   case chip_cram:
-    break;
+    ba.addr = ca.addr;
+    return ba;
 
   // TODO : CD chips
   case chip_bram:
@@ -436,9 +437,6 @@ sv chip_start(chip chip)
 {
   if(chip == chip_cart && maintarget != target_ram) {
     return ROMHEADERSIZE;
-  } else if(chip == chip_vram) {
-    // Skip null tile
-    return 0x20;
   } else if(chip == chip_pram) {
     // Skip CD BIOS
     return 0x6000;
@@ -510,7 +508,7 @@ chipaddr bankmove(chipaddr addr, bus bus, int newbank)
 
 sv align_value(sv value, sv step)
 {
-  if(value % step) {
+  if(step && value % step) {
     value += step - (value % step);
   }
 

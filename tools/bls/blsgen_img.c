@@ -20,6 +20,7 @@ static int compute_cells(unsigned int pixels)
 sv compute_map_size(unsigned int width, unsigned int height)
 {
   int hcells = compute_cells(width);
+  if(hcells < 64) hcells = 64;
   int vcells = compute_cells(height);
 
   return hcells * vcells * 2;
@@ -32,6 +33,7 @@ sv compute_map_size(unsigned int width, unsigned int height)
 void gen_simple_map(char *out, sv tiles_ram_offset, sv null_tile_offset, unsigned int width, unsigned int height)
 {
   int hcells = compute_cells(width);
+  if(hcells < 64) hcells = 64;
   int vcells = compute_cells(height);
   int img_hcells = (width + 7) / 8;
   int img_vcells = (height + 7) / 8;

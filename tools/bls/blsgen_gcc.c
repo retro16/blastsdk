@@ -367,7 +367,7 @@ const char *gen_load_defines()
       secl = bin->provides;
       if(bin->banks.bus == bus_main) {
         // Load from WRAM
-        fprintf(out, "blsload_read_cd(%08X, %04X);\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
+        fprintf(out, "blsload_read_cd(0x%08X, 0x%04X);\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
         busaddr physba = {bus_main, 0x200000, -1};
         BLSLL_FOREACH(sec,secl) {
           if(bin == mainout.ipbin || bin == mainout.spbin) {
@@ -386,11 +386,11 @@ const char *gen_load_defines()
         }
       } else {
         // Load from CD
-        fprintf(out, "blsload_start_read(%08X, %04X);\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
+        fprintf(out, "blsload_start_read(0x%08X, 0x%04X);\n", (unsigned int)(bin->physaddr / CDBLOCKSIZE), (unsigned int)((bin->physsize + CDBLOCKSIZE - 1) / CDBLOCKSIZE));
         BLSLL_FOREACH(sec,secl) {
           // Load from CD
           sv addr = chip2bank(sec->symbol->value, &sec->source->banks);
-          fprintf(out, "blsload_read_cd(%08X, %08X);\n", (unsigned int)addr, (unsigned int)sec->size);
+          fprintf(out, "blsload_read_cd(0x%08X, 0x%08X);\n", (unsigned int)addr, (unsigned int)sec->size);
         }
       }
     } else {

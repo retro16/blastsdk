@@ -214,6 +214,19 @@ chip symbol_get_chip(const char *name)
   return sym->value.chip;
 }
 
+chipaddr symbol_get_chipaddr(const char *name)
+{
+  chipaddr notfound = {chip_none, -1};
+
+  symbol *sym = symbol_find(name);
+
+  if(!sym) {
+    return notfound;
+  }
+
+  return sym->value;
+}
+
 sv symbol_get_bus(const char *name, bus bus)
 {
   symbol *sym = symbol_find(name);
@@ -313,7 +326,6 @@ sections_overlap_same_binaries:
   sv s2end = s2addr + s2->size;
 
   if(s1addr >= s2end || s2addr >= s1end) {
-    printf("NO: s1=%06X-%06X s2=%06X-%06X\n", (uint32_t)s1addr, (uint32_t)s1end, (uint32_t)s2addr, (uint32_t)s2end);
     return 0;
   }
 
@@ -1153,8 +1165,8 @@ void bls_map_section(section *sec)
   // Find a place for this section
   sv chipstart = chip_start(sec->symbol->value.chip);
   sv chipend = chipstart + chip_size(sec->symbol->value.chip);
-  sec->symbol->value.addr = chipstart;
-  printf("Section %s : size=%04X chip=%s chipstart=%06X chipend=%06X\n", sec->name, (unsigned int)sec->size, chip_names[sec->symbol->value.chip], (unsigned int)chipstart, (unsigned int)chipend);
+  sec->symbol->value.addr = align_value(chipstart, sec->align);
+  printf("Section %s(%s) : size=%04X chip=%s chipstart=%06X chipend=%06X ", sec->name, sec->symbol->name, (unsigned int)sec->size, chip_names[sec->symbol->value.chip], (unsigned int)chipstart, (unsigned int)chipend);
 
   while(sec->symbol->value.addr + sec->size <= chipend) {
     BLSLL(section) *sl = usedsections;
@@ -1164,19 +1176,14 @@ void bls_map_section(section *sec)
         continue;
       }
 
-      printf("Overlaps ? %s(%06X-%06X) <-> %s(%06X-%06X)  ", sec->name, (uint32_t)sec->symbol->value.addr, (uint32_t)(sec->symbol->value.addr + sec->size - 1), s->name, (uint32_t)s->symbol->value.addr, (uint32_t)(s->symbol->value.addr + s->size - 1));
-
       if(sections_overlap(sec, s)) {
-        printf("YES : %06X => ", (unsigned int)sec->symbol->value.addr);
-        sec->symbol->value.addr = s->symbol->value.addr + s->size;
+        sec->symbol->value.addr = align_value(s->symbol->value.addr + s->size, sec->align);
         chip_align(&sec->symbol->value);
-        printf("%06X\n", (unsigned int)sec->symbol->value.addr);
         goto bls_map_next_section_addr;
-      } else {
-        printf("No\n");
       }
     }
     // Found
+    printf("mapped at %06X\n", (unsigned int)sec->symbol->value.addr);
     return;
 bls_map_next_section_addr:
     continue;
@@ -1203,7 +1210,7 @@ void bls_map()
     sv addr = IPOFFSET;
     printf("Premapping IP binary\n");
     BLSLL_FOREACH(sec, secl) {
-      if(sec->symbol->value.chip != chip_ram) {
+      if(sec->format != format_empty && sec->symbol->value.chip != chip_ram) {
         printf("Error: Bootloader binary must be in ram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
         exit(1);
       }
@@ -1229,7 +1236,7 @@ void bls_map()
     addr = SPOFFSET;
     printf("Premapping SP binary\n");
     BLSLL_FOREACH(sec, secl) {
-      if(sec->symbol->value.chip != chip_pram) {
+      if(sec->format != format_empty && sec->symbol->value.chip != chip_pram) {
         printf("Error: Bootloader binary must be in pram, but section %s is not (it is in %s).\n", sec->name, chip_names[sec->symbol->value.chip]);
         exit(1);
       }

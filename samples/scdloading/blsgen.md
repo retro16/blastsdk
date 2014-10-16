@@ -18,10 +18,34 @@ Binary main
  - include bls_init.md
  - include bdp.md
 
-Binary main2
-------------
+Section plane_b
+---------------
 
- - provides main2.asm
+ - chip vram
+ - format empty
+ - size $800
+ - align $2000
+
+Section hscroll_table
+---------------------
+
+ - chip vram
+ - format empty
+ - size $800
+ - align $400
+
+Section sprat
+-------------
+
+ - chip vram
+ - format empty
+ - size $800
+ - align $400
+
+Binary blast_splash
+-------------------
+
+ - provides blast_splash.png plane_b hscroll_table sprat
  - bus main
 
 --------------------------------------

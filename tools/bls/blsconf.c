@@ -373,6 +373,7 @@ section *section_parse(const mdconfnode *md, const char *srcname, const char *na
   MDCONF_GET_INT(md, physsize, s->physsize);
   MDCONF_GET_ENUM(md, format, format, s->format);
   MDCONF_GET_INT(md, size, s->size);
+  MDCONF_GET_INT(md, align, s->align);
   MDCONF_GET_STR(md, datafile, s->datafile);
 
   if(!s->source) {

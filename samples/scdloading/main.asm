@@ -5,20 +5,16 @@
 MAIN
 IP_MAIN
                 bls_init 0, INT_VBLANK
-                bls_init_vdp 0, 1, 64, 64, $C000, 0, $E000, $B000, $BE00, 0, 0, 0, 0, 0, 0, 0
+                bls_init_vdp 0, 1, 64, 32, BLAST_SPLASH_PNG_MAP, 0, PLANE_B, SPRAT, HSCROLL_TABLE, 0, 0, 0, 0, 0, 0, 0
 
                 bls_enable_interrupts
                 SYNC_MAIN_SUB
 
-.1              
-              VDPSETBG #$600
-              VDPSETBG #$404
-                btst    #CBTNSTART_BIT, CDATA1
+ trap #7
+                BLSLOAD_BINARY_BLAST_SPLASH
+
+.1             
                 bne.b   .1
-
-
-                BLSLOAD_BINARY_MAIN2
-                jmp     MAIN2
 
 INT_VBLANK
                 movem.l d0/d1/a0/a1, -(sp)

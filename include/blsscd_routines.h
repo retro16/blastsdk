@@ -74,7 +74,7 @@ static inline void send_wram_2m() {
   while(!(*GA_MM & GA_DMNA));
 #else
   *GA_MM |= GA_RET;
-  while(*GA_MM & GA_RET);
+  while(!(*GA_MM & GA_RET));
 #endif
 }
 

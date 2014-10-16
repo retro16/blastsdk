@@ -127,6 +127,18 @@ void source_premap_png(group *s)
   section *pal = section_find_ext(s->name, ".pal");
   section *map = section_find_ext(s->name, ".map");
 
+  if(!img->align) {
+    img->align = 0x20;
+  }
+
+  if(!pal->align) {
+    pal->align = 0x20;
+  }
+
+  if(!map->align) {
+    map->align = 0x2000;
+  }
+
   if(img->symbol->value.chip == chip_none) {
     switch(s->banks.bus) {
     case bus_none:

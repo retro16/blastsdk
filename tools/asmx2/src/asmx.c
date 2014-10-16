@@ -3562,12 +3562,15 @@ void CloseInclude(void)
 
 void PreInclude(void)
 {
-    // Setup pre-includes
-    while(preInclude[nInclude + 1][0])
+    // Setup pre-includes in reverse order
+
+    int i;
+    for(i = 0; i < MAX_INCLUDE && preInclude[i][0]; ++i);
+    while(--i >= 0)
     {
-        if(!OpenInclude(preInclude[nInclude + 1]))
+        if(!OpenInclude(preInclude[i]))
         {
-            fprintf(stderr, "Error: cannot include %s\n", preInclude[nInclude + 1]);
+            fprintf(stderr, "Error: cannot include %s\n", preInclude[i]);
             exit(1);
         }
     }

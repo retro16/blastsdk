@@ -131,7 +131,7 @@ SEND_WRAM_2M    macro
         else
                 assert BUS == BUS_SUB
                 bset    #GA_RET_BIT, GA_MM + 1
-                loopwhile btst #GA_RET_BIT, GA_MM + 1
+                loopuntil btst #GA_RET_BIT, GA_MM + 1
         endif
                 endm
 
