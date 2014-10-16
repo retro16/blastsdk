@@ -1,5 +1,5 @@
 				include	bls_vdp.inc
 
 MAIN2
-				VDPSETBG #$E0E
+				VDPSETBG #$0EE
 .1				bra.b	.1

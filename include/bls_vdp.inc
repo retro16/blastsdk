@@ -1,4 +1,5 @@
-        if ..UNDEF VDPDATA
+        if ..UNDEF BLS_VDP_INC
+BLS_VDP_INC     set     1
 
 ; VDP address mappings - can be changed to use registers
 VDPDATA         set     $C00000
@@ -173,6 +174,7 @@ VDPWAITLINE     macro   line
                 cmpi.b  #line, (sp)             ; Compare V part with the line
                 addq.l  #2, sp                  ; Pop the value (CCR not affected)
                 bne.b   .waitline\?             ; Wait if line number is different
+                endm
 
 VDPUNTILLINE    macro   line
 .waitline\?
@@ -180,6 +182,7 @@ VDPUNTILLINE    macro   line
                 cmpi.b  #line, (sp)             ; Compare V part with the line
                 addq.l  #2, sp                  ; Pop the value (CCR not affected)
                 blo.b   .waitline\?             ; Wait if line number is different
+                endm
 
 VRAM            equ     $00000000
 CRAM            equ     $80000000

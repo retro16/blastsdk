@@ -10,23 +10,12 @@ IP_MAIN
                 bls_enable_interrupts
                 SYNC_MAIN_SUB
 
-
-;              VDPSETBG #$00E
-;              trap #7
-
-                bclr    #CSEL_BIT, CDATA1       ; Read A/Start
-
 .1              
               VDPSETBG #$600
               VDPSETBG #$404
                 btst    #CBTNSTART_BIT, CDATA1
                 bne.b   .1
 
-                ;bset    #0, GA_COMMFLAGS_MAIN
-
-                BLSLOAD_READ_CD 0, 1
-
-.0 bra.b .0
 
                 BLSLOAD_BINARY_MAIN2
                 jmp     MAIN2

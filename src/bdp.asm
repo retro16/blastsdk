@@ -76,7 +76,7 @@ bdp_send_byte
 
                 ; Packet sent
                 subq.l  #3, d1                  ; Compute remaining bytes to send
-                bgt.w   bdp_send_packet
+                bgt.b   bdp_send_packet
 
                 ; Wait until ack line is released
 .wait_last_ack
@@ -127,7 +127,7 @@ bdp_sub_check
 .bda_check_end
 
                 btst    #5, GA_COMMFLAGS_SUB    ; test if sub buffer contains data
-                beq.w   .noout
+                beq.b   .noout
 
                 ; Request program ram bank 0
                 SUB_ACCESS_PRAM 0

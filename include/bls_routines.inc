@@ -135,6 +135,7 @@ BLSFASTFILL macro dest, value, bytes
 
          endif
         endif
+        endif
         endm
 
 

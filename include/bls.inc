@@ -1,8 +1,7 @@
 ; Main include for Blast ! SDK
 ; It is automatically included by blsgen
 
-            if ..DEF BLS_VERSION
-            else
+            if ..UNDEF BLS_VERSION
 BLS_VERSION set 1
 
 ; Bus constants
@@ -170,17 +169,17 @@ INTV_TRAP12     set     $B0
 INTV_TRAP13     set     $B4
 INTV_TRAP14     set     $B8
 INTV_TRAP15     set     $BC
+                
+        if BUS == BUS_MAIN
+                include bls_vdp.inc
+        endif
 
                 include bls_macros.inc
                 include bls_routines.inc
-                
-                if BUS == BUS_MAIN
-                include bls_vdp.inc
-                endif
 
-                if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
                 include blsscd.inc
-                endif
+        endif
 
         endif
 

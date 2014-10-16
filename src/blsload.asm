@@ -77,7 +77,6 @@ BLSLOAD_CHECK_MAIN
                 bra.b   .romread_retry
 
 .cdctrn_success BIOS_CDCACK
- trap #7
 
                 move.l  a0, BLSLOAD_TARGET      ; Save current address to RAM
                 ; a1 points at BLSLOAD_DATA
