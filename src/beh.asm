@@ -32,10 +32,20 @@ beh_display_exception
                 move.w  #$2700, sr              ; Disable exceptions
                 subq    #8, a7                  ; Reserve space for SP+USP
                 movem.l d0-d7/a0-a6, -(a7)      ; Push registers to be displayed
-                lea     68(a7), a0              ; Compute SSP value before pushing registers
+                movem.l d0-d7/a0-a6, bda_d0.w   ; Store registers to BDA
+                lea     70(a7), a0              ; Compute SSP value before pushing registers
                 move.l  a0, 60(a7)              ; Move SSP in previously reserved space
+                move.l  a0, bda_sp.w            ; Store SSP to BDA
                 move    usp, a0                 ; Get USP
                 move.l  a0, 64(a7)              ; Move USP in previously reserved space
+
+                move.l  72(a7), bda_pc.w        ; Copy PC to BDA RAM
+                move.w  70(a7), 72(a7)          ; Copy SR to BDA RAM
+
+                moveq   #0, d0
+                move.w  68(a7), d0              ; Read exception vector
+                lsr.w   #2, d0                  ; Compute exception identifier
+                move.l  d0, bda_pkt_header.w    ; Store exception identifier for bda
 
                 VDPSETADDRREG                   ; Set a4 and a5 to data and control registers resp.
 
@@ -70,9 +80,10 @@ beh_display_exception
 
                 moveq   #1, d4                  ; Column count
                 moveq   #18, d7                 ; Line count
-                move.w  #PLANE_A_DEF+64*2*2+12, d6  ; VRAM address of the beginning of the 3rd line
+                move.w  #PLANE_A_DEF+64*2*2+12, d6 ; VRAM address of the beginning of the 3rd line
 
-.1              VDPSETWRITEVAR d6, VRAM
+.1              
+                VDPSETWRITEVAR d6, VRAM
                 move.l  (a7)+, d0               ; d0 = value to display
                 moveq   #7, d5                  ; 8 nybbles to display
                 move.l  d3, (a4)                ; 2 spaces before data
@@ -94,7 +105,9 @@ beh_display_exception
                 move.w  #PLANE_A_DEF+64*2*2+40, d6  ; VRAM address of the beginning of the second column
                 dbra    d4, .1                  ; Update second column
 
-beh_freeze      bra.b   beh_freeze
+
+                lea     bda_pkt_header.w, a7
+                jmp     bda_enter_panic
 
 beh_vdp_regs
                 db      VDPR00                  ; #00

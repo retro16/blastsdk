@@ -224,6 +224,9 @@ bda_enter
                 lea     bda_a7.w, a7            ; Use monitor stack
                 movem.l d0-d7/a0-a6, -(a7)      ; Push registers to bda_regs
                 subq.l  #4, a7                  ; Point a7 to bda_pkt_header
+
+bda_enter_panic ; Entry point when in panic (BEH calls this)
+
                 ; Load frequently used constants in registers (to save code space)
                 moveq.l #$00000006, d4          ; Bit number of TH line (CTH_BIT)
                 moveq.l #$00000007, d5          ; Longs per packet
