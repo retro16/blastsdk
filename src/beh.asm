@@ -30,7 +30,12 @@ int_trap00      move.w  #$0080, -(a7)
 ; Contains in order D0-D7, A0-A7, vector, exception stack frame, top of program stack
 beh_display_exception
                 move.w  #$2700, sr              ; Disable exceptions
-                movem.l d0-d7/a0-a7, -(a7)      ; Push registers to be displayed
+                subq    #8, a7                  ; Reserve space for SP+USP
+                movem.l d0-d7/a0-a6, -(a7)      ; Push registers to be displayed
+                lea     68(a7), a0              ; Compute SSP value before pushing registers
+                move.l  a0, 60(a7)              ; Move SSP in previously reserved space
+                move    usp, a0                 ; Get USP
+                move.l  a0, 64(a7)              ; Move USP in previously reserved space
 
                 VDPSETADDRREG                   ; Set a4 and a5 to data and control registers resp.
 
@@ -64,7 +69,7 @@ beh_display_exception
                 move.l  d3, (a4)                ; Clear vertical scroll
 
                 moveq   #1, d4                  ; Column count
-                moveq   #16, d7                 ; Line count
+                moveq   #18, d7                 ; Line count
                 move.w  #PLANE_A_DEF+64*2*2+12, d6  ; VRAM address of the beginning of the 3rd line
 
 .1              VDPSETWRITEVAR d6, VRAM
@@ -79,11 +84,13 @@ beh_display_exception
                 dbra    d5, .2
                 move.l  d3, (a4)                ; 2 spaces after data
 .3              addi.w  #64*2, d6               ; Go to next line
-                cmp.w   #9, d7                  ; Jump one line at line 8
+                cmp.w   #11, d7                 ; Jump one line at line 8
                 dbne    d7, .3
-                dbra    d7, .1
+                cmp.w   #2, d7                  ; Jump one line at line 16
+                dbne    d7, .3
+                dbra    d7, .1                  ; Go to next line
 
-                moveq   #16, d7                 ; Line count
+                moveq   #18, d7                 ; Line count for second column
                 move.w  #PLANE_A_DEF+64*2*2+40, d6  ; VRAM address of the beginning of the second column
                 dbra    d4, .1                  ; Update second column
 
