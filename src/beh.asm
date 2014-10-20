@@ -40,7 +40,7 @@ beh_display_exception
                 move.l  a0, 64(a7)              ; Move USP in previously reserved space
 
                 move.l  72(a7), bda_pc.w        ; Copy PC to BDA RAM
-                move.w  70(a7), 72(a7)          ; Copy SR to BDA RAM
+                move.w  70(a7), bda_sr.w        ; Copy SR to BDA RAM
 
                 moveq   #0, d0
                 move.w  68(a7), d0              ; Read exception vector
