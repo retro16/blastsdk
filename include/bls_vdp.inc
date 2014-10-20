@@ -261,29 +261,28 @@ VDPSETREADVAR   macro   reg, ram        ; Setup VDP to read from address (reg.w)
                 move.w  (a7)+, reg      ; Restore register
                 endm
 
-VDPSETWRITEVAR  macro   reg, ram        ; Setup VDP to write to address (reg.w) of specified ram
-                move.w  reg, -(a7)      ; Store register
+VDPSETWRITEVAR  macro   reg, ram        ; Setup VDP to write to address (reg.w) of specified ram. Alters d0.
+                move.w  reg, d0         ; Store register
                 ; Compute first half of the command
-                andi.w  #$3FFF, reg
-                ori.w   #(ram >> 16) | $4000, reg
+                andi.w  #$3FFF, d0
+                ori.w   #(ram >> 16) | $4000, d0
                 ; Send first half
         if _VDPREG
-                move.w  reg, (a5)
+                move.w  d0, (a5)
         else
-                move.w  reg, VDPCTRL
+                move.w  d0, VDPCTRL
         endif
-                move.w  (a7), reg       ; Recall register
+                move.w  reg, d0         ; Recall register
                 ; Compute second half of the command
-                rol.w   #2, reg         ; Place 2 MSB at the 2 LSB
-                andi.w  #$0003, reg
-                ori.w   #ram & $FFFF, reg
+                rol.w   #2, d0         ; Place 2 MSB at the 2 LSB
+                andi.w  #$0003, d0
+                ori.w   #ram & $FFFF, d0
                 ; Send second half
         if _VDPREG
-                move.w  reg, (a5)
+                move.w  d0, (a5)
         else
-                move.w  reg, VDPCTRL
+                move.w  d0, VDPCTRL
         endif
-                move.w  (a7)+, reg      ; Restore register
                 endm
 
 VDPSETDMASIZE   macro   s
@@ -295,10 +294,64 @@ VDPPREPDMASIZE  macro   s
                 VDPPREPREG 20, ((s >> 8) & $FF)
                 endm
 
-VDPDMASEND      macro   src, tgt, sz, ram       ; Copy sz words to vram address tgt from address src
+VDPDMAWAIT  macro       ; Wait until last DMA operation is finished
+                moveq   #VDPST_DMA, d1
+.dmawait\?
+        if _VDPREG
+                move.w  (a5), d0
+        else
+                move.w  VDPCTRL, d0
+        endif
+                and.w   d1, d0
+                bne.b   .dmawait\?
+                endm
+
+VDPFIFOWAIT     macro
+                move.w  #VDPST_EMPTY, d1
+.fifowait\?
+        if _VDPREG
+                move.w  (a5), d0
+        else
+                move.w  VDPCTRL, d0
+        endif
+                and.w   d1, d0
+                beq.b   .fifowait\?
+                endm
+
+VDPWAIT         macro
+                VDPDMAWAIT
+                VDPFIFOWAIT
+                endm
+
+VDPSEND         macro   src, tgt, sz, ram       ; Copy without using DMA
+                VDPSETWRITE tgt, ram
+                lea     src, a0
+        if sz / 4 <= 0x100
+                moveq   #(sz / 4) - 1, d0
+        else
+                move.w  #(sz / 4) - 1, d0
+        endif
+.writeloop\?
+        if _VDPREG
+                move.l  (a0)+, (a4)
+        else
+                move.l  (a0)+, VDPDATA
+        endif
+                dbra    d0, .writeloop\?
+
+        if sz & 2
+        if _VDPREG
+                move.w  (a0)+, (a4)
+        else
+                move.w  (a0)+, VDPDATA
+        endif
+        endif
+                endm
+
+VDPDMASEND      macro   src, tgt, sz, ram       ; Copy sz bytes to vram address tgt from address src
                                                 ; DMA must be enabled beforehand and autoincrement must be set correctly
 
-                VDPSETDMASIZE sz        ; Set DMA size
+                VDPSETDMASIZE sz / 2    ; Set DMA size
 
         if (src & $FFFFFF) >= $200000 && (src & $FFFFFF) < $240000
 SOFF            set     2
@@ -333,7 +386,7 @@ SOFF            set     0
                 endm
 
 VDPPREPDMASEND  macro   src, tgt, sz, ram
-                VDPPREPDMASIZE sz
+                VDPPREPDMASIZE sz / 2
                 VDPPREPREG 21, ((src >> 1) & $FF)
                 VDPPREPREG 22, ((src >> 9) & $FF)
                 VDPPREPREG 23, ((src >> 17) & $7F)
@@ -364,18 +417,6 @@ VDPDMAFILL      macro   data, tgt, sz   ; Fill sz bytes of vram at address tgt u
                 move.b  data, VDPDATA
         endif
 
-                endm
-
-VDPDMAWAIT  macro       ; Wait until last DMA operation is finished
-                moveq   #VDPST_DMA, d1
-.dmawait\?
-        if _VDPREG
-                move.w  (a5), d0
-        else
-                move.w  VDPCTRL, d0
-        endif
-                and.w   d1, d0
-                bne.b   .dmawait\?
                 endm
         
 

@@ -654,7 +654,7 @@ int main(int argc, char **argv)
 
     struct timeval select_timeout;
     select_timeout.tv_sec = 0;
-    select_timeout.tv_usec = 40000;
+    select_timeout.tv_usec = 50000;
     selectresult = select(genfd + 1, &readset, NULL, NULL, &select_timeout);
 
     if(selectresult > 0) {
@@ -1044,6 +1044,74 @@ void on_line_input(char *line)
 
     if(strcmp(token, "dbgstatus") == 0) {
       dbgstatus();
+      continue;
+    }
+
+    if(strcmp(token, "vbl") == 0) {
+      writebyte(0, 0xA12000, 0x01);
+      continue;
+    }
+
+    if(strcmp(token, "vdp") == 0) {
+      u32 reg = parse_int_skip(&l);
+      u32 val = parse_int_skip(&l);
+      writeword(0, 0xC00004, 0x8000 | ((reg & 0xFF) << 8) | (val & 0xFF));
+      continue;
+    }
+
+    if(strcmp(token, "dma") == 0) {
+      u32 src = parse_address_skip(&l);
+      u32 tgt = parse_address_skip(&l);
+      u32 sz = parse_address_skip(&l) / 2;
+      u32 ram;
+
+      parse_word(token, &l);
+      if(strcmp(token, "vram") == 0 || !*token) {
+        ram = 0x00000000;
+      } else if(strcmp(token, "vsram") == 0 || !*token) {
+        ram = 0x00000010;
+      } else if(strcmp(token, "cram") == 0 || !*token) {
+        ram = 0x80000000;
+      } else {
+        printf("Unknown ram type %s\n", token);
+        continue;
+      }
+
+      if((src & 0xF00000) == 0x200000) {
+        src += 2;
+        printf("DMA from WRAM: use workaround\n");
+      }
+
+      // Set DMA size
+      writelong(0, 0xC00004, 0x94009300 | ((sz & 0xFF00) << 8) | (sz & 0x00FF));
+      printf("Reg #19: 0x%02X\nReg #20: 0x%02X\n", sz & 0xFF, sz >> 8);
+
+      // Set auto increment and src low byte
+      writelong(0, 0xC00004, 0x8F029500 | ((src >> 1) & 0xFF));
+      printf("Reg #15: 0x02\nReg #21: 0x%02X\n", (src >> 1) & 0xFF);
+
+      // Set src middle and high byte
+      writelong(0, 0xC00004, 0x96009700 | (((src >> 9) & 0xFF) << 16) | ((src >> 17) & 0x7F));
+      printf("Reg #22: 0x%02X\nReg #23: 0x%02X\n", (src >> 9) & 0xFF, (src >> 17) & 0x7F);
+
+      // Set destination
+      writelong(0, 0xC00004, ((tgt & 0x3FFF) << 16) | ram | 0x40000080 | (tgt >> 14));
+      printf("VDPCTRL: 0x%08X\n", ((tgt & 0x3FFF) << 16) | ram | 0x40000080 | (tgt >> 14));
+
+      if((src & 0xF00000) == 0x200000) {
+        src -= 2;
+
+        usleep(1000);
+
+        writelong(0, 0xC00004, ((tgt & 0x3FFF) << 16) | ram | 0x40000000 | (tgt >> 14));
+        printf("VDPCTRL: 0x%08X\n", ((tgt & 0x3FFF) << 16) | ram | 0x40000000 | (tgt >> 14));
+
+        u32 firstword = readword(0, src);
+        writeword(0, 0xC00000, firstword);
+        printf("VDPDATA: 0x%04X\n", firstword);
+      }
+
+
       continue;
     }
 

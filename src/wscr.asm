@@ -35,7 +35,7 @@ _main_wscr_init_vdp
 
                 ; d1 contains line countdown
                 ; d6 contains cell count per column
-                moveq   #wscr_h / 8, d1
+                moveq   #(wscr_h / 8), d1
                 move.w  d1, d6
 
                 ; d5 contains empty cell data
@@ -45,29 +45,31 @@ _main_wscr_init_vdp
                 ; d7 contains current cell data
                 ori.w   #wscr_fbuf_chr / $20, d7
 
-
+                subq.w  #1, d1
 .gen_line       ; Generate one line of plane data
 
                 ; Left border
-                moveq   #(320-wscr_w)/8/2, d0
+                moveq   #((320-wscr_w)/8/2)-1, d0
 .left_border    VDPWRITEW d5
-                dbhi    d0, .left_border
+                dbra    d0, .left_border
 
                 ; Generate one line of framebuffer
-                moveq   #wscr_w/8, d0
+                moveq   #(wscr_w/8)-1, d0
 .gen_chr        VDPWRITEW d7
                 add.w   d6, d7
-                dbhi    d0, .gen_chr
+                dbra    d0, .gen_chr
 
                 ; Compute offset of the first cell of next line
                 subi.w  #(wscr_w * wscr_h / 64) - 1, d7
 
                 ; Right border
-                moveq   #64 - ((320-wscr_w)/8/2), d0
+                moveq   #(64 - ((320-wscr_w)/8/2))-1, d0
 .right_border   VDPWRITEW d5
-                dbhi    d0, .right_border
+                dbra    d0, .right_border
 
-                dbhi    d1, .gen_line
+                dbra    d1, .gen_line
+
+                moveq   #0, d1
 
                 ; Reset horizontal scrolling
                 VDPSETWRITE wscr_hscroll, VRAM

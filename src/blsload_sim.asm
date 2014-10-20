@@ -32,6 +32,10 @@ BOOT            ; Simulated BIOS boot program
                 clr.l   GA_COMMOUT + 8
                 clr.l   GA_COMMOUT + 12
 
+                ; Reset peripherals and setup drive LEDs
+                move.w  #0, GA_RH
+                loopuntil btst #GA_NORESET_BIT, (GA_RH + 1).w
+
                 ; Initialize word ram to 2M mode, accessible from main cpu
                 move.b  #$01, GA_MM + 1         ; Switch to 2M mode
 .wait_2m
@@ -133,6 +137,7 @@ CDCSTAT
 CDCSTOP
 CDCACK
                 clr.l   SECHEAD.w               ; Reset header
+                move.b  #0, GA_RH.w             ; Turn LEDs off
                 rts
 
 ROMREAD
@@ -164,6 +169,7 @@ BDP_WRITE_BUF
                 rts
 
 CDCREAD
+                move.b  #(GA_LEDG | GA_LEDR) >> 8, GA_RH.w ; Turn LEDs on
                 movem.l a0/a1, -(sp)
                 move.l  #($07000000 | (SECBUF << 8)), BDP_OUT_BUFFER.w
                 jsr     BDP_WRITE_BUF(PC)

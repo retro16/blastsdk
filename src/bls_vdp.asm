@@ -37,6 +37,7 @@ blsvdp_dma
                 movep.l d1, 3(a0)       ; Set DMA source address (first byte will be overwritten)
 
                 ; Prepare DMA length
+                lsr.l   #1, d2          ; Convert bytes to words
                 movep.w d2, 1(a0)
                 
                 ; Set VDP registers

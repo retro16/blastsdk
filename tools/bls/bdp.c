@@ -233,7 +233,8 @@ void bdp_readbuffer()
   // Simulate the effect of bdp_sub_check
   if((maintarget == target_scd1 || maintarget == target_scd2) && cpustate[0]) {
     int old_bdpdump = bdpdump;
-    bdpdump = 0; 
+    bdpdump = 0;
+
     u32 commflags = readword(0, 0xA1200E);
     bdpdump = old_bdpdump;
 

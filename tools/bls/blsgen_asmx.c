@@ -318,12 +318,12 @@ void gen_load_section_asmx(FILE *out, const section *sec, busaddr physba)
 
   case chip_vram:
     fprintf(out, "\tVDPSETAUTOINCR 2\n");
-    fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    fprintf(out, "\tVDPSEND\t$%08X, $%04X, $%04X, VRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     break;
 
   case chip_cram:
     fprintf(out, "\tVDPSETAUTOINCR 2\n");
-    fprintf(out, "\tVDPDMASEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+    fprintf(out, "\tVDPSEND\t$%08X, $%04X, $%04X, CRAM\n", (unsigned int)physba.addr, (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     break;
 
   case chip_wram:

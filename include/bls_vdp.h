@@ -133,7 +133,7 @@ static inline void blsvdp_enable(int display, int hint, int vint, int dma)
 // DO NOT do DMA from WRAM on CRAM or VSRAM !
 static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 len)
 {
-  blsvdp_set_reg2(19, len & 0xFF, 20, len >> 8);  // Set DMA length
+  blsvdp_set_reg2(19, (len >> 1) & 0xFF, 20, len >> 9);  // Set DMA length
   u32 srcval = (u32)src;
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
