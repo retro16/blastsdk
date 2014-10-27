@@ -200,6 +200,10 @@ void output_parse(const mdconfnode *n, const char *name)
     mainout.rom_end = -1;
   }
 
+  mainout.iso9660 = strdupnul(mdconfget(n, "iso9660"));
+  mainout.contentsize = 0;
+  mainout.imagesize = 0;
+
   mainout.file = strdupnul(mdconfget(n, "file"));
 
   if(!mainout.file) {

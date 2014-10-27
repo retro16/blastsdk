@@ -7,6 +7,8 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 
+#define EXTERN_CONST(type, local, name) extern void *name; static type local = (type)&name
+
 // Bus constants
 #define BUS_NONE 0
 #define BUS_MAIN 1

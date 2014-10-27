@@ -6,7 +6,9 @@
 #include "blspack.h"
 #include "blswrite.h"
 #include "blsparse.h"
+#include "blsiso.h"
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <libgen.h>
 
 #include "scdboot_us.c"
@@ -1400,15 +1402,36 @@ void bls_physmap_cd()
   // Map IP on physical medium
   mainout.ipbin->physaddr = CDHEADERSIZE + SECCODESIZE + 6;
 
+  if(mainout.ipbin->physaddr + mainout.ipbin->physsize > 16 * CDBLOCKSIZE) {
+    printf("Error: IP too large.\n");
+    exit(1);
+  }
+
   // Map SP on physical medium
   mainout.spbin->physaddr = align_value(mainout.ipbin->physaddr + mainout.ipbin->physsize, CDBLOCKSIZE) + SPHEADERSIZE;
+  if(mainout.contentsize && mainout.spbin->physaddr - SPHEADERSIZE < 16 * CDBLOCKSIZE && mainout.spbin->physaddr + mainout.spbin->physsize > 16 * CDBLOCKSIZE) {
+    // SP overlaps content: relocate after ISO9660 content
+    mainout.spbin->physaddr = align_value(mainout.contentsize, CDBLOCKSIZE) + SPHEADERSIZE;
+  }
 
-  sv physstart = align_value(mainout.spbin->physaddr + mainout.spbin->physsize, CDBLOCKSIZE);
+  // Map other binaries on physical medium
+  sv physstart;
+  if(mainout.contentsize && mainout.spbin->physaddr < 16 * CDBLOCKSIZE) {
+    // SP is before ISO filesystem, put content after the filesystem
+    physstart = align_value(mainout.contentsize, CDBLOCKSIZE);
+  } else {
+    // No filesystem or SP after the filesystem: put content after SP
+    physstart = align_value(mainout.spbin->physaddr + mainout.spbin->physsize, CDBLOCKSIZE);
+  }
   sv physend = MAXCDBLOCKS * CDBLOCKSIZE;
 
   BLSLL(group) *binl = usedbinaries;
   group *bin;
   BLSLL_FOREACH(bin, binl) {
+    if(bin == mainout.ipbin || bin == mainout.spbin) {
+      continue;
+    }
+
     if(bin->physsize == -1) {
       printf("Error : %s has unknown size.\n", bin->name);
       exit(1);
@@ -1416,11 +1439,6 @@ void bls_physmap_cd()
 
     if(bin->physsize == 0) {
       bin->physaddr = -1;
-      continue;
-    }
-
-    if(bin->physaddr != -1) {
-      // Binary already mapped
       continue;
     }
 
@@ -1434,6 +1452,12 @@ void bls_physmap_cd()
     }
 
     physstart = align_value(bin->physaddr + bin->physsize, CDBLOCKSIZE);
+  }
+
+  // Store image size
+  mainout.imagesize = physstart;
+  if(mainout.imagesize < MINCDBLOCKS * CDBLOCKSIZE) {
+    mainout.imagesize = MINCDBLOCKS * CDBLOCKSIZE;
   }
 
   binl = usedbinaries;
@@ -1705,6 +1729,15 @@ void bls_build_genesis_header(FILE *f)
 }
 
 
+void bls_compute_content_size()
+{
+  if(mainout.iso9660 && *mainout.iso9660) {
+    FILE *nul = fopen("/dev/null", "w");
+    mainout.contentsize = blsiso_gen(nul, mainout.name, mainout.serial, mainout.copyright, strcasecmp(mainout.iso9660, "self.iso") ? mainout.iso9660 : NULL, 0, 0);
+  }
+}
+
+
 void bls_build_cd_image()
 {
   printf("Writing CD image to %s\n", mainout.file);
@@ -1901,6 +1934,11 @@ void bls_build_cd_image()
 
   for(i = ftell(f); i < MINCDBLOCKS * CDBLOCKSIZE; ++i) {
     fputc(0, f);
+  }
+
+  // Output iso9660 filesystem
+  if(mainout.iso9660 && *mainout.iso9660) {
+    blsiso_gen(f, mainout.name, mainout.serial, mainout.copyright, strcasecmp(mainout.iso9660, "self.iso") ? mainout.iso9660 : NULL, mainout.imagesize, 1);
   }
 }
 
@@ -2273,6 +2311,7 @@ int main(int argc, char **argv)
     bls_pack_sections(); // Final packing pass
     bls_build_cart_image(); // Build the final cart image
   } else {
+    bls_compute_content_size(); // Compute the size of the iso9660 filesystem
     bls_pack_binaries(); // Pack once to find physical size for all files
     bls_physmap_cd(); // Map physical CD
     bls_map_reset();

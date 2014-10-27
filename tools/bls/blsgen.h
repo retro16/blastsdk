@@ -164,6 +164,9 @@ typedef struct output {
   group *spbin; // Binary of SP
   section *mainstack;
   section *substack;
+  char *iso9660; // ISO9660 content directory. If set to "self.iso", only the self.iso file will be generated.
+  sv contentsize; // ISO9660 content size
+  sv imagesize; // CD-ROM image size
 
   BLSLL(group) *bol; // Build order list
   BLSLL(group) *sol; // Section order lost
