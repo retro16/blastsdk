@@ -353,7 +353,7 @@ VDPDMASEND      macro   src, tgt, sz, ram       ; Copy sz bytes to vram address 
 
                 VDPSETDMASIZE sz / 2    ; Set DMA size
 
-        if (src & $FFFFFF) >= $200000 && (src & $FFFFFF) < $240000
+        if (src & $F00000) == $200000
 SOFF            set     2
         else
 SOFF            set     0

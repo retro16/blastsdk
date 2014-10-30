@@ -83,7 +83,7 @@ Section font.png.img
 Source text.txt
 ---------------
 
- - chip ram
+ - chip cart
  - format raw
 
 

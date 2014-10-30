@@ -3,14 +3,14 @@
 
 // Purely inline fill function.
 // Optimized for constant parameters
-static inline void blsfastfill(void restrict *dest, u8 value, u32 bytes) {
+static inline void blsfastfill(void *dest, u8 value, u32 bytes) {
   u8 *db = (u8 *)dest;
-  if(db & 1) {
+  if((u32)db & 1) {
     *db = value;
     --bytes;
   }
   u32 *dl = (u32 *)db;
-  u32 qval = (((u32)value) << 24) | (((u32)value) << 16) | (((u32)value) << 8) | value
+  u32 qval = (((u32)value) << 24) | (((u32)value) << 16) | (((u32)value) << 8) | value;
   for(; bytes >= 4; bytes -= 4) {
     *dl = qval;
     ++dl;
@@ -25,10 +25,10 @@ static inline void blsfastfill(void restrict *dest, u8 value, u32 bytes) {
 
 // Purely inline copy function.
 // Optimized for constant parameters
-static inline void blsfastcopy_aligned(void restrict *dest, void restrict *src, u32 bytes) {
+static inline void blsfastcopy_aligned(void *dest, void *src, u32 bytes) {
   u8 *d = (u8 *)dest;
   u8 *s = (u8 *)src;
-  if(!(d & 1) && !(s & 1)) {
+  if(!((u32)d & 1) && !((u32)s & 1)) {
     // Aligned pointers
     u32 *dl = (u32 *)dest;
     u32 *sl = (u32 *)src;
@@ -78,7 +78,11 @@ static inline void bls_disable_interrupts() {
   asm volatile("\tori #0x0700, %sr\n");
 }
 
-static inline void trap(t) { asm volatile("\tTRAP #"#t); }
+static inline void trap(t) {
+#define TRAP_STRING(t) #t
+  asm volatile("\tTRAP #" TRAP_STRING(t));
+#undef TRAP_STRING
+}
 
 static inline void enter_monitor() {
   trap(7);

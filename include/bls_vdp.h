@@ -31,13 +31,13 @@
 #define VDPR00 0x04             // VDP register #00
 #define VDPHINT 0x10             // Enable HBlank interrupt (level 4)
 #define VDPHVEN 0x02             // Enable read HV counter
-#define 
+
 #define VDPR01 0x04             // VDP register #01
 #define VDPDISPEN 0x40             // Display enable
 #define VDPVINT 0x20             // Enable VBlank interrupt (level 6)
 #define VDPDMAEN 0x10             // Enable DMA
 #define VDPV30 0x08             // Display 30 cells vertically (PAL only)
-#define 
+
 #define VDPR02 (PLANE_A >> 10 & 0x38)   // VDP register #02 - plane a name table
 #define VDPR03 0x00                     // VDP register #03 - window name table
 #define VDPR04 (PLANE_B >> 13)         // VDP register #04 - plane b name table
@@ -47,24 +47,24 @@
 #define VDPR08 0x00             // VDP register #08
 #define VDPR09 0x00             // VDP register #09
 #define VDPR10 0x00             // VDP register #10
-#define 
+
 #define VDPR11 0x00             // VDP register #11
 #define VDPEINT 0x08             // Enable external interrupt (level 2)
 #define VDPVCELLSCROLL 0x04             // V scroll : 2 cells
 #define VDPHCELLSCROLL 0x02             // H scroll : per cell
 #define VDPHLINESCROLL 0x03             // H scroll : per line
-#define 
+
 #define VDPR12 0x00             // VDP register #12
 #define VDPH40 0x81             // Display 40 cells horizontally
 #define VDPSTE 0x40             // Enable shadow/hilight
 #define VDPILACE 0x02             // Interlace mode
 #define VDPILACEDBL 0x06             // Interlace mode (double resolution)
-#define 
-#define 
+
+
 #define VDPR13 (HSCROLL_TABLE >> 10 & 0x3F)     // VDP register #13 - hscroll table
 #define VDPR14 0x00             // VDP register #14
 #define VDPR15 0x00             // VDP register #15 : autoincrement
-#define 
+
 #define VDPR16 0x00             // VDP register #16
 #define VDPSCRV32 0x00             // VDP scroll 32 cells vertical
 #define VDPSCRV64 0x10             // VDP scroll 64 cells vertical
@@ -72,24 +72,13 @@
 #define VDPSCRH32 0x00             // VDP scroll 32 cells horizontal
 #define VDPSCRH64 0x01             // VDP scroll 64 cells horizontal
 #define VDPSCRH128 0x03             // VDP scroll 128 cells horizontal
-#define 
+
 #define VDPR17 0x00             // VDP register #17
 #define VDPWINRIGHT 0x80             // Window on the right hand side
-#define 
+
 #define VDPR18 0x00             // VDP register #18
 #define VDPWINBOT 0x80             // Window at the bottom of the screen
 
-
-enum hscroll_mode_e {
-  VDPVSCREENSCROLL = 0,
-  VDPVCELLSCROLL = 0x04
-};
-
-enum vscroll_mode_e {
-  VDPHSCREENSCROLL = 0,
-  VDPHCELLSCROLL = 0x02,
-  VDPHLINESCROLL = 0x03
-};
 
 #define VDPCMD(cmd, target, addr) ((cmd) | (target) | ((addr) & 0x00003FFF) | (((addr) << 2) & 0x00030000))
 
@@ -125,7 +114,7 @@ static inline void blsvdp_set_autoincrement(u8 incr)
 
 static inline void blsvdp_enable(int display, int hint, int vint, int dma)
 {
-  blsvdp_set_reg2(0, VDPR00 | VDPHVEN | (hint ? VDPHINT : 0), 1, VDPR01 | (display ? VDPDISPEN : 0) | (vint ? VDPVINT : 0) | (dma ? VDPDMAEN : 0);
+  blsvdp_set_reg2(0, VDPR00 | VDPHVEN | (hint ? VDPHINT : 0), 1, VDPR01 | (display ? VDPDISPEN : 0) | (vint ? VDPVINT : 0) | (dma ? VDPDMAEN : 0));
 }
 
 // Inline version of DMA copy. Faster for constant values, slower for variables.
@@ -144,7 +133,7 @@ static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 
 
 #endif
   blsvdp_set_reg2(21, (srcval >> 1) & 0xFF, 22, (srcval >> 9) & 0xFF);
-  blsvdp_set_reg(23, (srcval >> 17) & 0x7F);
+  blsvdp_set_reg2(23, (srcval >> 17) & 0x7F, 15, 2);
 
   *VDPCTRL = VDPCMD(VDPWRITE | VDPDMA, target, dest) >> 16;
 
@@ -165,9 +154,8 @@ static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 
 
 static inline void blsvdp_dmafill_inline(u8 data, u16 dest, u16 len) {
   blsvdp_set_reg2(19, len & 0xFF, 20, len >> 8);  // Set DMA length
-  u32 srcval = (u32)src;
 
-  blsvdp_set_reg(23, 0x8000); // Set fill mode
+  blsvdp_set_reg2(23, 0x80, 15, 1); // Set fill mode
 
   *VDPCTRL_L = VDPCMD(VDPWRITE | VDPDMA, VDPVRAM, dest);
   *VDPDATA_B = data;
@@ -175,9 +163,11 @@ static inline void blsvdp_dmafill_inline(u8 data, u16 dest, u16 len) {
 
 static inline void blsvdp_send_inline(u32 target, u16 dest, const void *src, u16 len)
 {
+  blsvdp_set_reg(15, 2);
   *VDPCTRL_L = VDPCMD(VDPWRITE, target, dest);
 
-  for(u16 i = 0; i < len; i += 2) {
+  u16 i;
+  for(i = 0; i < len; i += 2) {
     *VDPDATA = ((const u16 *)src)[i];
   }
 }

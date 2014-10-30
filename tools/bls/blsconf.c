@@ -26,6 +26,8 @@ const struct {
   format fmt;
 } extfmt[] = {
   { ".bin", format_raw },
+  { ".txt", format_raw },
+  { ".raw", format_raw },
   { ".asm", format_asmx },
   { ".z80.c", format_sdcc },
   { ".c", format_gcc },
@@ -36,8 +38,8 @@ const struct {
   { ".text", format_raw },
   { ".data", format_raw },
   { ".bss", format_empty },
-  { ".image", format_raw },
-  { ".palette", format_raw },
+  { ".img", format_raw },
+  { ".pal", format_raw },
   { ".map", format_raw },
 
   { "", format_max}
@@ -152,7 +154,7 @@ group *source_parse(const mdconfnode *n, const char *name)
     break;
 
   case format_raw:
-//      section_create_raw(s, n);
+    section_create_raw(s, n);
     break;
 
   case format_asmx:

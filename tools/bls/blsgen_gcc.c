@@ -276,12 +276,12 @@ void find_binary_load(group *s, FILE *in)
   }
 }
 
-static void extract_section(section *s)
+static void extract_section(group *src, section *sec)
 {
-  const char *sname = strrchr(s->name, '.');
+  const char *secname = strrchr(sec->name, '.');
   char cmdline[4096];
-  snprintf(cmdline, 4096, "%s -O binary -j %s "BUILDDIR"/%s.elf "BUILDDIR"/%s", objcopy, sname, s->name, s->name);
-  printf("Extract section %s :\n%s\n", s->name, cmdline);
+  snprintf(cmdline, 4096, "%s -O binary -j %s "BUILDDIR"/%s.elf "BUILDDIR"/%s", objcopy, secname, src->name, sec->name);
+  printf("Extract section %s :\n%s\n", sec->name, cmdline);
   system(cmdline);
 }
 
@@ -295,9 +295,9 @@ void gen_load_section_gcc(FILE *out, const section *sec, busaddr physba)
 
   if(sec->format == format_zero) {
     if(sec->symbol->value.chip == chip_ram) {
-      fprintf(out, "blsfastfill(0x%08X, 0, 0x%08X);\n", (unsigned int)ba.addr, (unsigned int)sec->size);
+      fprintf(out, "blsfastfill((void*)0x%08X, 0, 0x%08X);\n", (unsigned int)ba.addr, (unsigned int)sec->size);
     } else if(sec->symbol->value.chip == chip_vram) {
-      fprintf(out, "blsvdp_dmafill_inline(0, 0x%04X, 0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
+      fprintf(out, "blsvdp_dmafill_inline(0,(u16) 0x%04X, (u16)0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)sec->size);
     } else {
       printf("Warning : chip %s does not support format_zero\n", chip_names[sec->symbol->value.chip]);
     }
@@ -323,18 +323,18 @@ void gen_load_section_gcc(FILE *out, const section *sec, busaddr physba)
     break;
 
   case chip_vram:
-    fprintf(out, "blsvdp_dma_inline(VDPVRAM, 0x%04X, 0x%08X, 0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+    fprintf(out, "blsvdp_dma_inline(VDPVRAM, (u16)0x%04X, (void*)0x%08X, (u16)0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
     break;
 
   case chip_cram:
-    fprintf(out, "blsvdp_dma_inline(VDPCRAM, 0x%04X, 0x%08X, 0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+    fprintf(out, "blsvdp_dma_inline(VDPCRAM, (u16)0x%04X, (void*)0x%08X, (u16)0x%04X);\n", (unsigned int)sec->symbol->value.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
     break;
 
   case chip_wram:
   case chip_zram:
   case chip_ram:
     if(maintarget != target_ram && ba.addr != physba.addr) {
-      fprintf(out, "blsfastcopy_aligned(0x%08X, 0x%08X, 0x%08X);\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
+      fprintf(out, "blsfastcopy_aligned((void*)0x%08X, (void*)0x%08X, (u32)0x%08X);\n", (unsigned int)ba.addr, (unsigned int)physba.addr, (unsigned int)sec->size);
     }
 
     break;
@@ -361,7 +361,7 @@ const char *gen_load_defines()
   BLSLL_FOREACH(bin, binl) {
     char binname[1024];
     getsymname(binname, bin->name);
-    fprintf(out, "static inline void %s%s() do { ", binary_load_function, binname);
+    fprintf(out, "static inline void %s%s() { ", binary_load_function, binname);
 
     if(maintarget == target_scd1 || maintarget == target_scd2) {
       secl = bin->provides;
@@ -376,7 +376,7 @@ const char *gen_load_defines()
           }
 
           // Load section from WRAM
-          gen_load_section_asmx(out, sec, physba);
+          gen_load_section_gcc(out, sec, physba);
 
           // Compute offset of next section
           physba.addr += sec->size;
@@ -398,7 +398,7 @@ const char *gen_load_defines()
       BLSLL_FOREACH(sec, secl) {
         // Load each section
         busaddr physba = phys2bus(sec->physaddr, bus_main);
-        gen_load_section_asmx(out, sec, physba);
+        gen_load_section_gcc(out, sec, physba);
       }
     }
 
@@ -598,9 +598,9 @@ system(cmdline);
 extract_section_elf(s, ".text", (unsigned int)textba.addr);
 extract_section_elf(s, ".data", (unsigned int)databa.addr);
 extract_section_elf(s, ".bss", (unsigned int)bssba.addr);
-extract_section(text);
-extract_section(data);
-extract_section(bss);
+extract_section(s, text);
+extract_section(s, data);
+extract_section(s, bss);
 }
 
 void source_premap_gcc(group *s)

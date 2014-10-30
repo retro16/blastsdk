@@ -7,7 +7,8 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 
-#define EXTERN_CONST(type, local, name) extern void *name; static type local = (type)&name
+#define EXTERN_CONST(name) extern void *name;
+#define EXTERN_DEF(type, name) ((type)(u32)&name)
 
 // Bus constants
 #define BUS_NONE 0
@@ -265,5 +266,6 @@ static inline void blscopy_inline(void *dest, const void *src, u32 length)
 #include "blsscd.h"
 #endif
 
+#include "bls_vdp.h"
 
 #endif

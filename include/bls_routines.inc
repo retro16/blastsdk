@@ -213,4 +213,66 @@ ENTER_MONITOR   macro
                 trap    #07
                 endm
 
+; Delay for a number of CPU cycles
+DELAY_CYCLES macro   cycles
+    if cycles < 68
+        BLSREPEAT cycles / 4, nop
+    else
+        move    sr, -(sp)       ; 18
+        move.w  d0, -(sp)       ; 18
+    if cycles >= 72 && cycles < 2632
+        moveq   #(cycles - 72) / 10, d0 ; 4
+    elsif cycles < 655432
+        move.w  #(cycles - 76) / 10, d0 ; 8
+    elsif cycles < 2752588
+        move.w  #(cycles - 76) / 42, d0
+    else
+        assert cycles < 2752588 ; Longer loops unimplemented
+    endif
+    if cycles < 88
+        BLSREPEAT (cycles - 72) / 4, nop ; Delay too short to make a loop
+    else
+.delayloop\?
+     if cycles >= 655432
+        BLSREPEAT 8, nop        ; Slow down loop for very long waits
+     endif
+        dbra    d0, .delayloop\?
+    endif
+        move.w  (sp)+, d0       ; 16
+        move    (sp)+, ccr      ; 16
+    endif
+        endm
+
+; Delay for millis milliseconds
+DELAY_MILLIS macro millis
+    if millis < 200
+     if BUS == BUS_MAIN
+        DELAY_CYCLES 7620 * millis
+     else
+        DELAY_CYCLES 12500 * millis
+     endif
+    else
+        move    sr, -(sp)       ; 18
+        move.w  d0, -(sp)       ; 18
+        move.w  #(millis - 1), d0 ; 8
+    ; First loop is shorter to counter setup time
+     if BUS == BUS_MAIN
+        DELAY_CYCLES 7620 - 76
+     else
+        DELAY_CYCLES 12500 - 76
+     endif
+     if millis > 1
+.delaymillisloop\?
+      if BUS == BUS_MAIN
+        DELAY_CYCLES 7620 - 10
+      else
+        DELAY_CYCLES 12500 - 10
+      endif
+        dbra d0, .delaymillisloop\?
+        move.w  (sp)+, d0       ; 16
+        move    (sp)+, ccr      ; 16
+     endif
+    endif
+        endm
+
 ; vim: ts=8 sw=8 sts=8 et

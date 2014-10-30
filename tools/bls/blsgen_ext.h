@@ -22,4 +22,10 @@ void source_compile_png(group *s);
 sv compute_map_size(unsigned int width, unsigned int height);
 void gen_simple_map(char *out, sv tiles_ram_offset, sv null_tile_offset, unsigned int width, unsigned int height);
 
+//blsgen_raw : raw file
+void section_create_raw(group *source, const mdconfnode *mdconf);
+void source_get_symbols_raw(group *s);
+void source_premap_raw(group *s);
+void source_compile_raw(group *s);
+
 // vim: ts=2 sw=2 sts=2 et

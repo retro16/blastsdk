@@ -89,6 +89,10 @@ const char *sections_cat(group *bin, const char *binname)
       i = fopen(secfile, "rb");
       filecat(i, o);
       sec->physsize = ftell(i);
+      if(sec->size != sec->physsize) {
+        printf("Warning: Logical and physical sizes differ for raw section %s (size=$%04X physsize=$%04X)\n", sec->name, sec->size, sec->physsize);
+      }
+      fclose(i);
     }
 
     // Move cursor after the binary
@@ -107,6 +111,9 @@ const char *sections_cat(group *bin, const char *binname)
       i = fopen(secfile, "rb");
       filecat(i, o);
       sec->physsize = ftell(i);
+      if(sec->size != sec->physsize) {
+        printf("Warning: Logical and physical sizes differ for raw section %s (size=$%04X physsize=$%04X)\n", sec->name, sec->size, sec->physsize);
+      }
       if(sec->physsize & 1) {
         fputc('\x00', o); // Align sections to word in binary
       }

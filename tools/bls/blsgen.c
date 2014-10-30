@@ -999,6 +999,11 @@ void bls_get_symbols()
 
     case format_asmx:
       source_get_symbols_asmx(grp);
+      break;
+
+    case format_raw:
+      source_get_symbols_raw(grp);
+      break;
 
     default:
       break;
@@ -1091,6 +1096,10 @@ void bls_compile()
 
     case format_asmx:
       source_compile_asmx(grp);
+      break;
+
+    case format_raw:
+      source_compile_raw(grp);
       break;
 
     default:
@@ -1599,6 +1608,11 @@ void bls_finalize_binary_dependencies()
       source_premap_asmx(grp);
       break;
 
+    case format_raw:
+      printf("Premapping %s\n", grp->name);
+      source_premap_raw(grp);
+      break;
+
     default:
       break;
     }
@@ -1613,13 +1627,13 @@ void bls_pack_binaries()
   BLSLL_FOREACH(bin, binl) {
     char binname[4096];
     snprintf(binname, 4096, BUILDDIR"/%s.binary", bin->name);
+    printf("Packing binary %s to file %s\n", bin->name, binname);
     sections_cat(bin, binname);
 
     if(!bin->physsize) {
       continue;
     }
 
-    printf("Packing binary %s\n", bin->name);
     snprintf(binname, 4096, "%s.binary", bin->name);
 
     switch(bin->format) {
@@ -1678,8 +1692,10 @@ void bls_pack_sections()
     default:
     case format_raw: {
       size_t fs = pack_raw(sec->name);
-      printf("Size of %s : %04X\n", sec->name, (unsigned int)fs);
       sec->physsize = fs;
+      if(sec->size != sec->physsize) {
+        printf("Warning: Logical and physical sizes differ for unpacked section %s (size=$%04X physsize=$%04X)\n", sec->name, sec->size, sec->physsize);
+      }
       break;
     }
 
@@ -2254,9 +2270,11 @@ void output_dump_cd(FILE *f)
   }
 }
 
-void confdump()
+void confdump_file(const char *name)
 {
-  FILE *f = fopen(BUILDDIR"/blsgen.md", "w");
+  char fname[4096];
+  snprintf(fname, 4096, BUILDDIR"/%s.md", name);
+  FILE *f = fopen(fname, "w");
   blsconf_dump(f); // Dump full configuration for reference and debugging
 
   if(maintarget == target_scd1 || maintarget == target_scd2) {
@@ -2266,6 +2284,11 @@ void confdump()
   }
 
   fclose(f);
+}
+
+void confdump()
+{
+  confdump_file("blsgen");
 }
 
 int main(int argc, char **argv)
@@ -2299,6 +2322,7 @@ int main(int argc, char **argv)
   bls_get_symbols(); // Get binary size with correct binary load
   bls_map();
   bls_get_symbol_values();
+  confdump_file("blsgen_1");
   bls_compile(); // Compile with most values to get a good approximation of file sizes
 
   if(maintarget != target_scd1 && maintarget != target_scd2) {
@@ -2314,11 +2338,15 @@ int main(int argc, char **argv)
     bls_compute_content_size(); // Compute the size of the iso9660 filesystem
     bls_pack_binaries(); // Pack once to find physical size for all files
     bls_physmap_cd(); // Map physical CD
+    confdump_file("blsgen_2");
     bls_map_reset();
     bls_map(); // Remap with final binary sizes
     bls_get_symbol_values();
+    confdump_file("blsgen_3");
     bls_compile(); // Compile with physical addresses
+    confdump_file("blsgen_4");
     bls_pack_binaries(); // Final packing pass
+    confdump_file("blsgen_5");
     bls_build_cd_image(); // Build the final CD image
   }
 }

@@ -41,9 +41,9 @@ blsvdp_dma
                 movep.w d2, 1(a0)
                 
                 ; Set VDP registers
-                move.l  (aO)+, (a1)
-                move.l  (aO)+, (a1)
-                move.w  (aO)+, (a1)
+                move.l  (a0)+, (a1)
+                move.l  (a0)+, (a1)
+                move.w  (a0)+, (a1)
 
                 move.w  d0, d2          ; d2 = VRAM address MSB + DMA flag
                 bset    #14, d0
@@ -83,7 +83,7 @@ blsvdp_dma
 ; void blsvdp_prepare_init(short *prepared);
 blsvdp_prepare_init
                 move.l  4(sp), a0
-                movei.w #$FFFF, (a0)
+                move.w  #$FFFF, (a0)
                 rts
 
 ;;;;;
@@ -96,7 +96,7 @@ blsvdp_prepare_dma
                 addi.w  #7, (a0)
 
                 ; Compute DMA length
-                movei.l #$93009400, d0  ; Set VDP command
+                move.l  #$93009400, d0  ; Set VDP command
                 move.b  14(sp), d0      ; Put MSB of len in VDP register 20
                 swap    d0
                 move.b  15(sp), d0      ; Put LSB of len in VDP register 19
