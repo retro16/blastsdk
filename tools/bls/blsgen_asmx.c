@@ -133,6 +133,7 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
 
         sec->symbol->value = ca;
         printf("Set address from ORG : 0x%06X\n", (unsigned int)address);
+        sec->fixed = 2;
       }
     }
 
@@ -180,8 +181,8 @@ static void parse_lst_asmx(group *src, FILE *f, int setvalues)
       if(sec->symbol->value.addr != -1) {
         sv newsize = binend - chip2bank(sec->symbol->value, &src->banks);
         if(newsize != sec->size) {
-          sec->size = newsize;
           printf("Warning: %s changed size (%06X -> %06X)\n", sec->name, (u32)sec->size, (u32)newsize);
+          sec->size = newsize;
         }
       } else {
         sec->size = binend - 0x40000;

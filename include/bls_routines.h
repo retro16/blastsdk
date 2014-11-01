@@ -78,11 +78,9 @@ static inline void bls_disable_interrupts() {
   asm volatile("\tori #0x0700, %sr\n");
 }
 
-static inline void trap(t) {
-#define TRAP_STRING(t) #t
-  asm volatile("\tTRAP #" TRAP_STRING(t));
-#undef TRAP_STRING
-}
+#define trap(t) do { \
+  asm volatile("\tTRAP #" #t "\n"); \
+} while(0)
 
 static inline void enter_monitor() {
   trap(7);

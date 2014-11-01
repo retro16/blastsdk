@@ -80,7 +80,7 @@
 #define VDPWINBOT 0x80             // Window at the bottom of the screen
 
 
-#define VDPCMD(cmd, target, addr) ((cmd) | (target) | ((addr) & 0x00003FFF) | (((addr) << 2) & 0x00030000))
+#define VDPCMD(cmd, ram, addr) ((cmd) | (ram) | ( ((addr & 0x3FFF) << 16) | ((addr & 0xC000) >> 14) ))
 
 // Defined in bls_vdp.asm
 extern void blsvdp_dma(const void *dest, const void *src, unsigned int len);

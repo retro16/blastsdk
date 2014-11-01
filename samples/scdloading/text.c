@@ -47,4 +47,13 @@ void DISPLAY_TEXT()
     }
     lineaddr += 0x80;
   }
+
+  // Clear the screen after last line if needed
+  while(lineaddr < vram_plane_a + vram_plane_a_size) {
+    *VDPCTRL_L = VDPCMD(VDPWRITE, VDPVRAM, lineaddr);
+    for(remaining = 0, remaining < linelen; ++remaining) {
+      *VDPDATA = (u16)' ';
+    }
+    lineaddr += 0x80;
+  }
 }

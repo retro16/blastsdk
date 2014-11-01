@@ -498,7 +498,15 @@ void group_dump(const group *grp, FILE *out)
   }
 
   if(grp->banks.bus < bus_max) {
-    fprintf(out, " - bus %s\n\n", bus_names[grp->banks.bus]);
+    fprintf(out, " - bus %s\n", bus_names[grp->banks.bus]);
+  }
+
+  if(grp->physaddr != -1) {
+    fprintf(out, " - physaddr $%08X\n", (u32)grp->physaddr);
+  }
+
+  if(grp->physsize != -1) {
+    fprintf(out, " - physsize $%08X\n", (u32)grp->physsize);
   }
 
   int c;
@@ -612,7 +620,7 @@ void section_dump(const section *sec, FILE *out)
     fprintf(out, " - chip %s\n", chip_names[sec->symbol->value.chip]);
 
     if(sec->symbol->value.addr != -1) {
-      fprintf(out, " - addr $%08lX", (uint64_t)sec->symbol->value.addr);
+      fprintf(out, " - addr $%08lX%s", (uint64_t)sec->symbol->value.addr, sec->fixed ? " (fixed)" : "");
 
       if(sec->source && chipaddr_reachable(sec->symbol->value, &sec->source->banks)) {
         busaddr ba = chip2bus(sec->symbol->value, sec->source->banks.bus);
@@ -859,6 +867,43 @@ bls_check_binary_load_bin_ok:
     }
   }
 }
+
+
+int bls_section_used(section *sec) {
+  BLSLL(section) *usecl = usedsections;
+  section *usec;
+  BLSLL_FOREACH(usec, usecl) {
+    if(usec == sec) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+void bls_remove_unused_sections()
+{
+  BLSLL(group) *binl = usedbinaries;
+  group *bin;
+  BLSLL_FOREACH(bin, binl) {
+    BLSLL(section) *secl = bin->provides;
+    section *sec;
+    BLSLL_FOREACH(sec, secl) {
+bls_remove_unused_sections_next_section:
+      if(!bls_section_used(sec)) {
+        secl = blsll_remove_section(secl);
+        if(secl) {
+          goto bls_remove_unused_sections_next_section;
+        } else {
+          goto bls_remove_unused_sections_next_binary;
+        }
+      }
+    }
+bls_remove_unused_sections_next_binary:
+    continue;
+  }
+}
+
 
 void bls_find_entry()
 {
@@ -1284,9 +1329,10 @@ void bls_map_reset()
   BLSLL(section) *secl;
   section *sec;
 
-  secl = usedsections;
+  secl = sections;
   BLSLL_FOREACH(sec, secl) {
     if(!sec->fixed && sec->symbol) {
+      printf("Resseting section %s\n", sec->name);
       sec->symbol->value.addr = -1;
     }
   }
@@ -2295,6 +2341,7 @@ int main(int argc, char **argv)
 {
   atexit(confdump);
 
+//  system("rm -rf "BUILDDIR);
   mkdir(BUILDDIR, 0777);
 
   if(argc > 1) {
@@ -2314,6 +2361,7 @@ int main(int argc, char **argv)
   bls_find_entry();
   bls_gen_bol();
   bls_check_binary_load();
+  bls_remove_unused_sections();
 
   if(maintarget != target_gen) {
     bls_cart_to_ram();
@@ -2322,7 +2370,6 @@ int main(int argc, char **argv)
   bls_get_symbols(); // Get binary size with correct binary load
   bls_map();
   bls_get_symbol_values();
-  confdump_file("blsgen_1");
   bls_compile(); // Compile with most values to get a good approximation of file sizes
 
   if(maintarget != target_scd1 && maintarget != target_scd2) {
@@ -2338,15 +2385,17 @@ int main(int argc, char **argv)
     bls_compute_content_size(); // Compute the size of the iso9660 filesystem
     bls_pack_binaries(); // Pack once to find physical size for all files
     bls_physmap_cd(); // Map physical CD
-    confdump_file("blsgen_2");
+    bls_map_reset();
+    bls_map(); // Remap with better binary sizes
+    bls_get_symbol_values(); // Refresh binary sizes and symbols with correct physical addresses
+/* confdump();
+ system("rm -rf "BUILDDIR"_3");
+ system("cp -r "BUILDDIR" "BUILDDIR"_3");*/
     bls_map_reset();
     bls_map(); // Remap with final binary sizes
     bls_get_symbol_values();
-    confdump_file("blsgen_3");
     bls_compile(); // Compile with physical addresses
-    confdump_file("blsgen_4");
     bls_pack_binaries(); // Final packing pass
-    confdump_file("blsgen_5");
     bls_build_cd_image(); // Build the final CD image
   }
 }
