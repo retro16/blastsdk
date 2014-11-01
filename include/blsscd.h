@@ -36,7 +36,7 @@
 
 #define GA_MM ((volatile u8 *)GATE_ARRAY + 0x03) // Memory mode
 #define GA_WP ((volatile u8 *)GATE_ARRAY + 0x02) // Write protect
-#if BUS = BUS_MAIN
+#if BUS == BUS_MAIN
 #define GA_BK0 0x40
 #define GA_BK1 0x80
 #else
@@ -183,5 +183,4 @@
 
 #define GA_SCADDR ((volatile u16 *)GATE_ARRAY + 0x68) // Subcode address
 
-#include "blsscd_routines.h"
 

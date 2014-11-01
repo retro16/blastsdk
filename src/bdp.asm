@@ -99,6 +99,7 @@ bdp_write_finished
 ; Poll sub cpu state
 ; void bdp_sub_check();
 bdp_sub_check
+        if ..UNDEF BLS_NBDA
                 btst    #6, GA_COMMFLAGS_SUB
                 beq.b   .bda_check_end
 
@@ -125,6 +126,7 @@ bdp_sub_check
 .sub_trap7
                 dl      $127
 .bda_check_end
+        endif
 
                 btst    #5, GA_COMMFLAGS_SUB    ; test if sub buffer contains data
                 beq.b   .noout

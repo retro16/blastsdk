@@ -14,15 +14,18 @@ BLSLOAD_CHECK_MAIN
 
                 rts
 
+                nop
 .loadquery      ; Main CPU asked for loading
-                move.l  BLSCDR_COMM, d0         ; Get sector number from main CPU
-                andi.l  #$00FFFFFF, d0          ; Filter out sector count
-        
-                moveq   #0, d1                  ; Get sector count from main CPU
-                move.b  BLSCDR_COMM, d1         ;
-
         if TARGET == TARGET_SCD1
                 move.l  #$0C0000, BLSLOAD_TARGET
+                nop
+                nop
+                move.l  #.wait_wram_1m, BLSLOAD_CHECK_MAIN + 2
+.wait_wram_1m
+                btst    #GA_DMNA_BIT, GA_MM + 1
+                bne.b   .wram_1m_ready
+                rts
+.wram_1m_ready
         else
                 assert TARGET == TARGET_SCD2
                 move.l  #$080000, BLSLOAD_TARGET
@@ -37,6 +40,12 @@ BLSLOAD_CHECK_MAIN
                 rts
 .wram_2m_ready
         endif
+
+                move.l  BLSCDR_COMM, d0         ; Get sector number from main CPU
+                andi.l  #$00FFFFFF, d0          ; Filter out sector count
+        
+                moveq   #0, d1                  ; Get sector count from main CPU
+                move.b  BLSCDR_COMM, d1         ;
 
                 movem.l d0/d1, BLSLOAD_SECTOR   ; Store data in ROMREADN format
 

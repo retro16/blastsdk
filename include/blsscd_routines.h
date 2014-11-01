@@ -95,6 +95,9 @@ static inline u8 has_wram_2m() {
 }
 
 #if BUS == BUS_SUB
+static inline void wait_swapreq_1m() {
+  while(!(*GA_MM & GA_DMNA));
+}
 static inline void swap_wram_1m() {
   *GA_MM ^= GA_RET;
   while(*GA_MM & GA_DMNA);
@@ -121,7 +124,7 @@ static inline void swap_wait_1m() {
 
 static inline void blsload_start_read(u32 sector, u8 count) {
   *BLSCDR_COMM = sector | ((u32)count << 24);
-  GA_COMMFLAGS_MAIN |= BLSCDR_FLAG;
+  *GA_COMMFLAGS_MAIN |= BLSCDR_FLAG;
 #if TARGET == TARGET_SCD1
   swap_req_1m();
 #else
@@ -138,6 +141,8 @@ static inline void blsload_wait_read() {
 #else
   wait_wram_2m();
 #endif
+  *GA_COMMFLAGS_MAIN &=~ BLSCDR_FLAG;
+  asm volatile("\tnop\n\tnop\n\tnop\n"); // Let the sub CPU catch the ack
 }
 
 static inline u8 blsload_read_ready() {
@@ -152,3 +157,21 @@ static inline void blsload_read_cd(u32 sector, u8 count) {
   blsload_start_read(sector, count);
   blsload_wait_read();
 }
+
+#if BUS == BUS_SUB
+static inline void set_wram_mode(int mode) {
+  if(mode == 1) {
+    *GA_MM |= GA_MODE;
+  } else {
+    *GA_MM &=~ GA_MODE;
+  }
+}
+
+static inline void set_wram_default_mode() {
+#if TARGET == TARGET_SCD1
+  set_wram_mode(1);
+#elif TARGET == TARGET_SCD2
+  set_wram_mode(2);
+#endif
+}
+#endif

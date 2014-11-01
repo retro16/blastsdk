@@ -1,4 +1,10 @@
-Hello world
+Blast ! SDK CD-ROM loading example.
 
-Testing txt file display !
+This example shows how to load binaries
+and use them in a program.
 
+The text file is embedded in a binary
+and rendered in real time.
+
+See samples/scdloading/blsgen.md for
+more details on how this works.

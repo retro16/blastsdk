@@ -24,14 +24,14 @@ Section plane_a
  - chip vram
  - format empty
  - addr $E000
- - size $800
+ - size $1000
 
 Section plane_b
 ---------------
 
  - chip vram
  - format empty
- - size $800
+ - size $1000
  - align $2000
 
 Section hscroll_table
@@ -90,27 +90,17 @@ Source text.txt
 
 --------------------------------------
 
-Sub CPU binaries
-================
-
-
-Binary sub
-----------
-
- - provides sub.asm
- - bus sub
- - include blsload_sub.md bdp_sub.md
-
-
-
---------------------------------------
-
 Output monitor
 ==============
 
  - name **Monitor**
  - file scdloading_eu.iso
  - region E
- - target scd2
- - binaries main sub
+ - target scd1
+ - binaries main
+ - include sub_idle.md
+
+To disable debug mode (BDA + BEH), enable this line:
+
+     - global BLS_NDEBUG (disable BDA and BEH)
 

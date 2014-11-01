@@ -1,9 +1,10 @@
-                if TARGET != TARGET_GEN
+        if ..UNDEF BLS_NBDA
+        if TARGET != TARGET_GEN
                 org     $FFFDBE
                 ds      $1F8                    ; Final code place
-                else
+        else
                 org     $FFFFB6                 ; On the genesis, code stays in ROM
-                endif
+        endif
 
 bda_pkt_header  ds      4                       ; Space reserved for communication
 
@@ -35,6 +36,6 @@ bda_cpu_state_end
 
                 ; Ensure that this code is placed at the end of main RAM
                 assert  (bda_cpu_state_end & $FFFFFF) == 0
-
+        ENDIF
 
 ; vim: ts=8 sw=8 sts=8 et

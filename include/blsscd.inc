@@ -149,6 +149,5 @@ GA_TVADDR       set     GATE_ARRAY + $66        ; Trace vector address
 GA_SCADDR       set     GATE_ARRAY + $68        ; Subcode address
 
                 include blsscd_macros.inc
-                include blsscd_routines.inc
 
 ; vim: ts=8 sw=8 sts=8 et

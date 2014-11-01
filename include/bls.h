@@ -3,12 +3,25 @@
 #ifndef BLS_H
 #define BLS_H
 
+// Flag dependencies
+#ifdef BLS_NDEBUG
+#ifndef BLS_NBDA
+#define BLS_NBDA
+#endif
+#ifndef BLS_NBEH
+#define BLS_NBEH
+#endif
+#endif
+
+
+// Types
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 
-#define EXTERN_CONST(name) extern void *name;
-#define EXTERN_DEF(type, name) ((type)(u32)&name)
+// Access to extern values
+#define EXTERN_CONST(name) extern void *name; // Extern value declaration
+#define EXTERN_DEF(type, name) ((type)(u32)&name) // Extern value access
 
 // Bus constants
 #define BUS_NONE 0
@@ -260,10 +273,14 @@ static inline void blscopy_inline(void *dest, const void *src, u32 length)
 
 #endif // BUS_MAIN
 
+#if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+#include "blsscd.h"
+#endif
+
 #include "bls_routines.h"
 
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
-#include "blsscd.h"
+#include "blsscd_routines.h"
 #endif
 
 #include "bls_vdp.h"

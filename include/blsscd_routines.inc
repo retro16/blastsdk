@@ -156,6 +156,10 @@ HAS_WRAM_2M     macro
                 endm
 
         if BUS == BUS_SUB
+WAIT_SWAPREQ_1M macro
+                loopuntil btst #GA_DMNA_BIT, GA_MM + 1
+                endm
+
 SWAP_WRAM_1M    macro
                 bchg    #GA_RET_BIT, GA_MM + 1
                 loopwhile btst #GA_DMNA_BIT, GA_MM + 1
@@ -221,7 +225,7 @@ BLSLOAD_WAIT_READ macro
         if TARGET == TARGET_SCD1
 
                 ; Wait until swap finished
-                loopuntil btst #GA_DMNA_BIT, GA_MM + 1
+                loopwhile btst #GA_DMNA_BIT, GA_MM + 1
 
         else
                 assert  TARGET == TARGET_SCD2
@@ -231,6 +235,9 @@ BLSLOAD_WAIT_READ macro
 
         endif
                 bclr    #BLSCDR_BIT, GA_COMMFLAGS_MAIN
+                nop
+                nop
+                nop
                 endm
         
 
@@ -254,5 +261,26 @@ BLSLOAD_READ_CD macro sector, count
                 endm
 
         endif   ; BUS == BUS_MAIN
+
+        if BUS == BUS_SUB
+
+SET_WRAM_MODE   macro mode
+         if mode == 1
+                bset #GA_MODE_BIT, GA_MM + 1
+                SWAP_WRAM_1M
+         else
+                bclr #GA_MODE_BIT, GA_MM + 1
+         endif
+        endm
+
+SET_WRAM_DEFAULT_MODE macro
+         if TARGET == TARGET_SCD1
+                SET_WRAM_MODE 1
+         elsif TARGET == TARGET_SCD2
+                SET_WRAM_MODE 2
+         endif
+        endm
+
+        endif   ; BUS == BUS_SUB
 
 ; vim: ts=8 sw=8 sts=8 et

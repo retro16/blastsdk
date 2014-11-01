@@ -51,7 +51,7 @@ void DISPLAY_TEXT()
   // Clear the screen after last line if needed
   while(lineaddr < vram_plane_a + vram_plane_a_size) {
     *VDPCTRL_L = VDPCMD(VDPWRITE, VDPVRAM, lineaddr);
-    for(remaining = 0, remaining < linelen; ++remaining) {
+    for(remaining = 0; remaining < 0x40; ++remaining) {
       *VDPDATA = (u16)' ';
     }
     lineaddr += 0x80;

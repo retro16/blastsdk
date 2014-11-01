@@ -171,6 +171,8 @@ typedef struct output {
   BLSLL(group) *bol; // Build order list
   BLSLL(group) *sol; // Section order lost
   BLSLL(group) *binaries; // Binaries to put in the image (in order)
+
+  BLSLL(symbol) *globals; // Global constants
 } output;
 output *output_new();
 void output_free(output *output);

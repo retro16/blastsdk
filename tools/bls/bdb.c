@@ -958,6 +958,19 @@ void on_line_input(char *line)
       continue;
     }
 
+    if(strcmp(token, "jsr") == 0) {
+      // Call a subroutine
+      u32 address = parse_address_skip(&l);
+      u32 sp = readreg(cpu, REG_SP) - 4; // Pre-decrement
+      u32 pc = readreg(cpu, REG_PC);
+      setreg(cpu, REG_SP, sp);
+      writelong(cpu, sp, pc);
+      setreg(cpu, REG_PC, address);
+      showreg(cpu);
+      d68k_instr(cpu);
+      continue;
+    }
+
     if(strcmp(token, "boot") == 0) {
       parse_word(token, &l);
       boot_img(token);

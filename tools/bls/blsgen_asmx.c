@@ -349,10 +349,19 @@ const char *gen_load_defines_asmx()
     exit(1);
   }
 
+  BLSLL(symbol) *syml;
+  symbol *sym;
   BLSLL(section) *secl;
   section *sec;
   BLSLL(group) *binl;
   group *bin;
+
+  FILE *defout = fopen(BUILDDIR"/_blsgen_defines.asm", "w");
+  syml = mainout.globals;
+  BLSLL_FOREACH(sym, syml) {
+    fprintf(defout, "%s\tSET\t$%08X\n", sym->name, (u32)sym->value.addr);
+  }
+  fclose(defout);
 
   binl = binaries;
   BLSLL_FOREACH(bin, binl) {
@@ -425,7 +434,7 @@ void source_get_symbols_asmx(group *s)
     org = chip2bank(sec->symbol->value, &s->banks);
   }
 
-  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i bls.inc -i %s -d CHIP:=%d -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l " BUILDDIR "/%s.lst -o /dev/null %s", (unsigned int)org, include_prefixes, defs, sec->symbol->value.chip, s->banks.bus, maintarget, maintarget, s->name, srcname);
+  snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e -1 %s -i "BUILDDIR"/_blsgen_defines.asm -i bls.inc -i %s -d CHIP:=%d -d BUS:=%d -d SCD:=%d -d TARGET:=%d -l " BUILDDIR "/%s.lst -o /dev/null %s", (unsigned int)org, include_prefixes, defs, sec->symbol->value.chip, s->banks.bus, maintarget, maintarget, s->name, srcname);
 printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
 system(cmdline);
 snprintf(cmdline, 4096, "cp "BUILDDIR"/%s.lst "BUILDDIR"/%s.lst.1", s->name, s->name);
@@ -449,9 +458,12 @@ exit(1);
 }
 
 section *sec = section_find_ext(s->name, ".bin");
+if(sec->symbol->value.addr == -1 || sec->size == 0) {
+  return;
+}
 sv org = chip2bank(sec->symbol->value, &s->banks);
 
-snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i bls.inc -i %s -d CHIP:=%d -d BUS:=%d -d SCD:=%d -d TARGET:=%d -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org, include_prefixes, defs, sec->symbol->value.chip, s->banks.bus, maintarget, maintarget, s->name, s->name, s->name, srcname);
+snprintf(cmdline, 4096, "asmx -C 68000 -b 0x%06X -w -e %s -i "BUILDDIR"/_blsgen_defines.asm -i bls.inc -i %s -d CHIP:=%d -d BUS:=%d -d SCD:=%d -d TARGET:=%d -i "BUILDDIR"/%s.sym -l "BUILDDIR"/%s.lst -o "BUILDDIR"/%s.bin %s", (unsigned int)org, include_prefixes, defs, sec->symbol->value.chip, s->banks.bus, maintarget, maintarget, s->name, s->name, s->name, srcname);
 printf("\n\nSecond pass compilation of %s :\n%s\n", s->name, cmdline);
 system(cmdline);
 

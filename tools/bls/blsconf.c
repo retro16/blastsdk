@@ -242,6 +242,23 @@ void output_parse(const mdconfnode *n, const char *name)
     group *g = binary_parse(NULL, name);
     mainout.binaries = blsll_insert_group(mainout.binaries, g);
   }
+
+  for(ni = n; (ni = mdconfsearch(ni, "global")); ni = ni->next) {
+    const char *g = ni->value;
+    const char *sep = strchr(g, '=');
+
+    char name[256];
+    parse_sym(name, &g);
+    u32 value = sep ? parse_int(sep + 1) : 1; // If no value, set to 1
+
+    mainout.globals = blsll_create_symbol(mainout.globals);
+    symbol *s = mainout.globals->data;
+    s->name = strdup(name);
+    s->value.addr = value;
+    s->value.chip = chip_none;
+
+    printf("Global constant %s=0x%08X\n", s->name, (u32)s->value.addr);
+  }
 }
 
 void blsconf_load(const char *file)

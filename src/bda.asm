@@ -1,3 +1,4 @@
+        if ..UNDEF BLS_NBDA
         if BUS == BUS_MAIN
 
 BDA_NEUTRALDATA set     (CTH|CTL|CUP|CDOWN|CLEFT|CRIGHT)
@@ -493,5 +494,7 @@ BUS     set BUS_MAIN
         endif   ; TARGET == TARGET_SCD1/2
 
         endif   ; BUS == BUS_MAIN
+
+        endif   ; ..UNDEF BLS_NBDA
 
 ; vim: ts=8 sw=8 sts=8 et

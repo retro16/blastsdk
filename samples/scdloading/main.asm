@@ -1,6 +1,7 @@
                 include bls_init.inc
                 include bls_vdp.inc
                 include bdp.inc
+                include sub_idle.inc
 
 MAIN
 IP_MAIN
@@ -8,8 +9,8 @@ IP_MAIN
                 bls_init_vdp 0, 1, 64, 32, BLAST_SPLASH_PNG_MAP, 0, PLANE_B, SPRAT, HSCROLL_TABLE, 0, 0, 0, 0, 0, 0, 0
 
                 bls_enable_interrupts
-                SYNC_MAIN_SUB
-
+                sub_idle_init
+ trap #7
                 BLSLOAD_BINARY_BLAST_SPLASH
 
                 DELAY_MILLIS 3000
@@ -20,8 +21,7 @@ IP_MAIN
 
 INT_VBLANK
                 movem.l d0/d1/a0/a1, -(sp)
-                SUB_INTERRUPT
-                bdp_sub_check
+                sub_idle_vsync
                 movem.l (sp)+, d0/d1/a0/a1
                 rte
 

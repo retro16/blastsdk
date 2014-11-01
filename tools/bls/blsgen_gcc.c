@@ -352,10 +352,19 @@ const char *gen_load_defines()
     exit(1);
   }
 
+  BLSLL(symbol) *syml;
+  symbol *sym;
   BLSLL(section) *secl;
   section *sec;
   BLSLL(group) *binl;
   group *bin;
+
+  FILE *defout = fopen(BUILDDIR"/_blsgen_defines.h", "w");
+  syml = mainout.globals;
+  BLSLL_FOREACH(sym, syml) {
+    fprintf(defout, "#define %s 0x%08X\n", sym->name, (u32)sym->value.addr);
+  }
+  fclose(defout);
 
   binl = binaries;
   BLSLL_FOREACH(bin, binl) {
@@ -390,7 +399,7 @@ const char *gen_load_defines()
         BLSLL_FOREACH(sec,secl) {
           // Load from CD
           sv addr = chip2bank(sec->symbol->value, &sec->source->banks);
-          fprintf(out, "blsload_read_cd(0x%08X, 0x%08X);\n", (unsigned int)addr, (unsigned int)sec->size);
+          fprintf(out, "blsload_read_cd(0x%08X, 0x%04X);\n", (unsigned int)addr, (unsigned int)sec->size);
         }
       }
     } else {
@@ -494,7 +503,7 @@ void source_get_symbols_gcc(group *s)
   if(is_asm(s)) {
     snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, srcname, object);
   } else {
-    snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->banks.bus, maintarget, defs, srcname, object);
+    snprintf(cmdline, 4096, "%s %s %s -DBUS=%d -DTARGET=%d -include "BUILDDIR"/_blsgen_defines.h -include bls.h -include %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, cflags, s->banks.bus, maintarget, defs, srcname, object);
   }
 
   printf("First pass compilation of %s :\n%s\n", s->name, cmdline);
@@ -531,7 +540,7 @@ void source_get_symbol_values_gcc(group *s)
   if(is_asm(s)) {
     snprintf(cmdline, 1024, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->banks.bus, maintarget, srcname, object);
   } else {
-    snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, defs, cflags, srcname, object);
+    snprintf(cmdline, 1024, "%s %s -DBUS=%d -DTARGET=%d -include "BUILDDIR"/_blsgen_defines.h -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, defs, cflags, srcname, object);
   }
 
   printf("Compile %s with load defines :\n%s\n", s->name, cmdline);
@@ -574,7 +583,7 @@ void source_compile_gcc(group *s)
   if(is_asm(s)) {
     snprintf(cmdline, 4096, "%s -DBUS=%d -DTARGET=%d -mcpu=68000 -c %s -o %s", compiler, s->banks.bus, maintarget, srcname, object);
   } else {
-    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, defs, cflags, srcname, object);
+    snprintf(cmdline, 4096, "%s %s -DBUS=%d -DTARGET=%d -include "BUILDDIR"/_blsgen_defines.h -include bls.h -include %s %s -mcpu=68000 -c %s -o %s", compiler, include_prefixes, s->banks.bus, maintarget, defs, cflags, srcname, object);
   }
 
   printf("Final compilation of %s :\n%s\n", s->name, cmdline);

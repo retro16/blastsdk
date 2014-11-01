@@ -1,7 +1,7 @@
 #ifndef BEH_H
 #define BEH_H
 
-#if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+#if (TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2) && !defined(BLS_NBEH)
 extern void BEH_INIT_SCD_VECTORS();
 static inline void beh_init() { BEH_INIT_SCD_VECTORS(); }
 #else

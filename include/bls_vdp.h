@@ -126,7 +126,7 @@ static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 
   u32 srcval = (u32)src;
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
-  if((src & 0x00F00000) == 0x00200000) {
+  if(((u32)src & 0x00F00000) == 0x00200000) {
     // WRAM DMA Workaround
     srcval += 2;
   }
@@ -143,7 +143,7 @@ static inline void blsvdp_dma_inline(u32 target, u16 dest, const void *src, u16 
 
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
 
-  if((src & 0x00F00000) == 0x00200000) {
+  if(((u32)src & 0x00F00000) == 0x00200000) {
     // WRAM DMA Workaround
     *VDPCTRL_L = VDPCMD(VDPWRITE, target, dest);
     *VDPDATA = *((const u16 *)src);

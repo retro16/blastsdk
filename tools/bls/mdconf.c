@@ -88,6 +88,7 @@ static int mdconfistoken(char c)
     || c == '/'
     || c == '\\'
     || c == ':'
+    || c == '='
     || c == '*'
     || c == '?'
     || c == '$'

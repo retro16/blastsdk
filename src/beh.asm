@@ -1,3 +1,4 @@
+        if ..UNDEF BLS_NBEH
                 if TARGET == TARGET_GEN
 int_buserr      move.w  #$0008, -(a7)
                 bra.b   beh_display_exception
@@ -183,5 +184,7 @@ beh_font
                 hex     7E222838 28227E00
                 hex     7E222838 28207000
 beh_font_end
+
+        endif   ; ..UNDEF BLS_NBEH
 
 ; vim: ts=8 sw=8 sts=8 et

@@ -1,6 +1,16 @@
 ; Main include for Blast ! SDK
 ; It is automatically included by blsgen
 
+; Flag dependencies
+        if ..DEF BLS_NDEBUG
+        if ..UNDEF BLS_NBDA
+BLS_NBDA set    1
+        endif
+        if ..UNDEF BLS_NBEH
+BLS_NBEH set    1
+        endif
+        endif
+
             if ..UNDEF BLS_VERSION
 BLS_VERSION set 1
 
@@ -174,13 +184,16 @@ INTV_TRAP15     set     $BC
                 include bls_vdp.inc
         endif
 
-                include bls_macros.inc
-                include bls_routines.inc
-
         if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
                 include blsscd.inc
         endif
 
+                include bls_macros.inc
+                include bls_routines.inc
+
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+                include blsscd_routines.inc
         endif
+
 
 ; vim: ts=8 sw=8 sts=8 et

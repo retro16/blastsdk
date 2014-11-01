@@ -275,4 +275,6 @@ DELAY_MILLIS macro millis
     endif
         endm
 
+        endif
+
 ; vim: ts=8 sw=8 sts=8 et

@@ -54,7 +54,7 @@ static inline void bls_setintvector(bls_int_vector vector, bls_int_callback targ
 #if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
   if(vector == INTV_HBLANK) {
     // Special case for hblank on the sega CD
-    *GA_HINT = (u16)target;
+    *GA_HINT = (u16)(u32)target;
     return;
   }
 #endif
