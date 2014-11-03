@@ -23,6 +23,10 @@ BLS_INIT
 
                 move.b	#CSEL, CCTRL1		; Enable CSEL for gamepad 1
 
+        if TARGET == TARGET_SCD1 || TARGET == TARGET_SCD2
+                clr.b   GA_COMMFLAGS_MAIN
+        endif
+
                 bda_init                        ; Init BDA
                 beh_init                        ; Init BEH
 

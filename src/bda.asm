@@ -20,10 +20,11 @@ bda_init                                        ; Call at console initialization
                 move.b  #$00, GA_MM
 
                 ; Get sub CPU BUSREQ
-                move.w  #GA_BUSREQ|GA_NORESET, GA_RH
+                moveq   #GA_BUSREQ|GA_NORESET, d1
+                move.w  d1, GA_RH
 .waitbus
                 move.b  GA_RH + 1, d0
-                cmpi.b  #GA_BUSREQ|GA_NORESET, d0
+                cmp.b   d1, d0
                 bne.b   .waitbus
 
                 ; Copy sub CPU monitor to sub CPU RAM

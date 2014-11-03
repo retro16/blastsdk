@@ -236,29 +236,28 @@ VDPWRITEL       macro   value
         endif
                 endm
 
-VDPSETREADVAR   macro   reg, ram        ; Setup VDP to read from address (reg.w) of specified ram
-                move.w  reg, -(a7)      ; Store register
+VDPSETREADVAR   macro   reg, ram        ; Setup VDP to read from address (reg.w) of specified ram. Alters d0.
+                move.w  reg, d0         ; Store register
                 ; Compute first half of the command
-                andi.w  #$3FFF, reg
-                ori.w   #(ram >> 16) & $7FFF, reg
+                andi.w  #$3FFF, d0
+                ori.w   #(ram >> 16) & $7FFF, d0
                 ; Send first half
         if _VDPREG
-                move.w  reg, (a5)
+                move.w  d0, (a5)
         else
-                move.w  reg, VDPCTRL
+                move.w  d0, VDPCTRL
         endif
-                move.w  (a7), reg       ; Recall register
+                move.w  reg, d0         ; Recall register
                 ; Compute second half of the command
-                rol.w   #2, reg         ; Place 2 MSB at the 2 LSB
-                andi.w  #$0003, reg
-                ori.w   #(ram | ((ram >> 26) & $20)) & $FFFF, reg
+                rol.w   #2, d0          ; Place 2 MSB at the 2 LSB
+                andi.w  #$0003, d0
+                ori.w   #(ram | ((ram >> 26) & $20)) & $FFFF, d0
                 ; Send second half
         if _VDPREG
-                move.w  reg, (a5)
+                move.w  d0, (a5)
         else
-                move.w  reg, VDPCTRL
+                move.w  d0, VDPCTRL
         endif
-                move.w  (a7)+, reg      ; Restore register
                 endm
 
 VDPSETWRITEVAR  macro   reg, ram        ; Setup VDP to write to address (reg.w) of specified ram. Alters d0.

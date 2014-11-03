@@ -95,8 +95,8 @@ Output monitor
 
  - name **Monitor**
  - file scdloading_eu.iso
- - region E
- - target scd1
+ - region U
+ - target scd2
  - binaries main
  - include sub_idle.md
 

@@ -1937,6 +1937,16 @@ void bls_build_cd_image()
     spinit = spmain;
   }
 
+  sv spextra = symbol_get_bus("SP_EXTRA", bus_sub);
+
+  if(spextra == -1) {
+    spextra = symbol_get_bus("sp_extra", bus_sub);
+  }
+
+  if(spextra == -1) {
+    spextra = spinit;
+  }
+
   sv spl2 = symbol_get_bus("SUB_HWINT_LEVEL2", bus_sub);
 
   if(spl2 == -1) {
@@ -1962,6 +1972,7 @@ void bls_build_cd_image()
   fputword(spinit - 0x6020, f);
   fputword(spmain - 0x6020, f);
   fputword(spl2 == -1 ? 0 : spl2 - 0x6020, f);
+  fputword(spextra - 0x6020, f);
   fputword(0, f);
 
   // 0x28 : End of SP header (SPHEADERSIZE)

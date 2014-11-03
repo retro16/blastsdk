@@ -6,17 +6,15 @@
 MAIN
 IP_MAIN
                 bls_init 0, INT_VBLANK
+                sub_idle_init
                 bls_init_vdp 0, 1, 64, 32, BLAST_SPLASH_PNG_MAP, 0, PLANE_B, SPRAT, HSCROLL_TABLE, 0, 0, 0, 0, 0, 0, 0
 
-                bls_enable_interrupts
-                sub_idle_init
- trap #7
                 BLSLOAD_BINARY_BLAST_SPLASH
 
-                DELAY_MILLIS 3000
+                delay_millis 3000
 
                 BLSLOAD_BINARY_TEXT
-                CCALL DISPLAY_TEXT
+                ccall display_text
 .1 bra.b .1
 
 INT_VBLANK

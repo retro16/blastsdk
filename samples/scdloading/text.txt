@@ -1,4 +1,13 @@
-Blast ! SDK CD-ROM loading example.
+
+
+    ____  __    ___   ___________   __
+   / __ )/ /   /   | / ___/_  __/  / /
+  / __  / /   / /| | \__ \ / /    / / 
+ / /_/ / /___/ __  |___/ // /    /_/  
+/_____/_____/_/  |_|____//_/    (_)   
+
+   Blast SDK CD-ROM loading example.
+
 
 This example shows how to load binaries
 and use them in a program.
@@ -8,3 +17,4 @@ and rendered in real time.
 
 See samples/scdloading/blsgen.md for
 more details on how this works.
+

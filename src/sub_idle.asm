@@ -5,13 +5,12 @@
                 include bdp_sub.inc
 
 SP_INIT
+                clr.b   GA_COMMFLAGS_SUB
                 set_wram_default_mode
                 sync_main_sub
                 rts
 
 SP_MAIN
-                sub_int_enable
-
 .1              
                 bra.b   .1                      ; Endless loop
 

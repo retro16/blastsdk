@@ -41,7 +41,7 @@
 #define MAXCARTSIZE 0x400000
 #define CDHEADERSIZE 0x200 // Size of CD
 #define SECCODESIZE 0x584 // Size of security code
-#define SPHEADERSIZE 0x28 // Size of SP header
+#define SPHEADERSIZE 0x2A // Size of SP header
 #define IPOFFSET (SECCODESIZE + 6) // chip address of IP binary in RAM
 #define SPOFFSET (0x6000 + SPHEADERSIZE) // chip address of SP binary in PRAM
 #define CDBLOCKSIZE 2048 // ISO block size

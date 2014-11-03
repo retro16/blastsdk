@@ -10,19 +10,23 @@ MAIN
 
                 VDPSETADDRREG                   ; Access VDP through a4/a5
 
-		VDPDMASEND FONT_PNG_IMG, 0, FONT_PNG_IMG_SIZE/2, VRAM ; Upload font tiles
+		VDPDMASEND FONT_PNG_IMG, 0, FONT_PNG_IMG_SIZE, VRAM ; Upload font tiles
 
 		VDPSETWRITE 0, CRAM
-		move.l	#$00000AAA, (a4)	; Set background to black and text to grey
+		move.l	#$000008AA, (a4)	; Set background and text color
+		VDPSETWRITE 66, CRAM		; Point at palette 3, index 1
+                move.w  #$0EC8, (a4)            ; Set odd column text color
+		VDPSETWRITE 98, CRAM		; Point at palette 4, index 1
+                move.w  #$0EEC, (a4)            ; Set highlighted odd column text color
 		VDPSETWRITE 34, CRAM		; Point at palette 2, index 1
-		move.w	#$00E0, (a4)		; Set highlighted text color
+		move.w	#$04E8, (a4)	        ; Set highlighted text color
 
 		; Initialize RAM values
 		move.l	#$FF0000, dumpscroll
 		move.l	#$FF0000, addr
 		move.l	#$00000000, value
-		move.w	#0, cursor
 		move.b	#1, mode
+		move.w	#0, cursor
 
                 BLS_INIT_VDP 0, 1, 64, 32, PLANE_A_DEF, 0, PLANE_B_DEF, SPRAT_DEF, HSCROLL_TABLE_DEF, VDPHSCRSCROLL, VDPVSCRSCROLL, 0, 0, VDPWIN_TOPLEFT, 0, 0
 
@@ -67,13 +71,13 @@ printline
 		dbra	d0, .1
 
 hilight_cursor
-		move.w  #PLANE_A_DEF, d0
-		move.b  cursor+1, d0	; Character number to d0
-		addq	#8, d0
-		VDPSETREADVAR d0, VRAM	; Read from VRAM at highlighted character
+		move.w  #PLANE_A_DEF, d2
+		move.b  cursor+1, d2	; Character number to d2
+		addq	#8, d2
+		VDPSETREADVAR d2, VRAM	; Read from VRAM at highlighted character
 		move.w	(a4), d1	; Read character
 		ori.w	#$2000, d1	; Set palette 1
-		VDPSETWRITEVAR d0, VRAM	; Write to VRAM at highlighted character
+		VDPSETWRITEVAR d2, VRAM	; Write to VRAM at highlighted character
 		move.w	d1, (a4)	; Replace highlighted character
 dump_ram
 		move.l	dumpscroll, a0
@@ -81,14 +85,15 @@ dump_ram
 		moveq	#26, d6		; Line count
 
 .1		VDPSETWRITEVAR d4, VRAM
-		move.w	#0, (a4)	; Print spaces on the left
-		move.w	#0, (a4)	;
 		bsr.b	printaddr	; Print address on the first column
+                move.w  #0, (a4)        ; Separate address and data with a space
 
-		moveq	#5, d5		; Words per line
-.2		move.w	#0, (a4)	; Separate value with a space
-		move.w	(a0)+, d0	; Dump one RAM word
-		bsr.b	printword	; Display data on screen
+		moveq	#3, d5		; Longs per line
+.2              cmpi.w  #1, d5          ; Leave a space column at the center of the screen
+                bne.b   .3
+  		move.w	#0, (a4)	; Separate value with a space
+.3		move.l	(a0)+, d0	; Dump one RAM word
+		bsr.b	printlong	; Display data on screen
 		dbra	d5, .2
 
 		move.w	#0, (a4)	; Print spaces on the right
@@ -98,6 +103,8 @@ dump_ram
 		dbra	d6, .1
 		rts
 
+byteattr        dw      0               ; Byte display attribute
+
 ; Print the byte in d0 as hexadecimal
 ; Destroys d0-d1
 printbyte
@@ -105,9 +112,11 @@ printbyte
 		lsr.b	#4, d1
 		andi.w	#$000F, d1
 		addq.b	#1, d1
+                or.w    byteattr, d1
 		move.w	d1, (a4)
 		andi.w	#$000F, d0
 		addq.b	#1, d0
+                or.w    byteattr, d0
 		move.w	d0, (a4)
 		rts
 
@@ -130,9 +139,11 @@ printaddr
 
 ; Print the long word in d0
 printlong
+                move.w  #$4000, byteattr
 		movem.l	d0, -(a7)
 		movem.w	(a7)+, d0
 		bsr.b	printword
+                clr.w   byteattr
 		movem.w	(a7)+, d0
 		bra.b	printword
 
@@ -190,19 +201,19 @@ processinput
 		; Start pressed : scroll view
 		btst	#CUP_BIT, d0
 		bne.b	.noup
-		subi.l	#12, dumpscroll		; Scroll one line up
+		subi.l	#16, dumpscroll		; Scroll one line up
 
 .noup		btst	#CDOWN_BIT, d0
 		bne.b	.nodown
-		addi.l	#12, dumpscroll		; Scroll one line down
+		addi.l	#16, dumpscroll		; Scroll one line down
 
 .nodown		btst	#CLEFT_BIT, d0
 		bne.b	.noleft
-		subi.l	#(12*27), dumpscroll	; Scroll one page up
+		subi.l	#(16*27), dumpscroll	; Scroll one page up
 
 .noleft		btst	#CRIGHT_BIT, d0
 		bne.b	int_vblank_end
-		addi.l	#(12*27), dumpscroll	; Scroll one page down
+		addi.l	#(16*27), dumpscroll	; Scroll one page down
 
 		bra.b	int_vblank_end
 
