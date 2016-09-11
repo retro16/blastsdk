@@ -199,7 +199,7 @@ CDCTRN
 .unaligned
                 move.w  #$7FF, d0
 .trn_copy_byte
-                move.l  (a1)+, (a0)+
+                move.b  (a1)+, (a0)+
                 dbra    d0, .trn_copy_byte
 
                 ; Restore damaged registers except a0 and write header
