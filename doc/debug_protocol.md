@@ -368,9 +368,9 @@ Simulated BIOS calls :
 
 **ROMREAD / ROMREADN / ROMREADE**
 
-The BIOS sends the sector number over BDP. Example requesting sector $140221 :
+The BIOS sends the sector number over BDP. Example requesting sector $040221 :
 
-    03 14 02 21
+    03 04 02 21
 
 BDB will seek the file descriptor at the correct offset.
 
