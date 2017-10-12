@@ -1,65 +1,76 @@
 #ifndef BDP_H
 #define BDP_H
 
-typedef void (*unknown_handler_ptr)(const u8 inp[36], int inpl);
-typedef void (*breakpoint_handler_ptr)(int cpu, u32 address);
-typedef void (*exception_handler_ptr)(int cpu, int ex);
+// Public interface of BDP
+struct bdp {
+  // File descriptor
+  // Call readfd(struct bdp *bdp) to flush data from the file descriptor.
+  int fd;
 
-extern int genfd; // Genesis file descriptor
+  // Callback opaque identifier
+  void *callback_value;
 
-// Device access
-extern void open_debugger(const char *path, unknown_handler_ptr on_unknown, breakpoint_handler_ptr on_breakpoint, exception_handler_ptr on_exception);
-extern void close_debugger();
-extern void bdp_set_dump(int newdump);
-extern void bdp_readdata();
-extern void bdp_readbuffer();
-extern int bridgequery(u8 *data);
-extern void update_bda_sub(const u8 *image, int imgsize);
+  // Device access
+  void (*readfd)(struct bdp *bdp); // Read from the file descriptor
+  void (*close)(struct bdp *bdp); // Release all resources
+  void (*set_dump)(struct bdp *bdp, int newdump);
 
-// Memory read
-extern void readmem(int cpu, u8 *target, u32 address, u32 length);
-extern void readwram(int mode, const u8 *source, u32 length); // Mode : 0 = 2M, 1 = 1M bank 0, 2 = 1M bank 1
-extern void readvram(u8 *target, u32 address, u32 length);
+  // Memory read (uses bulk download)
+  void (*readmem)(struct bdp *bdp, int cpu, u8 *target, u32 address, u32 length);
+  void (*readwram)(struct bdp *bdp, int mode, const u8 *source, u32 length); // Mode : 0 = 2M, 1 = 1M bank 0, 2 = 1M bank 1
+  void (*readvram)(struct bdp *bdp, u8 *target, u32 address, u32 length); // Will alter VDP state on real hardware
 
-// Memory write
-extern void writemem(int cpu, u32 address, const u8 *source, u32 length);
-extern void writemem_verify(int cpu, u32 address, const u8 *source, u32 length);
-extern void sendfile(int cpu, const char *filename, u32 address);
-extern void writewram(int mode, u32 address, const u8 *source, u32 length);
-extern void writevram(u32 address, const u8 *source, u32 length);
+  // Memory write (uses bulk upload)
+  void (*writemem)(struct bdp *bdp, int cpu, u32 address, const u8 *source, u32 length);
+  void (*writemem_verify)(struct bdp *bdp, int cpu, u32 address, const u8 *source, u32 length);
+  void (*sendfile)(struct bdp *bdp, int cpu, const char *filename, u32 address);
+  void (*writewram)(struct bdp *bdp, int mode, u32 address, const u8 *source, u32 length);
+  void (*writevram)(struct bdp *bdp, u32 address, const u8 *source, u32 length); // Will alter VDP state on real hardware
 
-// Bus access
-extern u32 readlong(int cpu, u32 address);
-extern u32 readword(int cpu, u32 address);
-extern u32 readbyte(int cpu, u32 address);
-extern void writebyte(int cpu, u32 address, u32 b);
-extern void writeword(int cpu, u32 address, u32 w);
-extern void writelong(int cpu, u32 address, u32 l);
+  // Bus access
+  u32 (*readlong)(struct bdp *bdp, int cpu, u32 address);
+  u32 (*readword)(struct bdp *bdp, int cpu, u32 address);
+  u32 (*readbyte)(struct bdp *bdp, int cpu, u32 address);
+  void (*writebyte)(struct bdp *bdp, int cpu, u32 address, u32 b);
+  void (*writeword)(struct bdp *bdp, int cpu, u32 address, u32 w);
+  void (*writelong)(struct bdp *bdp, int cpu, u32 address, u32 l);
 
-// CPU access
-extern void subfreeze();
-extern void dbgstatus(); // To be removed
-extern u32 readreg(int cpu, int reg); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
-extern void readregs(int cpu, u32 *regs); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
-extern void setreg(int cpu, int reg, u32 value);
-extern void setregs(int cpu, u32 *regs);
-extern void startcpu(int cpu); // Enter run mode
-extern void stopcpu(int cpu); // Enter monitor mode
-extern void stepcpu(int cpu); // Execute only one instruction
-extern void reach_breakpoint(int cpu); // Run until a breakpoint is reached
-extern void resetcpu(int cpu);
-extern int is_running(int cpu);
+  // CPU access
+  void (*subfreeze)(struct bdp *bdp);
+  u32 (*readreg)(struct bdp *bdp, int cpu, int reg); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
+  void (*readregs)(struct bdp *bdp, int cpu, u32 *regs); // 0-7 = D0-D7, 8-15 = A0-A7, 16 = PC, 17 = SR
+  void (*setreg)(struct bdp *bdp, int cpu, int reg, u32 value);
+  void (*setregs)(struct bdp *bdp, int cpu, u32 *regs);
+  void (*startcpu)(struct bdp *bdp, int cpu); // Enter run mode
+  void (*stopcpu)(struct bdp *bdp, int cpu); // Enter monitor mode
+  void (*stepcpu)(struct bdp *bdp, int cpu); // Execute only one instruction
+  void (*reach_breakpoint)(struct bdp *bdp, int cpu); // Run until a breakpoint is reached
+  void (*resetcpu)(struct bdp *bdp, int cpu);
+  int (*is_running)(struct bdp *bdp, int cpu);
 
-// VDP access
-extern void vdpsetreg(int reg, u8 value);
+  // VDP access
+  void (*vdpsetreg)(struct bdp *bdp, int reg, u8 value);
 
-// Breakpoints
-extern void setup_breakpoints(int cpu);
-extern void cleanup_breakpoints(int cpu);
-extern void list_breakpoints(int cpu);
-extern int has_breakpoint(int cpu, u32 address);
-extern void set_breakpoint(int cpu, u32 address);
-extern int delete_breakpoint(int cpu, u32 address);
+  // Breakpoints
+  void (*setup_breakpoints)(struct bdp *bdp, int cpu);
+  void (*cleanup_breakpoints)(struct bdp *bdp, int cpu);
+  void (*list_breakpoints)(struct bdp *bdp, int cpu);
+  int (*has_breakpoint)(struct bdp *bdp, int cpu, u32 address);
+  void (*set_breakpoint)(struct bdp *bdp, int cpu, u32 address);
+  int (*delete_breakpoint)(struct bdp *bdp, int cpu, u32 address);
+};
+
+// Callbacks
+typedef void (*unknown_handler_ptr)(struct bdp *bdp, void *callback_value, const u8 inp[], int inpl);
+typedef void (*breakpoint_handler_ptr)(struct bdp *bdp, void *callback_value, int cpu, u32 address);
+typedef void (*exception_handler_ptr)(struct bdp *bdp, void *callback_value, int cpu, int ex);
+typedef void (*incoming_data_handler_ptr)(struct bdp *bdp, void *callback_value, const u8 data[], int datalen);
+
+// Initialize debugger
+// To release memory and resources, call bdp->close(bdp);
+// path can either be a serial device ("/dev/something") or a network host ("192.168.0.6" or "arduino.localdomain")
+// protocol version is sensed automatically on open
+extern struct bdp* open_debugger(const char *path, void *callback_value, unknown_handler_ptr on_unknown, breakpoint_handler_ptr on_breakpoint, exception_handler_ptr on_exception, incoming_data_handler_ptr on_incoming_data);
 
 #endif
 // vim: ts=2 sw=2 sts=2 et

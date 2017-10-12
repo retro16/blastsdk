@@ -1,6 +1,12 @@
 The Blast ! Debugger protocol v2
 ================================
 
+This page describes the protocol used to communicate between the debugger and
+a real genesis.
+
+Communication between the debugger and an emulator uses a different protocol
+described in [The Blast ! Emulator debug protocol](debug_protocol_emu.md).
+
 Electrical specification.
 -------------------------
 

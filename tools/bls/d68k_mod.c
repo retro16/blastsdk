@@ -617,7 +617,9 @@ void print_pc_offset(int offset)
 void print_rl(u32 list)
 {
   if(!list) {
-    ++*suspicious;
+    if(suspicious) {
+      ++*suspicious;
+    }
     TPRINTF("none");
     return;
   }
@@ -714,7 +716,9 @@ void print_ea(int mode, int reg)
 
     if(flags & 0x07) {
       TPRINTF("\t; Illegal");
-      ++*suspicious;
+      if(suspicious) {
+        ++*suspicious;
+      }
     }
 
     cycles += op->size == 4 ? 14 : 10;
@@ -775,7 +779,9 @@ void print_ea(int mode, int reg)
 
       if(flags & 0x07) {
         TPRINTF(" ; Illegal");
-        ++*suspicious;
+        if(suspicious) {
+          ++*suspicious;
+        }
       }
 
       cycles += op->size == 4 ? 14 : 10;
@@ -1119,7 +1125,9 @@ static void d68k_pass()
       TPRINTF("$%04X", opcode);
       TALIGN(40);
       TPRINTF("; Illegal opcode");
-      ++*suspicious;
+      if(suspicious) {
+        ++*suspicious;
+      }
     }
 
     TPRINTF("\n");
@@ -1141,7 +1149,9 @@ int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _ins
   startaddr = address;
   endaddr = address + size;
 
-  *suspicious = 0;
+  if(suspicious) {
+    *suspicious = 0;
+  }
 
   int errorcode;
 
@@ -1164,7 +1174,7 @@ int64_t d68k(char *_targetdata, int _tsize, const u8 *_code, int _size, int _ins
   instructions = _instructions;
   address = _address;
   labels = _labels;
-  suspicious = _suspicious;
+  suspicious = NULL;
   startaddr = address;
   endaddr = address + size;
 

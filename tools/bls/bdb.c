@@ -555,8 +555,7 @@ void d68k_instr(int cpu)
   readmem(cpu, data, address, 10);
 
   char out[256];
-  int suspicious;
-  d68k(out, 256, data, 10, 1, address, 1, 1, 1, &suspicious);
+  d68k(out, 256, data, 10, 1, address, 1, 1, 1, NULL);
   printf("(next) %s", out);
 }
 
@@ -567,8 +566,7 @@ void d68k_skip_instr(int cpu)
   readmem(cpu, data, address, 10);
 
   char out[256];
-  int suspicious;
-  address = d68k(out, 256, data, 10, 1, address, 0, 0, 0, &suspicious);
+  address = d68k(out, 256, data, 10, 1, address, 0, 0, 0, NULL);
   printf("(skip) %s", out);
   setreg(cpu, REG_PC, address);
   d68k_instr(cpu);
@@ -581,8 +579,7 @@ void d68k_next_instr(int cpu)
   readmem(cpu, data, address, 10);
 
   char out[256];
-  int suspicious;
-  u32 targetaddress = d68k(out, 256, data, 10, 1, address, 0, 0, 0, &suspicious);
+  u32 targetaddress = d68k(out, 256, data, 10, 1, address, 0, 0, 0, NULL);
 
   int hasbp = has_breakpoint(cpu, targetaddress);
   if(!hasbp) set_breakpoint(cpu, targetaddress);
@@ -920,8 +917,7 @@ void on_line_input(char *line)
       readmem(cpu, data, address, size);
 
       char out[262144];
-      int suspicious;
-      d68k(out, 262144, data, size, instructions, address, 1, 1, 1, &suspicious);
+      d68k(out, 262144, data, size, instructions, address, 1, 1, 1, NULL);
       printf("%s\n", out);
 
       continue;
@@ -1052,11 +1048,6 @@ void on_line_input(char *line)
       parse_word(token, &l);
       d68k_freesymbols();
       printf("Symbol table cleared.\n");
-      continue;
-    }
-
-    if(strcmp(token, "dbgstatus") == 0) {
-      dbgstatus();
       continue;
     }
 
